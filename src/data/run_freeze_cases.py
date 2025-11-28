@@ -4,16 +4,9 @@ from pathlib import Path  # noqa: E402
 from extremeweatherbench import cases, defaults, evaluate, inputs, metrics
 
 # make the basepath - change this to your local path
-basepath = Path.home() / "ExtremeWeatherBench" / ""
+basepath = Path.home() / "extreme-weather-bench-paper" / ""
 basepath = str(basepath) + "/"
 
-# ugly hack to load in our plotting scripts
-import sys  # noqa: E402
-
-sys.path.append(basepath + "/docs/notebooks/")
-
-
-# setup the templates to load in the data
 # setup the templates to load in the data
 
 # Forecast Examples
@@ -195,7 +188,7 @@ ewb_hres = evaluate.ExtremeWeatherBench(ewb_cases, HRES_FREEZE_EVALUATION_OBJECT
 # load in the results for all heat waves in parallel
 # this will take awhile to run if you do them all in one code box
 # if you have already saved them (from running this once), then skip this box
-parallel_config = {"backend": "loky", "n_jobs": 48}
+parallel_config = {"backend": "loky", "n_jobs": 32}
 
 fourv2_results = ewb_fourv2.run(parallel_config=parallel_config)
 gc_results = ewb_gc.run(parallel_config=parallel_config)
@@ -203,7 +196,9 @@ pang_results = ewb_pang.run(parallel_config=parallel_config)
 hres_results = ewb_hres.run(parallel_config=parallel_config)
 
 # save the results to make it more efficient
-fourv2_results.to_pickle(basepath + "docs/notebooks/figs/fourv2_freeze_results.pkl")
-gc_results.to_pickle(basepath + "docs/notebooks/figs/gc_freeze_results.pkl")
-pang_results.to_pickle(basepath + "docs/notebooks/figs/pang_freeze_results.pkl")
-hres_results.to_pickle(basepath + "docs/notebooks/figs/hres_freeze_results.pkl")
+print("saving results to pickle")
+fourv2_results.to_pickle(basepath + "saved_data/fourv2_freeze_results.pkl")
+gc_results.to_pickle(basepath + "saved_data/gc_freeze_results.pkl")
+pang_results.to_pickle(basepath + "saved_data/pang_freeze_results.pkl")
+hres_results.to_pickle(basepath + "saved_data/hres_freeze_results.pkl")
+print("results saved")

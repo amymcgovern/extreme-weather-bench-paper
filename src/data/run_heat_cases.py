@@ -188,15 +188,17 @@ ewb_hres = evaluate.ExtremeWeatherBench(ewb_cases, HRES_HEAT_EVALUATION_OBJECTS)
 # load in the results for all heat waves in parallel
 # this will take awhile to run if you do them all in one code box
 # if you have already saved them (from running this once), then skip this box
-parallel_config = {"backend": "loky", "n_jobs": 24}
+parallel_config = {"backend": "loky", "n_jobs": 32}
 
 fourv2_results = ewb_fourv2.run(parallel_config=parallel_config)
 gc_results = ewb_gc.run(parallel_config=parallel_config)
 pang_results = ewb_pang.run(parallel_config=parallel_config)
 hres_results = ewb_hres.run(parallel_config=parallel_config)
 
+print("saving results to pickle")
 # save the results to make it more efficient
-fourv2_results.to_pickle(basepath + "docs/notebooks/figs/fourv2_heat_results.pkl")
-gc_results.to_pickle(basepath + "docs/notebooks/figs/gc_heat_results.pkl")
-pang_results.to_pickle(basepath + "docs/notebooks/figs/pang_heat_results.pkl")
-hres_results.to_pickle(basepath + "docs/notebooks/figs/hres_heat_results.pkl")
+fourv2_results.to_pickle(basepath + "saved_data/fourv2_heat_results.pkl")
+gc_results.to_pickle(basepath + "saved_data/gc_heat_results.pkl")
+pang_results.to_pickle(basepath + "saved_data/pang_heat_results.pkl")
+hres_results.to_pickle(basepath + "saved_data/hres_heat_results.pkl")
+print("results saved")
