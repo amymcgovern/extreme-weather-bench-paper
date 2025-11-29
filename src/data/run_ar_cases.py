@@ -5,19 +5,44 @@ from pathlib import Path
 from extremeweatherbench import cases, defaults, derived, evaluate, inputs, metrics
 
 # make the basepath - change this to your local path
-basepath = Path.home() / "ExtremeWeatherBench" / ""
+basepath = Path.home() / "extreme-weather-bench-paper" / ""
 basepath = str(basepath) + "/"
 
-# ugly hack to load in our plotting scripts
-import sys  # noqa: E402
+import numpy as np
+import xarray as xr
 
-sys.path.append(basepath + "/docs/notebooks/")
-
-
-# setup the templates to load in the data
 # setup the templates to load in the data
 
 # Forecast Examples
+
+
+# Preprocess function for CIRA data using Brightband kerchunk parquets
+def _preprocess_bb_ar_cira_forecast_dataset(ds: xr.Dataset) -> xr.Dataset:
+    """An example preprocess function that renames the time coordinate to lead_time,
+    creates a valid_time coordinate, and sets the lead time range and resolution not
+    present in the original dataset.
+
+    Args:
+        ds: The forecast dataset to rename.
+
+    Returns:
+        The renamed forecast dataset.
+    """
+    ds = ds.rename({"time": "lead_time"})
+
+    # The evaluation configuration is used to set the lead time range and resolution.
+    ds["lead_time"] = np.array(
+        [i for i in range(0, 241, 6)], dtype="timedelta64[h]"
+    ).astype("timedelta64[ns]")
+    if "q" not in ds.variables:
+        # Calculate specific humidity from relative humidity and air temperature
+        ds["specific_humidity"] = metrics.calc.specific_humidity_from_relative_humidity(
+            air_temperature=ds["t"],
+            relative_humidity=ds["r"],
+            levels=ds["level"],
+        )
+    return ds
+
 
 cira_AR_FOURv2_GFSforecast = inputs.KerchunkForecast(
     source="gs://extremeweatherbench/FOUR_v200_GFS.parq",
@@ -28,7 +53,7 @@ cira_AR_FOURv2_GFSforecast = inputs.KerchunkForecast(
     ],
     variable_mapping=inputs.CIRA_metadata_variable_mapping,
     storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
-    preprocess=defaults._preprocess_bb_ar_cira_forecast_dataset,
+    preprocess=_preprocess_bb_ar_cira_forecast_dataset,
     name="CIRA FOURv2 GFS",
 )
 
@@ -41,7 +66,7 @@ cira_AR_GC_GFSforecast = inputs.KerchunkForecast(
     ],
     variable_mapping=inputs.CIRA_metadata_variable_mapping,
     storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
-    preprocess=defaults._preprocess_bb_ar_cira_forecast_dataset,
+    preprocess=_preprocess_bb_ar_cira_forecast_dataset,
     name="CIRA GC GFS",
 )
 
@@ -54,7 +79,7 @@ cira_AR_PANG_GFSforecast = inputs.KerchunkForecast(
     ],
     variable_mapping=inputs.CIRA_metadata_variable_mapping,
     storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
-    preprocess=defaults._preprocess_bb_ar_cira_forecast_dataset,
+    preprocess=_preprocess_bb_ar_cira_forecast_dataset,
     name="CIRA PANG GFS",
 )
 
@@ -135,7 +160,7 @@ pang_results = ewb_pang.run(parallel_config=parallel_config)
 hres_results = ewb_hres.run(parallel_config=parallel_config)
 
 # save the results to make it more efficient
-fourv2_results.to_pickle(basepath + "docs/notebooks/figs/fourv2_ar_results.pkl")
-gc_results.to_pickle(basepath + "docs/notebooks/figs/gc_ar_results.pkl")
-pang_results.to_pickle(basepath + "docs/notebooks/figs/pang_ar_results.pkl")
-hres_results.to_pickle(basepath + "docs/notebooks/figs/hres_ar_results.pkl")
+fourv2_results.to_pickle(basepath + "saved_data/fourv2_ar_results.pkl")
+gc_results.to_pickle(basepath + "saved_data/gc_ar_results.pkl")
+pang_results.to_pickle(basepath + "saved_data/pang_ar_results.pkl")
+hres_results.to_pickle(basepath + "saved_data/hres_ar_results.pkl")
