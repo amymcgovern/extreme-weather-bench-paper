@@ -1420,31 +1420,31 @@ def plot_two_results_by_metric(
     ax.set_xlabel("Lead Time (days)", fontsize=20)
     ax.set_title(title, fontsize=20)
 
-    # # Add a blank line to your legend_elements list
-    # legend_elements.append(plt.Line2D([0], [0], color="white", alpha=0, label=" "))
+    # Add a blank line to your legend_elements list
+    legend_elements.append(plt.Line2D([0], [0], color="white", alpha=0, label=" "))
 
-    # # now add the unique groups with markers
-    # my_groups = list()
-    # for my_settings in settings1:
-    #     if my_settings["group"] not in my_groups and my_settings["group"] != "HRES":
-    #         my_groups.append(my_settings["group"])
-    #         legend_elements.append(
-    #             plt.Line2D(
-    #                 [0],
-    #                 [0],
-    #                 color="darkgrey",
-    #                 marker=my_settings["marker"],
-    #                 markersize=10,
-    #                 label=my_settings["group"],
-    #                 linestyle=my_settings["linestyle"],
-    #                 linewidth=4,
-    #             )
-    #         )
+    # now add the unique groups with markers
+    my_groups = list()
+    for my_settings in settings1:
+        if my_settings["group"] not in my_groups and my_settings["group"] != "HRES":
+            my_groups.append(my_settings["group"])
+            legend_elements.append(
+                plt.Line2D(
+                    [0],
+                    [0],
+                    color="darkgrey",
+                    marker=my_settings["marker"],
+                    markersize=10,
+                    label=my_settings["group"],
+                    linestyle=my_settings["linestyle"],
+                    linewidth=4,
+                )
+            )
 
-    # ax.legend(handles=legend_elements, loc="center left", bbox_to_anchor=(1.0, 0.5))
+    ax2.legend(handles=legend_elements, loc="center left", bbox_to_anchor=(1.1, 0.5))
 
-    # if filename is not None:
-    #     plt.savefig(filename, bbox_inches="tight", dpi=300)
+    if filename is not None:
+        plt.savefig(filename, bbox_inches="tight", dpi=300)
 
 
 def subset_results_to_xarray(
