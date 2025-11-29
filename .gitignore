@@ -218,5 +218,6 @@ saved_data/hres_severe_results.pkl
 saved_data/gc_severe_results.pkl
 saved_data/hres_ar_results.pkl
 saved_data/pang_severe_results.pkl
+saved_data/fourv2_severe_results.pkl
 .gitignore
 .gitignore
