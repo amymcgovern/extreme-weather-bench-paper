@@ -182,12 +182,12 @@ ewb_hres = evaluate.ExtremeWeatherBench(ewb_cases, HRES_SEVERE_EVALUATION_OBJECT
 
 parallel_config = {"backend": "loky", "n_jobs": 48}
 
-fourv2_results = ewb_fourv2.run(parallel_config=parallel_config)
-# gc_results = ewb_gc.run(parallel_config=parallel_config)
-# pang_results = ewb_pang.run(parallel_config=parallel_config)
+# fourv2_results = ewb_fourv2.run(parallel_config=parallel_config)
+gc_results = ewb_gc.run(parallel_config=parallel_config)
+pang_results = ewb_pang.run(parallel_config=parallel_config)
 # hres_results = ewb_hres.run(parallel_config=parallel_config)
 
-fourv2_results.to_pickle(basepath + "saved_data/fourv2_severe_results.pkl")
-# gc_results.to_pickle(basepath + "saved_data/gc_severe_results.pkl")
-# pang_results.to_pickle(basepath + "saved_data/pang_severe_results.pkl")
+# fourv2_results.to_pickle(basepath + "saved_data/fourv2_severe_results.pkl")
+gc_results.to_pickle(basepath + "saved_data/gc_severe_results.pkl")
+pang_results.to_pickle(basepath + "saved_data/pang_severe_results.pkl")
 # hres_results.to_pickle(basepath + "saved_data/hres_severe_results.pkl")

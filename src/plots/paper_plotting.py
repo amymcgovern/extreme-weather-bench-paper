@@ -1273,8 +1273,8 @@ def plot_results_by_metric(
     ]
     ax.set_xticks(labels=xtick_str, ticks=np.arange(0, len(model["lead_time"]), 1))
 
-    ax.set_ylabel("Celsius")
-    ax.set_xlabel("Lead Time (days)")
+    ax.set_ylabel("Celsius", fontsize=20)
+    ax.set_xlabel("Lead Time (days)", fontsize=20)
     ax.set_title(title, fontsize=20)
 
     # Add a blank line to your legend_elements list
@@ -1302,6 +1302,149 @@ def plot_results_by_metric(
 
     if filename is not None:
         plt.savefig(filename, bbox_inches="tight", dpi=300)
+
+
+def plot_two_results_by_metric(
+    data1,
+    data2,
+    settings1,
+    settings2,
+    y_label1,
+    y_label2,
+    title,
+    filename=None,
+    show_all_in_legend=False,
+    ax=None,
+):
+    """
+    Plots the results of the ExtremeWeatherBench for the data
+    specified for two different metrics.
+    parameters:
+        data1: list of dictionaries containing the data to plot for the first metric
+        data2: list of dictionaries containing the data to plot for the second metric
+        settings1: list of dictionaries containing the plot settings for the first
+            metric
+        settings2: list of dictionaries containing the plot settings for the second
+            metric
+        title: string, the title of the plot
+        filename: string, filename to save the plot to (None if you
+        don't want to save it)
+        show_all_in_legend: boolean, if True, then all labels will
+        be shown in the legend, if False they will be grouped
+    """
+    if ax is None:
+        fig = plt.figure(figsize=(6, 4))
+        ax = fig.add_axes([0, 0, 1, 1])
+
+    ax2 = ax.twinx()
+
+    sns.set_theme(style="whitegrid")
+    _ = sns.color_palette("tab10")
+
+    legend_elements = []
+    legend_labels = list()
+
+    # and add the HRES line
+    for my_settings in settings1:
+        if show_all_in_legend:
+            # my_label = f"{my_settings['label_str']} (n={my_n})"
+            raise ValueError("need to fix what my_n should be")
+        else:
+            my_label = my_settings["label_str"]
+
+        if "HRES" in my_label:
+            legend_elements.append(
+                plt.Line2D(
+                    [0], [0], color=my_settings["color"], linewidth=4, label=my_label
+                )
+            )
+            break
+
+    # Add a blank line to your legend_elements list
+    legend_elements.append(plt.Line2D([0], [0], color="white", alpha=0, label=" "))
+
+    for i, model in enumerate(data1):
+        my_mean = model["value"].mean("case_id_number")
+        my_n = len(np.unique(model["case_id_number"].values))
+        my_settings = settings1[i]
+        if show_all_in_legend:
+            my_label = f"{my_settings['label_str']} (n={my_n})"
+        else:
+            my_label = my_settings["label_str"]
+
+        ax.plot(
+            my_mean,
+            color=my_settings["color"],
+            linewidth=4,
+            label=my_label,
+            linestyle=my_settings["linestyle"],
+            marker=my_settings["marker"],
+            markersize=10,
+        )
+
+        # plot the second metric
+        model2 = data2[i]
+        my_mean2 = model2["value"].mean("case_id_number")
+        my_settings2 = settings2[i]
+        ax2.plot(
+            my_mean2,
+            color=my_settings2["color"],
+            linewidth=4,
+            label=my_label,
+            linestyle=my_settings2["linestyle"],
+            marker=my_settings2["marker"],
+            markersize=10,
+        )
+
+        # add any unique labels to the legend except for HRES
+        # (it gets its own line in the legend)
+        if show_all_in_legend or (
+            my_label not in legend_labels and "HRES" not in my_label
+        ):
+            legend_labels.append(my_label)
+            legend_elements.append(
+                plt.Line2D(
+                    [0], [0], color=my_settings["color"], linewidth=4, label=my_label
+                )
+            )
+
+    # set the xticks in days
+    xtick_str = [
+        f"{int(my_time / np.timedelta64(1, 'D')):d}"
+        for my_time in model["lead_time"].values
+    ]
+    ax.set_xticks(labels=xtick_str, ticks=np.arange(0, len(model["lead_time"]), 1))
+
+    ax.set_ylabel(y_label1, fontsize=20)
+    ax2.set_ylabel(y_label2, fontsize=20)
+    ax.set_xlabel("Lead Time (days)", fontsize=20)
+    ax.set_title(title, fontsize=20)
+
+    # # Add a blank line to your legend_elements list
+    # legend_elements.append(plt.Line2D([0], [0], color="white", alpha=0, label=" "))
+
+    # # now add the unique groups with markers
+    # my_groups = list()
+    # for my_settings in settings1:
+    #     if my_settings["group"] not in my_groups and my_settings["group"] != "HRES":
+    #         my_groups.append(my_settings["group"])
+    #         legend_elements.append(
+    #             plt.Line2D(
+    #                 [0],
+    #                 [0],
+    #                 color="darkgrey",
+    #                 marker=my_settings["marker"],
+    #                 markersize=10,
+    #                 label=my_settings["group"],
+    #                 linestyle=my_settings["linestyle"],
+    #                 linewidth=4,
+    #             )
+    #         )
+
+    # ax.legend(handles=legend_elements, loc="center left", bbox_to_anchor=(1.0, 0.5))
+
+    # if filename is not None:
+    #     plt.savefig(filename, bbox_inches="tight", dpi=300)
 
 
 def subset_results_to_xarray(
