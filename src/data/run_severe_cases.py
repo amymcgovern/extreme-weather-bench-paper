@@ -16,38 +16,6 @@ from pathlib import Path  # noqa: E402
 basepath = Path.home() / "extreme-weather-bench-paper" / ""
 basepath = str(basepath) + "/"
 
-import numpy as np
-import xarray as xr
-
-
-# Preprocess function for CIRA data using Brightband kerchunk parquets
-def _preprocess_bb_severe_cira_forecast_dataset(ds: xr.Dataset) -> xr.Dataset:
-    """An example preprocess function that renames the time coordinate to lead_time,
-    creates a valid_time coordinate, and sets the lead time range and resolution not
-    present in the original dataset.
-
-    Args:
-        ds: The forecast dataset to rename.
-
-    Returns:
-        The renamed forecast dataset.
-    """
-    ds = ds.rename({"time": "lead_time"})
-
-    # The evaluation configuration is used to set the lead time range and resolution.
-    ds["lead_time"] = np.array(
-        [i for i in range(0, 241, 6)], dtype="timedelta64[h]"
-    ).astype("timedelta64[ns]")
-    if "q" not in ds.variables:
-        # Calculate specific humidity from relative humidity and air temperature
-        ds["specific_humidity"] = metrics.calc.specific_humidity_from_relative_humidity(
-            air_temperature=ds["t"],
-            relative_humidity=ds["r"],
-            levels=ds["level"],
-        )
-    ds["geopotential"] = ds["z"] * metrics.calc.g0
-    return ds
-
 
 # setup the templates to load in the data
 
@@ -57,7 +25,7 @@ cira_severe_convection_forecast_FOURV2_GFS = inputs.KerchunkForecast(
     variable_mapping=inputs.CIRA_metadata_variable_mapping,
     storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
     name="CIRA FOURv2 GFS",
-    preprocess=_preprocess_bb_severe_cira_forecast_dataset,
+    preprocess=defaults._preprocess_bb_severe_cira_forecast_dataset,
 )
 
 cira_severe_convection_forecast_GC_GFS = inputs.KerchunkForecast(
@@ -66,7 +34,7 @@ cira_severe_convection_forecast_GC_GFS = inputs.KerchunkForecast(
     variable_mapping=inputs.CIRA_metadata_variable_mapping,
     storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
     name="CIRA GC GFS",
-    preprocess=_preprocess_bb_severe_cira_forecast_dataset,
+    preprocess=defaults._preprocess_bb_severe_cira_forecast_dataset,
 )
 
 cira_severe_convection_forecast_PANG_GFS = inputs.KerchunkForecast(
@@ -75,7 +43,7 @@ cira_severe_convection_forecast_PANG_GFS = inputs.KerchunkForecast(
     variable_mapping=inputs.CIRA_metadata_variable_mapping,
     storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
     name="CIRA PANG GFS",
-    preprocess=_preprocess_bb_severe_cira_forecast_dataset,
+    preprocess=defaults._preprocess_bb_severe_cira_forecast_dataset,
 )
 
 hres_severe_forecast = inputs.ZarrForecast(

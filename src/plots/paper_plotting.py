@@ -1192,7 +1192,13 @@ def generate_freeze_plots(
 
 
 def plot_results_by_metric(
-    data, settings, title, filename=None, show_all_in_legend=False, ax=None
+    data,
+    settings,
+    title,
+    filename=None,
+    show_all_in_legend=False,
+    ax=None,
+    y_label="Celsius",
 ):
     """
     Plots the results of the ExtremeWeatherBench for the data
@@ -1273,7 +1279,7 @@ def plot_results_by_metric(
     ]
     ax.set_xticks(labels=xtick_str, ticks=np.arange(0, len(model["lead_time"]), 1))
 
-    ax.set_ylabel("Celsius", fontsize=20)
+    ax.set_ylabel(y_label, fontsize=20)
     ax.set_xlabel("Lead Time (days)", fontsize=20)
     ax.set_title(title, fontsize=20)
 
@@ -1441,7 +1447,7 @@ def plot_two_results_by_metric(
                 )
             )
 
-    ax2.legend(handles=legend_elements, loc="center left", bbox_to_anchor=(1.1, 0.5))
+    ax2.legend(handles=legend_elements, loc="center left", bbox_to_anchor=(1.2, 0.5))
 
     if filename is not None:
         plt.savefig(filename, bbox_inches="tight", dpi=300)
