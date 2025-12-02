@@ -143,10 +143,13 @@ HRES_AR_EVALUATION_OBJECTS = [
 ewb_cases = cases.load_ewb_events_yaml_into_case_collection()
 ewb_cases = ewb_cases.select_cases("event_type", "atmospheric_river")
 
+bad_case_ids = [114, 115, 116, 117, 118, 119]
 my_cases = [
     case
     for case in ewb_cases.cases
-    if case.case_id_number < 115 and case.case_id_number >= 110
+    if case.case_id_number < 120
+    and case.case_id_number >= 110
+    and case.case_id_number not in bad_case_ids
 ]
 ewb_cases = cases.IndividualCaseCollection(cases=my_cases)
 
