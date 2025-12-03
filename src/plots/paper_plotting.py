@@ -1431,7 +1431,7 @@ def plot_two_results_by_metric(
 
     # now add the unique groups with markers
     my_groups = list()
-    for my_settings in settings1:
+    for my_settings in settings1 + settings2:
         if my_settings["group"] not in my_groups and my_settings["group"] != "HRES":
             my_groups.append(my_settings["group"])
             legend_elements.append(
@@ -1447,7 +1447,7 @@ def plot_two_results_by_metric(
                 )
             )
 
-    ax2.legend(handles=legend_elements, loc="center left", bbox_to_anchor=(1.2, 0.5))
+    ax2.legend(handles=legend_elements, loc="center left", bbox_to_anchor=(1.1, 0.5))
 
     if filename is not None:
         plt.savefig(filename, bbox_inches="tight", dpi=300)
