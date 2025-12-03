@@ -455,11 +455,21 @@ def plot_all_cases_and_obs(
 
             # grab the target data for this case; targets is a list of tuples of
             # (case_id, target dataset)
-            my_target_info = [
-                n[1]
-                for n in targets
-                if n[0] == indiv_case.case_id_number and n[1].attrs["source"] != "ERA5"
-            ]
+            # print(targets)
+            if indiv_event_type == "severe_convection":
+                my_target_info = [
+                    n[1]
+                    for n in targets
+                    if n[0] == indiv_case.case_id_number
+                    and n[1].attrs["source"] == "local_storm_reports"
+                ]
+            else:
+                my_target_info = [
+                    n[1]
+                    for n in targets
+                    if n[0] == indiv_case.case_id_number
+                    and n[1].attrs["source"] != "ERA5"
+                ]
             # print(my_target_info)
 
             # make a scatter plot of the target points (for hot/cold/tc events)
@@ -515,7 +525,7 @@ def plot_all_cases_and_obs(
                 data = my_target_info[0]
                 # print(data)
                 try:
-                    data = utils.stack_sparse_data_from_dims(
+                    data = utils.stack_dataarray_from_dims(
                         data["report_type"], ["latitude", "longitude"]
                     )
                 except Exception as e:
@@ -531,6 +541,9 @@ def plot_all_cases_and_obs(
                 for my_data in data:
                     # print(my_data)
                     hail_reports = my_data[my_data == "hail"]
+                    if len(hail_reports) == 0:
+                        hail_reports = my_data[my_data == 2]
+
                     severe_report_counts["hail"] += len(hail_reports)
                     # print(hail_reports)
                     lat_values = hail_reports.latitude.values
@@ -546,6 +559,9 @@ def plot_all_cases_and_obs(
                     )
 
                     tor_reports = my_data[my_data == "tor"]
+                    if len(tor_reports) == 0:
+                        tor_reports = my_data[my_data == 3]
+
                     severe_report_counts["tor"] += len(tor_reports)
                     # print(tor_reports)
                     lat_values = tor_reports.latitude.values
