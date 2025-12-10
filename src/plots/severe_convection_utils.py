@@ -146,6 +146,7 @@ def plot_cbss_forecast_panel(
     projection: ccrs.Projection = ccrs.PlateCarree(),
     ax: Optional[plt.Axes] = None,
     title: Optional[str] = None,
+    alpha: Optional[float] = 0.5,
 ) -> Tuple[plt.Figure, plt.Axes, plt.cm.ScalarMappable]:
     """Plot a single CBSS forecast panel.
 
@@ -190,6 +191,7 @@ def plot_cbss_forecast_panel(
         cmap=cmap_custom,
         norm=norm,
         extend="max",
+        alpha=alpha,
         transform=ccrs.PlateCarree(),
     )
 
@@ -227,7 +229,7 @@ def plot_cbss_forecast_panel(
     plotting.setup_gridlines(ax)
 
     # Set title
-    valid_time = target_date + lead_time_td
+    valid_time = target_date
     if title is not None:
         title_str = (
             title
