@@ -144,6 +144,8 @@ def plot_cbss_forecast_panel(
     tornado_reports: Optional[pd.DataFrame] = None,
     hail_reports: Optional[pd.DataFrame] = None,
     projection: ccrs.Projection = ccrs.PlateCarree(),
+    ax: Optional[plt.Axes] = None,
+    title: Optional[str] = None,
 ) -> Tuple[plt.Figure, plt.Axes, plt.cm.ScalarMappable]:
     """Plot a single CBSS forecast panel.
 
@@ -155,7 +157,8 @@ def plot_cbss_forecast_panel(
         pph_data: Optional PPH data for contours.
         tornado_reports: Optional tornado report DataFrame.
         hail_reports: Optional hail report DataFrame.
-        projection: Cartopy projection to use.
+        projection: Cartopy projection to use (only used if ax is None).
+        ax: Optional existing axes to plot on. If None, creates a new figure and axes.
 
     Returns:
         Tuple of (figure, axis, contour_mappable) for further customization.
@@ -163,8 +166,13 @@ def plot_cbss_forecast_panel(
     # Setup colormap and levels
     cmap_custom, norm, levels = setup_cbss_colormap_and_levels()
 
-    # Create figure and axis
-    fig, ax = plt.subplots(1, 1, figsize=(8, 6), subplot_kw={"projection": projection})
+    # Create figure and axis if not provided
+    if ax is None:
+        fig, ax = plt.subplots(
+            1, 1, figsize=(8, 6), subplot_kw={"projection": projection}
+        )
+    else:
+        fig = ax.figure
 
     # Select data for this lead time
     lead_time_td = pd.Timedelta(hours=lead_time_hours)
@@ -220,10 +228,19 @@ def plot_cbss_forecast_panel(
 
     # Set title
     valid_time = target_date + lead_time_td
-    ax.set_title(
-        f"CBSS +{lead_time_hours}h\nValid: {valid_time.strftime('%Y-%m-%d %H:%M')} UTC",
-        fontsize=10,
-    )
+    if title is not None:
+        title_str = (
+            title
+            + f" CBSS +{lead_time_hours}h\n"
+            + f"Valid: {valid_time.strftime('%Y-%m-%d %H:%M')} UTC"
+        )
+    else:
+        title_str = (
+            f"CBSS +{lead_time_hours}h\n"
+            + f"Valid: {valid_time.strftime('%Y-%m-%d %H:%M')} UTC"
+        )
+
+    ax.set_title(title_str, fontsize=10)
 
     return fig, ax, im
 
