@@ -1,0 +1,154 @@
+# setup all the imports
+import matplotlib.font_manager
+
+flist = matplotlib.font_manager.get_font_names()
+import pickle
+from pathlib import Path  # noqa: E402
+
+from extremeweatherbench import cases, defaults, derived, evaluate, inputs
+
+# make the basepath - change this to your local path
+basepath = Path.home() / "extreme-weather-bench-paper" / ""
+basepath = str(basepath) + "/"
+
+# ugly hack to load in our plotting scripts
+# import sys  # noqa: E402
+
+# sys.path.append(basepath + "/docs/notebooks/")
+
+# load in all of the events in the yaml file
+print("loading in the events yaml file")
+ewb_cases = cases.load_ewb_events_yaml_into_case_collection()
+
+# downselect to only the severe cases
+ewb_cases = ewb_cases.select_cases("event_type", "severe_convection")
+
+# build out all of the expected data to evalate the case (we need this so we can plot
+# the LSR reports)
+case_operators = cases.build_case_operators(
+    ewb_cases, defaults.get_brightband_evaluation_objects()
+)
+# to plot the targets, we need to run the pipeline for each case and target
+from joblib import Parallel, delayed  # noqa: E402
+from joblib.externals.loky import get_reusable_executor  # noqa: E402
+
+# load in all the case info (note this takes awhile in non-parallel form as it has to
+# run all the target information for each case)
+# this will return a list of tuples with the case id and the target dataset
+
+print("running the pipeline for each case and target")
+parallel = Parallel(n_jobs=32, return_as="generator", backend="loky")
+case_operators_with_targets_established_generator = parallel(
+    delayed(
+        lambda co: (
+            co.case_metadata.case_id_number,
+            evaluate.run_pipeline(co.case_metadata, co.target),
+        )
+    )(case_operator)
+    for case_operator in case_operators
+)
+case_operators_with_targets_established = list(
+    case_operators_with_targets_established_generator
+)
+# this will throw a bunch of errors below but they're not consequential. this releases
+# the memory as it shuts down the workers
+get_reusable_executor().shutdown(wait=True)
+
+
+def get_cbss_and_pph_outputs(ewb_case, forecast_source):
+    pph_target = inputs.PPH()
+    pph = evaluate.run_pipeline(ewb_case, pph_target)
+    cbss = evaluate.run_pipeline(ewb_case, forecast_source)
+
+    return cbss, pph
+
+
+cira_severe_convection_forecast_GC_GFS = inputs.KerchunkForecast(
+    source="gs://extremeweatherbench/GRAP_v100_GFS.parq",
+    variables=[derived.CravenBrooksSignificantSevere()],
+    variable_mapping=inputs.CIRA_metadata_variable_mapping,
+    storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
+    name="CIRA GC GFS",
+    preprocess=defaults._preprocess_bb_severe_cira_forecast_dataset,
+)
+
+cira_severe_convection_forecast_FOURV2_GFS = inputs.KerchunkForecast(
+    source="gs://extremeweatherbench/FOUR_v200_GFS.parq",
+    variables=[derived.CravenBrooksSignificantSevere()],
+    variable_mapping=inputs.CIRA_metadata_variable_mapping,
+    storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
+    name="CIRA FOURv2 GFS",
+    preprocess=defaults._preprocess_bb_severe_cira_forecast_dataset,
+)
+
+
+cira_severe_convection_forecast_PANG_GFS = inputs.KerchunkForecast(
+    source="gs://extremeweatherbench/PANG_v100_GFS.parq",
+    variables=[derived.CravenBrooksSignificantSevere()],
+    variable_mapping=inputs.CIRA_metadata_variable_mapping,
+    storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
+    name="CIRA PANG GFS",
+    preprocess=defaults._preprocess_bb_severe_cira_forecast_dataset,
+)
+
+hres_severe_forecast = inputs.ZarrForecast(
+    source="gs://weatherbench2/datasets/hres/2016-2022-0012-1440x721.zarr",
+    variables=[derived.CravenBrooksSignificantSevere()],
+    variable_mapping=inputs.HRES_metadata_variable_mapping,
+    storage_options={"remote_options": {"anon": True}},
+    name="ECMWF HRES",
+)
+
+my_ids = [
+    269,
+    270,
+    271,
+    284,
+    285,
+    286,
+    287,
+    288,
+    316,
+    317,
+    318,
+    319,
+    320,
+    321,
+    322,
+    323,
+]
+
+hres_graphics = pickle.load(open(basepath + "saved_data/hres_graphics.pkl", "rb"))
+gc_graphics = pickle.load(open(basepath + "saved_data/gc_graphics.pkl", "rb"))
+pang_graphics = pickle.load(open(basepath + "saved_data/pang_graphics.pkl", "rb"))
+fourv2_graphics = pickle.load(open(basepath + "saved_data/fourv2_graphics.pkl", "rb"))
+for my_id in my_ids:
+    # compute CBSS and PPH for all the AI models and HRES for the case we chose
+    print(my_id)
+    my_case = ewb_cases.select_cases("case_id_number", my_id).cases[0]
+
+    # [cbss_hres, pph_hres] = get_cbss_and_pph_outputs(my_case, hres_severe_forecast)
+    # [cbss_gc, pph_gc] = get_cbss_and_pph_outputs(
+    #     my_case, cira_severe_convection_forecast_GC_GFS
+    # )
+    # [cbss_pang, pph_pang] = get_cbss_and_pph_outputs(
+    #     my_case, cira_severe_convection_forecast_PANG_GFS
+    # )
+    [cbss_fourv2, pph_fourv2] = get_cbss_and_pph_outputs(
+        my_case, cira_severe_convection_forecast_FOURV2_GFS
+    )
+    # hres_graphics[my_id, "cbss"] = cbss_hres
+    # gc_graphics[my_id, "cbss"] = cbss_gc
+    # pang_graphics[my_id, "cbss"] = cbss_pang
+    fourv2_graphics[my_id, "cbss"] = cbss_fourv2
+
+    # hres_graphics[my_id, "pph"] = pph_hres
+    # gc_graphics[my_id, "pph"] = pph_gc
+    # pang_graphics[my_id, "pph"] = pph_pang
+    fourv2_graphics[my_id, "pph"] = pph_fourv2
+
+
+# pickle.dump(hres_graphics, open(basepath + "saved_data/hres_graphics.pkl", "wb"))
+# pickle.dump(gc_graphics, open(basepath + "saved_data/gc_graphics.pkl", "wb"))
+# pickle.dump(pang_graphics, open(basepath + "saved_data/pang_graphics.pkl", "wb"))
+pickle.dump(fourv2_graphics, open(basepath + "saved_data/fourv2_graphics.pkl", "wb"))

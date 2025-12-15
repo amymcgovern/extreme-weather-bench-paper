@@ -7,6 +7,47 @@ from extremeweatherbench import cases, defaults, evaluate, inputs, metrics
 basepath = Path.home() / "extreme-weather-bench-paper" / ""
 basepath = str(basepath) + "/"
 
+from dataclasses import dataclass
+
+import pandas as pd
+import xarray as xr
+from arraylake import Client
+
+
+@dataclass
+class ArraylakeForecast(inputs.ForecastBase):
+    prefetch: bool = True
+
+    def _prefetch_data(self):
+        client = Client()
+        repo = client.get_repo(f"{self.org_name}/{self.repo_name}")
+        session = repo.readonly_session(self.branch_name)
+        self.ds = xr.open_zarr(session.store, group=self.group_name)
+        self.ds = self.ds.assign_coords(
+            {"lead_time": self.ds.lead_time.astype("timedelta64[h]")}
+        )
+
+    def __post_init__(self):
+        # source should be like arraylake://org_name/repo_name@branch_name/group/name/goes/here
+        if not self.source.startswith("arraylake://"):
+            raise ValueError("source must start with arraylake://")
+        bits = self.source.split("://")[1].split("/")
+        self.org_name = bits[0]
+        if "@" not in bits[1]:
+            self.branch_name = "main"
+            self.repo_name = bits[1]
+        else:
+            self.repo_name, self.branch_name = bits[1].split("@")
+        self.group_name = "/".join(bits[2:])
+        if self.prefetch:
+            self._prefetch_data()
+
+    def _open_data_from_source(self) -> xr.Dataset:
+        if self.ds is None:
+            self._prefetch_data()
+        return self.ds
+
+
 # setup the templates to load in the data
 
 # Forecast Examples
@@ -72,10 +113,34 @@ hres_forecast = inputs.ZarrForecast(
     name="ECMWF HRES",
 )
 
+bb_hres_forecast = ArraylakeForecast(
+    source="arraylake://brightband/ecmwf@main/forecast-archive/ewb-hres",
+    variables=["surface_air_temperature"],
+    variable_mapping={
+        "t2m": "surface_air_temperature",
+    },
+    name="ECMWF HRES, Brightband mirror",
+)
+
 
 freeze_metrics = [
     metrics.MinimumMeanAbsoluteError,
     metrics.RootMeanSquaredError,
+]
+
+BB_HRES_FREEZE_EVALUATION_OBJECTS = [
+    inputs.EvaluationObject(
+        event_type="freeze",
+        metric_list=freeze_metrics,
+        target=defaults.era5_freeze_target,
+        forecast=bb_hres_forecast,
+    ),
+    inputs.EvaluationObject(
+        event_type="freeze",
+        metric_list=freeze_metrics,
+        target=defaults.ghcn_freeze_target,
+        forecast=bb_hres_forecast,
+    ),
 ]
 
 
@@ -179,9 +244,24 @@ HRES_FREEZE_EVALUATION_OBJECTS = [
 ewb_cases = cases.load_ewb_events_yaml_into_case_collection()
 ewb_cases = ewb_cases.select_cases("event_type", "freeze")
 
-ewb_fourv2 = evaluate.ExtremeWeatherBench(ewb_cases, FOURv2_FREEZE_EVALUATION_OBJECTS)
-ewb_gc = evaluate.ExtremeWeatherBench(ewb_cases, GC_FREEZE_EVALUATION_OBJECTS)
-ewb_pang = evaluate.ExtremeWeatherBench(ewb_cases, PANG_FREEZE_EVALUATION_OBJECTS)
+early_cases = cases.IndividualCaseCollection(
+    [i for i in ewb_cases.cases if i.end_date < pd.Timestamp("2023-01-01")]
+)
+later_cases = cases.IndividualCaseCollection(
+    [i for i in ewb_cases.cases if i.start_date > pd.Timestamp("2023-01-01")]
+)
+
+ewb_hres_early = evaluate.ExtremeWeatherBench(
+    early_cases, HRES_FREEZE_EVALUATION_OBJECTS
+)
+ewb_hres_later = evaluate.ExtremeWeatherBench(
+    later_cases, BB_HRES_FREEZE_EVALUATION_OBJECTS
+)
+
+
+# ewb_fourv2 = evaluate.ExtremeWeatherBench(ewb_cases, FOURv2_FREEZE_EVALUATION_OBJECTS)
+# ewb_gc = evaluate.ExtremeWeatherBench(ewb_cases, GC_FREEZE_EVALUATION_OBJECTS)
+# ewb_pang = evaluate.ExtremeWeatherBench(ewb_cases, PANG_FREEZE_EVALUATION_OBJECTS)
 ewb_hres = evaluate.ExtremeWeatherBench(ewb_cases, HRES_FREEZE_EVALUATION_OBJECTS)
 
 
@@ -190,15 +270,17 @@ ewb_hres = evaluate.ExtremeWeatherBench(ewb_cases, HRES_FREEZE_EVALUATION_OBJECT
 # if you have already saved them (from running this once), then skip this box
 parallel_config = {"backend": "loky", "n_jobs": 32}
 
-fourv2_results = ewb_fourv2.run(parallel_config=parallel_config)
-gc_results = ewb_gc.run(parallel_config=parallel_config)
-pang_results = ewb_pang.run(parallel_config=parallel_config)
-hres_results = ewb_hres.run(parallel_config=parallel_config)
+# fourv2_results = ewb_fourv2.run(parallel_config=parallel_config)
+# gc_results = ewb_gc.run(parallel_config=parallel_config)
+# pang_results = ewb_pang.run(parallel_config=parallel_config)
+hres_results = ewb_hres_early.run(parallel_config=parallel_config)
+bb_hres_results = ewb_hres_later.run(parallel_config=parallel_config)
+hres_results = pd.concat([hres_results, bb_hres_results])
 
 # save the results to make it more efficient
 print("saving results to pickle")
-fourv2_results.to_pickle(basepath + "saved_data/fourv2_freeze_results.pkl")
-gc_results.to_pickle(basepath + "saved_data/gc_freeze_results.pkl")
-pang_results.to_pickle(basepath + "saved_data/pang_freeze_results.pkl")
+# fourv2_results.to_pickle(basepath + "saved_data/fourv2_freeze_results.pkl")
+# gc_results.to_pickle(basepath + "saved_data/gc_freeze_results.pkl")
+# pang_results.to_pickle(basepath + "saved_data/pang_freeze_results.pkl")
 hres_results.to_pickle(basepath + "saved_data/hres_freeze_results.pkl")
 print("results saved")
