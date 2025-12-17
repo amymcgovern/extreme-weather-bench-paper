@@ -144,18 +144,20 @@ ewb_cases = cases.load_ewb_events_yaml_into_case_collection()
 ewb_cases = ewb_cases.select_cases("event_type", "severe_convection")
 
 ewb_fourv2 = evaluate.ExtremeWeatherBench(ewb_cases, FOURv2_SEVERE_EVALUATION_OBJECTS)
-# ewb_gc = evaluate.ExtremeWeatherBench(ewb_cases, GC_SEVERE_EVALUATION_OBJECTS)
-# ewb_pang = evaluate.ExtremeWeatherBench(ewb_cases, PANG_SEVERE_EVALUATION_OBJECTS)
-# ewb_hres = evaluate.ExtremeWeatherBench(ewb_cases, HRES_SEVERE_EVALUATION_OBJECTS)
+ewb_gc = evaluate.ExtremeWeatherBench(ewb_cases, GC_SEVERE_EVALUATION_OBJECTS)
+ewb_pang = evaluate.ExtremeWeatherBench(ewb_cases, PANG_SEVERE_EVALUATION_OBJECTS)
+ewb_hres = evaluate.ExtremeWeatherBench(ewb_cases, HRES_SEVERE_EVALUATION_OBJECTS)
 
-parallel_config = {"backend": "loky", "n_jobs": 64}
+parallel_config = {"backend": "loky", "n_jobs": 24}
 
-fourv2_results = ewb_fourv2.run(parallel_config=parallel_config)
+print("running the cases")
+# fourv2_results = ewb_fourv2.run(parallel_config=parallel_config)
 # gc_results = ewb_gc.run(parallel_config=parallel_config)
-# pang_results = ewb_pang.run(parallel_config=parallel_config)
+pang_results = ewb_pang.run(parallel_config=parallel_config)
 # hres_results = ewb_hres.run(parallel_config=parallel_config)
 
-fourv2_results.to_pickle(basepath + "saved_data/fourv2_severe_results.pkl")
+print("saving the results")
+# fourv2_results.to_pickle(basepath + "saved_data/fourv2_severe_results.pkl")
 # gc_results.to_pickle(basepath + "saved_data/gc_severe_results.pkl")
-# pang_results.to_pickle(basepath + "saved_data/pang_severe_results.pkl")
+pang_results.to_pickle(basepath + "saved_data/pang_severe_results.pkl")
 # hres_results.to_pickle(basepath + "saved_data/hres_severe_results.pkl")
