@@ -289,6 +289,7 @@ def plot_all_cases_and_obs(
     show_orig_pph=False,
     case_id=None,
     ax=None,
+    show_legend=True,
 ):
     """Plot all cases (outlined) and observations (filled) on map.
     Args:
@@ -371,6 +372,16 @@ def plot_all_cases_and_obs(
         }
     )
 
+    observation_counts_by_type = dict(
+        {
+            "freeze": 0,
+            "heat_wave": 0,
+            "tropical_cyclone": 0,
+            "severe_convection": 0,
+            "atmospheric_river": 0,
+        }
+    )
+
     zorders = {
         "freeze": 9,
         "heat_wave": 8,
@@ -439,7 +450,7 @@ def plot_all_cases_and_obs(
                         color=color,
                         alpha=alphas[indiv_event_type],
                         my_zorder=zorders[indiv_event_type],
-                        linewidth=0.8,
+                        linewidth=1.2,
                         fill=False,
                     )
             else:
@@ -449,7 +460,7 @@ def plot_all_cases_and_obs(
                     color=color,
                     alpha=alphas[indiv_event_type],
                     my_zorder=zorders[indiv_event_type],
-                    linewidth=0.8,
+                    linewidth=1.2,
                     fill=False,
                 )
 
@@ -463,7 +474,7 @@ def plot_all_cases_and_obs(
                     if n[0] == indiv_case.case_id_number
                     and n[1].attrs["source"] == "local_storm_reports"
                 ]
-            else:
+            elif indiv_event_type in ["heat_wave", "freeze", "tropical_cyclone"]:
                 my_target_info = [
                     n[1]
                     for n in targets
@@ -518,6 +529,9 @@ def plot_all_cases_and_obs(
                     transform=ccrs.Geodetic(),
                     zorder=zorders[indiv_event_type],
                 )
+
+                # add the count of observations
+                observation_counts_by_type[indiv_event_type] += len(lat_values)
 
             # if it is convective, show the PPH and LSRs
             if indiv_event_type == "severe_convection":
@@ -575,78 +589,98 @@ def plot_all_cases_and_obs(
                         s=6,
                     )
 
-    # Create a custom legend for event types
-    if event_type is not None:
-        # if we are only plotting one event type, only show that in the legend
-        if event_type == "severe_convection":
-            legend_elements = [
-                Patch(
-                    facecolor="black",
-                    alpha=0.9,
-                    label="Hail Reports (n = %d)" % severe_report_counts["hail"],
-                ),
-                Patch(
-                    facecolor="red",
-                    alpha=0.9,
-                    label="Tornado Reports (n = %d)" % severe_report_counts["tor"],
-                ),
-                Patch(
-                    facecolor=event_colors[event_type],
-                    alpha=0.9,
-                    label="Severe Convective Events (n = %d)"
-                    % counts_by_type[event_type],
-                ),
-            ]
+    if show_legend:
+        # Create a custom legend for event types
+        if event_type is not None:
+            # if we are only plotting one event type, only show that in the legend
+            if event_type == "severe_convection":
+                legend_elements = [
+                    plt.Line2D(
+                        [0],
+                        [0],
+                        color="black",
+                        marker="o",
+                        linestyle="none",
+                        label="Hail Reports (n = %d)" % severe_report_counts["hail"],
+                    ),
+                    plt.Line2D(
+                        [0],
+                        [0],
+                        color="red",
+                        marker="^",
+                        linestyle="none",
+                        label="Tornado Reports (n = %d)" % severe_report_counts["tor"],
+                    ),
+                ]
+            else:
+                if event_type in ["heat_wave", "freeze"]:
+                    my_label = (
+                        "GHCNh stations (n = %d)"
+                        % observation_counts_by_type[event_type]
+                    )
+                elif event_type == "tropical_cyclone":
+                    my_label = (
+                        "IBTrACS (n = %d)" % observation_counts_by_type[event_type]
+                    )
+                else:
+                    my_label = (
+                        "Atmospheric Rivers (n = %d)"
+                        % observation_counts_by_type[event_type]
+                    )
+
+                legend_elements = [
+                    plt.Line2D(
+                        [0],
+                        [0],
+                        color=event_colors[event_type],
+                        linestyle="none",
+                        marker=".",
+                        markersize=10,
+                        label=my_label,
+                    ),
+                ]
         else:
+            # otherwise show all event types in the legend
             legend_elements = [
                 Patch(
-                    facecolor=event_colors[event_type],
+                    facecolor=event_colors["heat_wave"],
                     alpha=0.9,
-                    label=f"{event_type.replace('_', ' ').title()} (n = %d)"
-                    % counts_by_type[event_type],
+                    label="Heat Wave (n = %d)" % counts_by_type["heat_wave"],
+                ),
+                Patch(
+                    facecolor=event_colors["freeze"],
+                    alpha=0.9,
+                    label="Freeze (n = %d)" % counts_by_type["freeze"],
+                ),
+                Patch(
+                    facecolor=event_colors["severe_convection"],
+                    alpha=0.9,
+                    label="Convection (n = %d)" % counts_by_type["severe_convection"],
+                ),
+                Patch(
+                    facecolor=event_colors["atmospheric_river"],
+                    alpha=0.9,
+                    label="Atmospheric River (n = %d)"
+                    % counts_by_type["atmospheric_river"],
+                ),
+                Patch(
+                    facecolor=event_colors["tropical_cyclone"],
+                    alpha=0.9,
+                    label="Tropical Cyclone (n = %d)"
+                    % counts_by_type["tropical_cyclone"],
                 ),
             ]
-    else:
-        # otherwise show all event types in the legend
-        legend_elements = [
-            Patch(
-                facecolor=event_colors["heat_wave"],
-                alpha=0.9,
-                label="Heat Wave (n = %d)" % counts_by_type["heat_wave"],
-            ),
-            Patch(
-                facecolor=event_colors["freeze"],
-                alpha=0.9,
-                label="Freeze (n = %d)" % counts_by_type["freeze"],
-            ),
-            Patch(
-                facecolor=event_colors["severe_convection"],
-                alpha=0.9,
-                label="Convection (n = %d)" % counts_by_type["severe_convection"],
-            ),
-            Patch(
-                facecolor=event_colors["atmospheric_river"],
-                alpha=0.9,
-                label="Atmospheric River (n = %d)"
-                % counts_by_type["atmospheric_river"],
-            ),
-            Patch(
-                facecolor=event_colors["tropical_cyclone"],
-                alpha=0.9,
-                label="Tropical Cyclone (n = %d)" % counts_by_type["tropical_cyclone"],
-            ),
-        ]
-    # Create a larger legend by specifying a larger font size in the prop dictionary
-    legend = ax.legend(
-        handles=legend_elements,
-        loc="lower left",
-        framealpha=1,
-        frameon=True,
-        borderpad=0.5,
-        handletextpad=0.8,
-        handlelength=2.5,
-    )
-    legend.set_zorder(10)
+        # Create a larger legend by specifying a larger font size in the prop dictionary
+        legend = ax.legend(
+            handles=legend_elements,
+            loc="lower left",
+            framealpha=1,
+            frameon=True,
+            borderpad=0.5,
+            handletextpad=0.8,
+            handlelength=2.5,
+        )
+        legend.set_zorder(10)
 
     if event_type is None:
         title = "ExtremeWeatherBench Cases (n = %d)" % sum(counts_by_type.values())
