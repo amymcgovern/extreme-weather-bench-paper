@@ -414,12 +414,11 @@ def plot_storm_reports_on_axis(
         ax.scatter(
             tornado_reports["longitude"],
             tornado_reports["latitude"],
-            c="k",
+            c="#DC267F",
             s=marker_size,
             alpha=alpha,
             transform=ccrs.PlateCarree(),
             marker="^",
-            edgecolors="k",
             linewidths=1,
             zorder=zorder,
         )
@@ -428,12 +427,11 @@ def plot_storm_reports_on_axis(
         ax.scatter(
             hail_reports["longitude"],
             hail_reports["latitude"],
-            c="green",
+            c="#FFB000",
             s=marker_size,
             alpha=alpha,
             transform=ccrs.PlateCarree(),
             marker="s",
-            edgecolors="darkgreen",
             linewidths=1,
             zorder=zorder,
         )
@@ -442,12 +440,11 @@ def plot_storm_reports_on_axis(
         ax.scatter(
             wind_reports["longitude"],
             wind_reports["latitude"],
-            c="blue",
+            c="#648FFF",
             s=marker_size,
             alpha=alpha,
             transform=ccrs.PlateCarree(),
             marker="o",
-            edgecolors="darkblue",
             linewidths=1,
             zorder=zorder,
         )
