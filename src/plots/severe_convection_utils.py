@@ -6,16 +6,15 @@ for forecast data, observations, and verification metrics.
 """
 
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import cartopy.crs as ccrs
 import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import plotting_utils as plotting
 import xarray as xr
-
-import src.plots.plotting_utils as plotting
 
 logger = logging.getLogger(__name__)
 
@@ -147,6 +146,8 @@ def plot_cbss_forecast_panel(
     ax: Optional[plt.Axes] = None,
     title: Optional[str] = None,
     alpha: Optional[float] = 0.5,
+    geographic_features_kwargs: Dict[str, Any] = {},
+    gridlines_kwargs: Dict[str, Any] = {},
 ) -> Tuple[plt.Figure, plt.Axes, plt.cm.ScalarMappable]:
     """Plot a single CBSS forecast panel.
 
@@ -160,20 +161,24 @@ def plot_cbss_forecast_panel(
         hail_reports: Optional hail report DataFrame.
         projection: Cartopy projection to use (only used if ax is None).
         ax: Optional existing axes to plot on. If None, creates a new figure and axes.
+        title: Optional title for the plot.
+        alpha: Optional alpha value for the CBSS contour.
+        geographic_features_kwargs: Optional keyword arguments for the geographic features.
+        gridlines_kwargs: Optional keyword arguments for the gridlines.
 
     Returns:
-        Tuple of (figure, axis, contour_mappable) for further customization.
+        Tuple of (axis, contour_mappable) for further customization.
     """
     # Setup colormap and levels
     cmap_custom, norm, levels = setup_cbss_colormap_and_levels()
 
     # Create figure and axis if not provided
     if ax is None:
-        fig, ax = plt.subplots(
+        _, ax = plt.subplots(
             1, 1, figsize=(8, 6), subplot_kw={"projection": projection}
         )
     else:
-        fig = ax.figure
+        _ = ax.figure
 
     # Select data for this lead time
     lead_time_td = pd.Timedelta(hours=lead_time_hours)
@@ -213,7 +218,7 @@ def plot_cbss_forecast_panel(
         plot_pph_contours(ax, pph_data, pph_cmap, pph_norm, pph_levels)
 
     # Add geographic features
-    plotting.add_geographic_features(ax)
+    plotting.add_geographic_features(ax, **geographic_features_kwargs)
 
     # Plot storm reports
     plot_storm_reports(ax, tornado_reports, hail_reports)
@@ -226,7 +231,7 @@ def plot_cbss_forecast_panel(
     )
 
     # Add gridlines
-    plotting.setup_gridlines(ax)
+    plotting.setup_gridlines(ax, **gridlines_kwargs)
 
     # Set title
     valid_time = target_date
@@ -244,7 +249,7 @@ def plot_cbss_forecast_panel(
 
     ax.set_title(title_str, fontsize=10)
 
-    return fig, ax, im
+    return ax, im
 
 
 def plot_cbss_forecast_multipanel(
