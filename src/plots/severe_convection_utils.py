@@ -13,8 +13,9 @@ import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import plotting_utils as plotting
 import xarray as xr
+
+import src.plots.plotting_utils as plotting
 
 logger = logging.getLogger(__name__)
 
