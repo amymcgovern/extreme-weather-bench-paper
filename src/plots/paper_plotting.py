@@ -353,6 +353,12 @@ def plot_all_cases_and_obs(
         "atmospheric_river": sns_palette[7],
     }
 
+    lsr_colors = {
+        "tornado": "#DC267F",
+        "hail": "#FFB000",
+        "wind": "#648FFF",
+    }
+
     # Initialize counts for each event type
     counts_by_type = dict(
         {
@@ -565,10 +571,11 @@ def plot_all_cases_and_obs(
                     ax.scatter(
                         lon_values,
                         lat_values,
-                        color="black",
+                        color=lsr_colors["hail"],
                         alpha=0.9,
-                        marker="o",
+                        marker="s",
                         transform=ccrs.Geodetic(),
+                        zorder=8,
                         s=6,
                     )
 
@@ -583,9 +590,10 @@ def plot_all_cases_and_obs(
                     ax.scatter(
                         lon_values,
                         lat_values,
-                        color="red",
+                        color=lsr_colors["tornado"],
                         marker="^",
                         transform=ccrs.Geodetic(),
+                        zorder=9,
                         s=6,
                     )
 
@@ -598,15 +606,15 @@ def plot_all_cases_and_obs(
                     plt.Line2D(
                         [0],
                         [0],
-                        color="black",
-                        marker="o",
+                        color=lsr_colors["hail"],
+                        marker="s",
                         linestyle="none",
                         label="Hail Reports (n = %d)" % severe_report_counts["hail"],
                     ),
                     plt.Line2D(
                         [0],
                         [0],
-                        color="red",
+                        color=lsr_colors["tornado"],
                         marker="^",
                         linestyle="none",
                         label="Tornado Reports (n = %d)" % severe_report_counts["tor"],
