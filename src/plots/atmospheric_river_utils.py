@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
@@ -14,6 +15,110 @@ import src.plots.plotting_utils as plotting
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+# Create custom colormap from original code
+cmap_colors = [
+    "#ffffff",
+    "#bde6fa",
+    "#7bbae7",
+    "#4892bd",
+    "#49ae62",
+    "#a7d051",
+    "#f9d251",
+    "#f7792f",
+    "#e43d28",
+    "#c11b24",
+    "#921318",
+]
+cmap = mcolors.LinearSegmentedColormap.from_list("custom_cubehelix", cmap_colors)
+bounds = np.arange(0, 1200, 100)
+norm = mcolors.BoundaryNorm(bounds, cmap.N)
+
+
+def plot_ar_mask_single_timestep(
+    ivt_data: xr.DataArray,
+    ar_mask: xr.DataArray,
+    title: Optional[str] = None,
+    ax: Optional[plt.Axes] = None,
+    colorbar: bool = True,
+) -> plt.Axes:
+    """Plot the AR mask for a single timestep.
+
+    This function plots the AR mask for a single timestep. The incoming data must be
+    dataarrays with only 2 dimensions: longitude and latitude.
+
+    Args:
+        ivt_data: Integrated vapor transport data with time dimension.
+        ar_mask: AR mask data with time dimension.
+        title: Title of the plot.
+        ax: Axes to plot on.
+    Returns:
+        Axes object.
+    """
+
+    # Strong checks for dimensions
+    if len(ivt_data.dims) != 2 or len(ar_mask.dims) != 2:
+        raise ValueError("IVT and AR mask data must have only 2 dimensions.")
+
+    if "longitude" not in ivt_data.dims or "latitude" not in ivt_data.dims:
+        raise ValueError("IVT data must have longitude and latitude dimensions.")
+
+    if "longitude" not in ar_mask.dims or "latitude" not in ar_mask.dims:
+        raise ValueError("AR mask data must have longitude and latitude dimensions.")
+    if ax is None:
+        fig = plt.figure(figsize=(16, 9))
+        # Adjust subplot parameters to center plot and minimize whitespace
+        # Leave space for colorbar on right, but center the main plot area
+        fig.subplots_adjust(left=0.08, right=0.98, top=0.92, bottom=0.05)
+        ax = plt.axes(projection=ccrs.PlateCarree())
+    else:
+        fig = ax.figure
+    # Use general plotting functions for geographic features
+    plotting.add_geographic_features(ax, include_land_ocean=True, land_ocean_alpha=0.1)
+    # Override borders with custom linestyle
+    ax.add_feature(cfeature.BORDERS, linestyle=":")
+    plotting.setup_gridlines(ax, show_top_labels=False, show_right_labels=False)
+
+    center_latitude = (ar_mask.latitude.min() + ar_mask.latitude.max()) / 2
+    center_longitude = (ar_mask.longitude.min() + ar_mask.longitude.max()) / 2
+    center_point = (
+        utils.convert_longitude_to_180(center_longitude.values),
+        center_latitude.values,
+    )
+    lon_min, lon_max, lat_min, lat_max = generate_extent(
+        center_point, zoom=8, aspect_ratio=(16, 9), out_crs=ccrs.PlateCarree()
+    )
+
+    # Create initial IVT plot
+    im = ax.pcolormesh(
+        ivt_data.longitude,
+        ivt_data.latitude,
+        ivt_data.values,
+        transform=ccrs.PlateCarree(),
+        cmap=cmap,
+        norm=norm,
+    )
+
+    # Add AR mask as contour
+    _ = ax.contour(
+        ar_mask.longitude,
+        ar_mask.latitude,
+        ar_mask.values,
+        levels=[0.5],
+        colors="black",
+        linewidths=2,
+        transform=ccrs.PlateCarree(),
+    )
+    ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
+    # Add colorbar if requested
+    if colorbar:
+        cbar = fig.colorbar(im, ax=ax, label="Integrated Vapor Transport (kgm^-1s^-1)")
+        cbar.set_label("Integrated Vapor Transport (kgm^-1s^-1)", size=14)
+        cbar.ax.tick_params(labelsize=12)
+    if title:
+        _ = ax.set_title(title, loc="left")
+
+    return ax
 
 
 def plot_ar_mask_animation(
@@ -63,24 +168,6 @@ def plot_ar_mask_animation(
     lon_min, lon_max, lat_min, lat_max = generate_extent(
         center_point, zoom=8, aspect_ratio=(16, 9), out_crs=ccrs.PlateCarree()
     )
-
-    # Create custom colormap from original code
-    cmap_colors = [
-        "#ffffff",
-        "#bde6fa",
-        "#7bbae7",
-        "#4892bd",
-        "#49ae62",
-        "#a7d051",
-        "#f9d251",
-        "#f7792f",
-        "#e43d28",
-        "#c11b24",
-        "#921318",
-    ]
-    cmap = mcolors.LinearSegmentedColormap.from_list("custom_cubehelix", cmap_colors)
-    bounds = np.arange(0, 1200, 100)
-    norm = mcolors.BoundaryNorm(bounds, cmap.N)
 
     # Initialize first frame
     first_time_idx = 0
