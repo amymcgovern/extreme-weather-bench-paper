@@ -30,6 +30,13 @@ from shapely.geometry import Polygon
 logger = logging.getLogger(__name__)
 
 
+lsr_colors = {
+    "tornado": "black",
+    "hail": "blue",
+    "wind": "red",
+}
+
+
 def convert_longitude_for_plotting(lon_data: np.ndarray) -> np.ndarray:
     """Convert longitude from 0-360 to -180-180 for plotting.
 
@@ -422,15 +429,11 @@ def plot_storm_reports_on_axis(
         zorder: Drawing order (higher values drawn on top).
     """
 
-    tornado_color = "black"
-    hail_color = "blue"
-    wind_color = "red"
-
     if tornado_reports is not None and len(tornado_reports) > 0:
         ax.scatter(
             tornado_reports["longitude"],
             tornado_reports["latitude"],
-            c=tornado_color,
+            c=lsr_colors["tornado"],
             s=marker_size,
             alpha=alpha,
             transform=ccrs.PlateCarree(),
@@ -443,7 +446,7 @@ def plot_storm_reports_on_axis(
         ax.scatter(
             hail_reports["longitude"],
             hail_reports["latitude"],
-            c=hail_color,
+            c=lsr_colors["hail"],
             s=marker_size,
             alpha=alpha,
             transform=ccrs.PlateCarree(),
@@ -456,7 +459,7 @@ def plot_storm_reports_on_axis(
         ax.scatter(
             wind_reports["longitude"],
             wind_reports["latitude"],
-            c=wind_color,
+            c=lsr_colors["wind"],
             s=marker_size,
             alpha=alpha,
             transform=ccrs.PlateCarree(),
@@ -464,13 +467,6 @@ def plot_storm_reports_on_axis(
             linewidths=1,
             zorder=zorder,
         )
-
-
-lsr_colors = {
-    "tornado": "black",
-    "hail": "blue",
-    "wind": "red",
-}
 
 
 def get_polygon_from_bounding_box(bounding_box):
@@ -1586,7 +1582,13 @@ def subset_results_to_xarray(
 
 
 def plot_heatmap(
-    relative_error_array, error_array, settings, title=None, filename=None, ax=None
+    relative_error_array,
+    error_array,
+    settings,
+    title=None,
+    filename=None,
+    ax=None,
+    show_colorbar=False,
 ):
     """
     Plots a heatmap of the relative error of the models versus the IFS HRES
@@ -1601,9 +1603,10 @@ def plot_heatmap(
             (None if you are creating a new figure). If provided, the function
             will create 3 subplots within this axis, effectively subdividing it.
             The parent axis will be hidden and used as a container.
+        show_colorbar: boolean, if True, the colorbar will be shown
     """
     n_rows = 1
-    n_cols = 3
+    n_cols = len(settings["metric_str"])
     col_space = 0.5
     row_space = 0.5
     figsize = (
@@ -1664,9 +1667,9 @@ def plot_heatmap(
 
     # Adjust font sizes based on whether we're a subplot
     if is_subplot:
-        title_fontsize = "large"
-        label_fontsize = "large"
-        tick_fontsize = "large"
+        title_fontsize = "xx-large"
+        label_fontsize = "xx-large"
+        tick_fontsize = "xx-large"
         title_y = 1.05
     else:
         title_fontsize = "xx-large"
@@ -1721,17 +1724,29 @@ def plot_heatmap(
             axs[i].set_visible(False)
 
     # Position colorbar appropriately based on whether we're a subplot
-    if is_subplot:
+    if is_subplot and show_colorbar:
         # When used as subplot, position colorbar relative to the subplot axes
         # Get bounding box of all subplot axes
         bboxes = [ax.get_position() for ax in axs]
         left = min(bbox.x0 for bbox in bboxes)
-        # right = max(bbox.x1 for bbox in bboxes)
-        # bottom = min(bbox.y0 for bbox in bboxes)
-        # width = right - left
-        # Position colorbar below the subplots
-        # cax = fig.add_axes((left + width * 0.25, bottom - 0.08, width * 0.5, 0.03))
-    else:
+        right = max(bbox.x1 for bbox in bboxes)
+        bottom = min(bbox.y0 for bbox in bboxes)
+        width = right - left
+        # Position colorbar below the subplots with proper spacing
+        cbar_height = 0.03
+        cbar_spacing = 0.02  # Space between subplots and colorbar
+        cbar_width = width * 0.9
+        cbar_left = left + width * 0.05  # Center 90% width colorbar
+        cbar_bottom = bottom - cbar_height - cbar_spacing
+        cax = fig.add_axes((cbar_left, cbar_bottom, cbar_width, cbar_height))
+        # Create the colorbar using the first subplot's collections
+        cb = fig.colorbar(mappable=axs[0].collections[0], cax=cax, **cbar_kws)
+        cb.ax.set_xticks(cb_levels)
+        cbar_fontsize = "xx-large" if is_subplot else "large"
+        cb.ax.set_xlabel(
+            "Better ← % difference vs IFS HRES → Worse", fontsize=cbar_fontsize
+        )
+    elif show_colorbar:
         # Original positioning for standalone figure
         cax = fig.add_axes((0.25, -0.05, 0.5, 0.05))
 
