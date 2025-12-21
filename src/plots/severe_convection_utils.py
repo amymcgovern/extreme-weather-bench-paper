@@ -32,6 +32,7 @@ def setup_cbss_colormap_and_levels() -> Tuple[
     """
     levels = np.array([0, 10000, 15000, 22500, 30000, 50000, 75000])
     cmap = plt.cm.YlOrRd
+    # cmap = plt.cm.Purples
     colors_list = cmap(np.linspace(0, 1, len(levels) - 1))
     colors_list[0] = [1, 1, 1, 0]  # Set first color to transparent white
     cmap_custom = colors.ListedColormap(colors_list)

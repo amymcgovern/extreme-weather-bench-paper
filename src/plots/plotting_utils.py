@@ -410,11 +410,16 @@ def plot_storm_reports_on_axis(
         alpha: Transparency of markers.
         zorder: Drawing order (higher values drawn on top).
     """
+
+    tornado_color = "black"
+    hail_color = "blue"
+    wind_color = "red"
+
     if tornado_reports is not None and len(tornado_reports) > 0:
         ax.scatter(
             tornado_reports["longitude"],
             tornado_reports["latitude"],
-            c="#DC267F",
+            c=tornado_color,
             s=marker_size,
             alpha=alpha,
             transform=ccrs.PlateCarree(),
@@ -427,7 +432,7 @@ def plot_storm_reports_on_axis(
         ax.scatter(
             hail_reports["longitude"],
             hail_reports["latitude"],
-            c="#FFB000",
+            c=hail_color,
             s=marker_size,
             alpha=alpha,
             transform=ccrs.PlateCarree(),
@@ -440,7 +445,7 @@ def plot_storm_reports_on_axis(
         ax.scatter(
             wind_reports["longitude"],
             wind_reports["latitude"],
-            c="#648FFF",
+            c=wind_color,
             s=marker_size,
             alpha=alpha,
             transform=ccrs.PlateCarree(),

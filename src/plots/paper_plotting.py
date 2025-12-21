@@ -17,6 +17,13 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from shapely.geometry import Polygon
 
 
+lsr_colors = {
+    "tornado": "black",
+    "hail": "blue",
+    "wind": "red",
+}
+
+
 def get_polygon_from_bounding_box(bounding_box):
     """Convert a bounding box tuple to a shapely Polygon."""
     if bounding_box is None:
@@ -351,12 +358,6 @@ def plot_all_cases_and_obs(
         "tropical_cyclone": sns_palette[1],
         "severe_convection": sns_palette[5],
         "atmospheric_river": sns_palette[7],
-    }
-
-    lsr_colors = {
-        "tornado": "#DC267F",
-        "hail": "#FFB000",
-        "wind": "#648FFF",
     }
 
     # Initialize counts for each event type
