@@ -228,7 +228,7 @@ def generate_heatwave_plots(
     plt.tight_layout()
     if filename is not None:
         plt.savefig(filename, transparent=True)
-    
+
     plt.show()
 
     # Plot 2: Average regional temperature time series
@@ -448,7 +448,7 @@ def generate_freeze_plots(
     plt.tight_layout()
     if filename is not None:
         plt.savefig(filename, transparent=True)
-   
+
     plt.show()
 
     # Plot 2: Average regional temperature time series
@@ -498,9 +498,6 @@ def generate_freeze_plots(
     )
     ax2.tick_params(axis="y", labelsize=12)
 
-    # Create legend handles including the axvspan
-    from matplotlib.patches import Patch
-
     legend_elements = [
         plt.Line2D(
             [0],
@@ -525,5 +522,5 @@ def generate_freeze_plots(
     ax2.tick_params(axis="y", which="major", labelsize=12)
     plt.tight_layout()
     if filename is not None:
-    
+        plt.savefig(filename, transparent=True)
     plt.show()
