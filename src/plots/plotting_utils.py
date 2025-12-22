@@ -1527,60 +1527,6 @@ def plot_two_results_by_metric(
         plt.savefig(filename, bbox_inches="tight", dpi=300)
 
 
-def subset_results_to_xarray(
-    results_df,
-    forecast_source,
-    target_source,
-    metric,
-    init_time=None,
-    case_id_list=None,
-):
-    """
-    takes in one of the overall results tables and returns a multi-dimensional xarray
-        for easier plotting.
-    parameters:
-        results_df: pandas dataframe containing the results
-        forecast_source: string, the forecast source
-        target_source: string, the target source
-        metric: string, the metric to plot
-        init_time: string, the initial time to subset the data to
-            (None if you don't want to subset by init time)
-        case_id_list: list of strings, the case ids to subset the data to
-            (None if you don't want to subset)
-    returns:
-        subset_xa: xarray dataset containing the subsetted data
-    """
-    # if the case_id_list is not empty, subset to the specific cases
-    if case_id_list is not None:
-        subset = results_df[
-            (results_df["forecast_source"] == forecast_source)
-            & (results_df["target_source"] == target_source)
-            & (results_df["metric"] == metric)
-            & (results_df["case_id_number"].isin(case_id_list))
-        ]
-    else:
-        subset = results_df[
-            (results_df["forecast_source"] == forecast_source)
-            & (results_df["target_source"] == target_source)
-            & (results_df["metric"] == metric)
-        ]
-
-    subset = subset.astype({"lead_time": "timedelta64[ns]"})
-
-    # if the init time is specified, subset that
-    if init_time == "zeroz":
-        # convert to a timedelta object so we can grab zeroz
-        subset = subset[subset["lead_time"].dt.seconds % 86400 == 0]
-    elif init_time == "twelvez":
-        subset = subset[subset["lead_time"].dt.seconds % 86400 == 43200]
-
-    # prepare for xarray conversion
-    subset2 = subset.set_index(["lead_time", "case_id_number"]).sort_index()
-    subset_xa = subset2.to_xarray()
-
-    return subset_xa
-
-
 def plot_heatmap(
     relative_error_array,
     error_array,
