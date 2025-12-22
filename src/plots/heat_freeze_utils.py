@@ -1,15 +1,89 @@
 # setup all the imports
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
+import matplotlib.colors as mcolors
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import xarray as xr
 from cartopy.mpl.gridliner import LatitudeFormatter, LongitudeFormatter
 from extremeweatherbench import cases, utils
 from matplotlib.patches import Patch
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from plotting_utils import celsius_colormap_and_normalize, convert_day_yearofday_to_time
+
+
+def convert_day_yearofday_to_time(dataset: xr.Dataset, year: int) -> xr.Dataset:
+    """Convert dayofyear and hour coordinates in an xarray Dataset to a new time
+    coordinate.
+
+    Args:
+        dataset: The input xarray dataset.
+        year: The base year to use for the time coordinate.
+
+    Returns:
+        The dataset with a new time coordinate.
+    """
+    # Create a new time coordinate by combining dayofyear and hour
+    time_dim = pd.date_range(
+        start=f"{year}-01-01",
+        periods=len(dataset["dayofyear"]) * len(dataset["hour"]),
+        freq="6h",
+    )
+    dataset = dataset.stack(time=("dayofyear", "hour"))
+    # Assign the new time coordinate to the dataset
+    dataset = dataset.drop_vars(["time", "dayofyear", "hour"]).assign_coords(
+        time=time_dim
+    )
+
+    return dataset
+
+
+def celsius_colormap_and_normalize() -> tuple[mcolors.Colormap, mcolors.Normalize]:
+    """Gets the colormap and normalization for 2m temperature.
+
+    Uses a custom colormap for temperature in Celsius.
+
+    Returns:
+        A tuple (cmap, norm) for plotting.
+    """
+    lo_colors = [
+        "#E4C7F4",
+        "#E53885",
+        "#C17CBE",
+        "#694396",
+        "#CBCCE9",
+        "#6361BD",
+        "#77FBFE",
+    ]
+    hi_colors = [
+        "#8CE9B0",
+        "#479F31",
+        "#F0F988",
+        "#AD311B",
+        "#ECB9F1",
+        "#7F266F",
+    ]
+    colors = lo_colors + hi_colors
+
+    # Calculate the position where we want the 0C jump
+    lo = -67.8
+    hi = 54.4
+    threshold = 0
+    threshold_pos = (threshold - lo) / (hi - lo)  # normalize 0°C position to [0,1]
+
+    # Create positions for colors with a small gap around zero_pos
+    positions = np.concatenate(
+        [
+            np.linspace(0, threshold_pos - 0.02, len(lo_colors)),  # Colors up to white
+            # [threshold_pos],  # White position
+            np.linspace(threshold_pos + 0.02, 1, len(hi_colors)),  # Colors after white
+        ]
+    )
+
+    return mcolors.LinearSegmentedColormap.from_list(
+        "temp_colormap", list(zip(positions, colors))
+    ), mcolors.Normalize(vmin=lo, vmax=hi)
 
 
 def generate_heatwave_dataset(

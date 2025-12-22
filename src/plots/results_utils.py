@@ -105,9 +105,11 @@ def compute_relative_error(
     """Computes the relative error of the results by lead time Error
     is defined as relative to the comparison results.
     If the metric is better when lower,
-        the relative error is computed as (my_mean - comparison_mean) / comparison_mean * 100.
+        the relative error is computed as (my_mean - comparison_mean) /
+            comparison_mean * 100.
     If the metric is better when higher,
-        the relative error is computed as (comparison_mean - my_mean) / comparison_mean * 100.
+        the relative error is computed as (comparison_mean - my_mean) /
+            comparison_mean * 100.
     parameters:
         results_df: pandas dataframe containing the results
         comparison_results_df: pandas dataframe containing the comparison results

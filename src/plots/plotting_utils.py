@@ -27,6 +27,7 @@ from extremeweatherbench import cases, utils
 from matplotlib.patches import Patch
 from shapely.geometry import Polygon
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -1190,80 +1191,6 @@ def plot_boxes(box_list, box_names, title, filename=None):
     # just wants to see the plot)
     if filename is not None:
         plt.savefig(filename, transparent=False, bbox_inches="tight", dpi=300)
-
-
-def celsius_colormap_and_normalize() -> tuple[mcolors.Colormap, mcolors.Normalize]:
-    """Gets the colormap and normalization for 2m temperature.
-
-    Uses a custom colormap for temperature in Celsius.
-
-    Returns:
-        A tuple (cmap, norm) for plotting.
-    """
-    lo_colors = [
-        "#E4C7F4",
-        "#E53885",
-        "#C17CBE",
-        "#694396",
-        "#CBCCE9",
-        "#6361BD",
-        "#77FBFE",
-    ]
-    hi_colors = [
-        "#8CE9B0",
-        "#479F31",
-        "#F0F988",
-        "#AD311B",
-        "#ECB9F1",
-        "#7F266F",
-    ]
-    colors = lo_colors + hi_colors
-
-    # Calculate the position where we want the 0C jump
-    lo = -67.8
-    hi = 54.4
-    threshold = 0
-    threshold_pos = (threshold - lo) / (hi - lo)  # normalize 0°C position to [0,1]
-
-    # Create positions for colors with a small gap around zero_pos
-    positions = np.concatenate(
-        [
-            np.linspace(0, threshold_pos - 0.02, len(lo_colors)),  # Colors up to white
-            # [threshold_pos],  # White position
-            np.linspace(threshold_pos + 0.02, 1, len(hi_colors)),  # Colors after white
-        ]
-    )
-
-    return mcolors.LinearSegmentedColormap.from_list(
-        "temp_colormap", list(zip(positions, colors))
-    ), mcolors.Normalize(vmin=lo, vmax=hi)
-
-
-def convert_day_yearofday_to_time(dataset: xr.Dataset, year: int) -> xr.Dataset:
-    """Convert dayofyear and hour coordinates in an xarray Dataset to a new time
-    coordinate.
-
-    Args:
-        dataset: The input xarray dataset.
-        year: The base year to use for the time coordinate.
-
-    Returns:
-        The dataset with a new time coordinate.
-    """
-    # Create a new time coordinate by combining dayofyear and hour
-    time_dim = pd.date_range(
-        start=f"{year}-01-01",
-        periods=len(dataset["dayofyear"]) * len(dataset["hour"]),
-        freq="6h",
-    )
-    dataset = dataset.stack(time=("dayofyear", "hour"))
-    # Assign the new time coordinate to the dataset
-    dataset = dataset.drop_vars(["time", "dayofyear", "hour"]).assign_coords(
-        time=time_dim
-    )
-
-    return dataset
-
 
 def plot_results_by_metric(
     data,
