@@ -21,12 +21,10 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import shapely
-import xarray as xr
 from cartopy.mpl.gridliner import LatitudeFormatter, LongitudeFormatter
 from extremeweatherbench import cases, utils
 from matplotlib.patches import Patch
 from shapely.geometry import Polygon
-
 
 logger = logging.getLogger(__name__)
 
@@ -1191,6 +1189,7 @@ def plot_boxes(box_list, box_names, title, filename=None):
     # just wants to see the plot)
     if filename is not None:
         plt.savefig(filename, transparent=False, bbox_inches="tight", dpi=300)
+
 
 def plot_results_by_metric(
     data,
