@@ -477,9 +477,6 @@ def generate_freeze_plots(
     )
     ax2.tick_params(axis="y", labelsize=12)
 
-    # Create legend handles including the axvspan
-    from matplotlib.patches import Patch
-
     legend_elements = [
         plt.Line2D(
             [0],
