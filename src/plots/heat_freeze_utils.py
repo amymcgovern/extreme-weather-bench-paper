@@ -7,38 +7,11 @@ import matplotlib.colors as mcolors
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import xarray as xr
 from cartopy.mpl.gridliner import LatitudeFormatter, LongitudeFormatter
 from extremeweatherbench import cases, utils
 from matplotlib.patches import Patch
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
-
-def convert_day_yearofday_to_time(dataset: xr.Dataset, year: int) -> xr.Dataset:
-    """Convert dayofyear and hour coordinates in an xarray Dataset to a new time
-    coordinate.
-
-    Args:
-        dataset: The input xarray dataset.
-        year: The base year to use for the time coordinate.
-
-    Returns:
-        The dataset with a new time coordinate.
-    """
-    # Create a new time coordinate by combining dayofyear and hour
-    time_dim = pd.date_range(
-        start=f"{year}-01-01",
-        periods=len(dataset["dayofyear"]) * len(dataset["hour"]),
-        freq="6h",
-    )
-    dataset = dataset.stack(time=("dayofyear", "hour"))
-    # Assign the new time coordinate to the dataset
-    dataset = dataset.drop_vars(["time", "dayofyear", "hour"]).assign_coords(
-        time=time_dim
-    )
-
-    return dataset
 
 
 def celsius_colormap_and_normalize() -> tuple[mcolors.Colormap, mcolors.Normalize]:
@@ -102,10 +75,10 @@ def generate_heatwave_dataset(
         single_case: cases.IndividualCase object with metadata
     """
     era5_case = era5[["2m_temperature"]].sel(
-        time=slice(single_case.start_date, single_case.end_date)
+        valid_time=slice(single_case.start_date, single_case.end_date)
     )
-    subset_climatology = convert_day_yearofday_to_time(
-        climatology, np.unique(era5_case.time.dt.year.values)[0]
+    subset_climatology = utils.convert_day_yearofday_to_time(
+        climatology, np.unique(era5_case.valid_time.dt.year.values)[0]
     )
     merged_dataset = xr.merge(
         [
@@ -155,7 +128,7 @@ def generate_heatwave_plots(
         figsize=(12, 6), subplot_kw={"projection": ccrs.PlateCarree()}
     )
     # Select the timestep with the maximum spatially averaged temp
-    subset_timestep = time_based_heatwave_dataset["time"][
+    subset_timestep = time_based_heatwave_dataset["valid_time"][
         time_based_heatwave_dataset["2m_temperature"].argmax()
     ]
     # Mask places where temp >= 85th percentile climatology
@@ -169,7 +142,7 @@ def generate_heatwave_plots(
     # Apply mask to temperature data
     masked_temp = temp_data.where(mask)
     cmap, norm = celsius_colormap_and_normalize()
-    im = masked_temp.sel(time=subset_timestep).plot(
+    im = masked_temp.sel(valid_time=subset_timestep).plot(
         ax=ax1,
         transform=ccrs.PlateCarree(),
         cmap=cmap,
@@ -177,7 +150,7 @@ def generate_heatwave_plots(
         add_colorbar=False,
     )
     (
-        temp_data.sel(time=subset_timestep).plot.contour(
+        temp_data.sel(valid_time=subset_timestep).plot.contour(
             ax=ax1,
             levels=[0],
             colors="r",
@@ -205,8 +178,8 @@ def generate_heatwave_plots(
     gl.ylabel_style = {"size": 12, "color": "k"}
     ax1.set_title("")  # clears the default xarray title
     time_str = (
-        heatwave_dataset["time"]
-        .sel(time=subset_timestep)
+        heatwave_dataset["valid_time"]
+        .sel(valid_time=subset_timestep)
         .dt.strftime("%Y-%m-%d %Hz")
         .values
     )
@@ -248,18 +221,21 @@ def generate_heatwave_plots(
     start = None
     for i, val in enumerate(mask.values):
         if val and start is None:
-            start = time_based_heatwave_dataset.time[i].values
+            start = time_based_heatwave_dataset.valid_time[i].values
         elif not val and start is not None:
             ax2.axvspan(
                 start,
-                time_based_heatwave_dataset.time[i].values,
+                time_based_heatwave_dataset.valid_time[i].values,
                 color="red",
                 alpha=0.1,
             )
             start = None
     if start is not None:
         ax2.axvspan(
-            start, time_based_heatwave_dataset.time[-1].values, color="red", alpha=0.1
+            start,
+            time_based_heatwave_dataset.valid_time[-1].values,
+            color="red",
+            alpha=0.1,
         )
     ax2.set_title("")
     ax2.set_title(
@@ -268,7 +244,7 @@ def generate_heatwave_plots(
         loc="left",
     )
     ax2.set_ylabel("Temperature (C)", fontsize=12)
-    ax2.set_xlabel("Time", fontsize=12)
+    ax2.set_xlabel("valid_time", fontsize=12)
     ax2.tick_params(axis="x", labelsize=12)
     ax2.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))
     ax2.xaxis.set_tick_params(
@@ -322,10 +298,10 @@ def generate_freeze_dataset(
         single_case: cases.IndividualCase object with metadata
     """
     era5_case = era5[["2m_temperature"]].sel(
-        time=slice(single_case.start_date, single_case.end_date)
+        valid_time=slice(single_case.start_date, single_case.end_date)
     )
-    subset_climatology = convert_day_yearofday_to_time(
-        climatology, np.unique(era5_case.time.dt.year.values)[0]
+    subset_climatology = utils.convert_day_yearofday_to_time(
+        climatology, np.unique(era5_case.valid_time.dt.year.values)[0]
     )
     merged_dataset = xr.merge(
         [
@@ -375,7 +351,7 @@ def generate_freeze_plots(
         figsize=(12, 6), subplot_kw={"projection": ccrs.PlateCarree()}
     )
     # Select the timestep with the maximum spatially averaged temp
-    subset_timestep = time_based_freeze_dataset["time"][
+    subset_timestep = time_based_freeze_dataset["valid_time"][
         time_based_freeze_dataset["2m_temperature"].argmin()
     ]
     # Mask places where temp >= 15th percentile climatology
@@ -389,7 +365,7 @@ def generate_freeze_plots(
     # Apply mask to temperature data
     masked_temp = temp_data.where(mask)
     cmap, norm = celsius_colormap_and_normalize()
-    im = masked_temp.sel(time=subset_timestep).plot(
+    im = masked_temp.sel(valid_time=subset_timestep).plot(
         ax=ax1,
         transform=ccrs.PlateCarree(),
         cmap=cmap,
@@ -397,7 +373,7 @@ def generate_freeze_plots(
         add_colorbar=False,
     )
     (
-        temp_data.sel(time=subset_timestep).plot.contour(
+        temp_data.sel(valid_time=subset_timestep).plot.contour(
             ax=ax1,
             levels=[0],
             colors="r",
@@ -425,8 +401,8 @@ def generate_freeze_plots(
     gl.ylabel_style = {"size": 12, "color": "k"}
     ax1.set_title("")  # clears the default xarray title
     time_str = (
-        freeze_dataset["time"]
-        .sel(time=subset_timestep)
+        freeze_dataset["valid_time"]
+        .sel(valid_time=subset_timestep)
         .dt.strftime("%Y-%m-%d %Hz")
         .values
     )
@@ -468,18 +444,21 @@ def generate_freeze_plots(
     start = None
     for i, val in enumerate(mask.values):
         if val and start is None:
-            start = time_based_freeze_dataset.time[i].values
+            start = time_based_freeze_dataset.valid_time[i].values
         elif not val and start is not None:
             ax2.axvspan(
                 start,
-                time_based_freeze_dataset.time[i].values,
+                time_based_freeze_dataset.valid_time[i].values,
                 color="red",
                 alpha=0.1,
             )
             start = None
     if start is not None:
         ax2.axvspan(
-            start, time_based_freeze_dataset.time[-1].values, color="red", alpha=0.1
+            start,
+            time_based_freeze_dataset.valid_time[-1].values,
+            color="red",
+            alpha=0.1,
         )
     ax2.set_title("")
     ax2.set_title(
@@ -488,7 +467,7 @@ def generate_freeze_plots(
         loc="left",
     )
     ax2.set_ylabel("Temperature (C)", fontsize=12)
-    ax2.set_xlabel("Time", fontsize=12)
+    ax2.set_xlabel("valid_time", fontsize=12)
     ax2.tick_params(axis="x", labelsize=12)
     ax2.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))
     ax2.xaxis.set_tick_params(
