@@ -78,6 +78,7 @@ def compute_mean_by_lead_time(
     returns:
         my_mean: numpy array containing the mean of the results by lead time
     """
+
     subset = subset_results_to_xarray(
         results_df=results_df,
         forecast_source=forecast_source,
@@ -86,8 +87,15 @@ def compute_mean_by_lead_time(
         init_time=init_time,
         case_id_list=case_ids,
     )
-    subset = subset.sel(lead_time=lead_times)
-    return subset["value"].mean(dim="case_id_number").values
+    # if there are results, subset to the right lead times
+    if len(subset.case_id_number.values) > 0:
+        subset = subset.sel(lead_time=lead_times)
+        return subset["value"].mean(dim="case_id_number").values
+    else:
+        print(
+            f"No results found for the given parameters: {forecast_source}, {target_source}, {metric}, {init_time}, {lead_times}, {case_ids}"
+        )
+        return None
 
 
 def compute_relative_error(

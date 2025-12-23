@@ -108,25 +108,36 @@ def generate_heatwave_dataset(
     return merged_dataset
 
 
-def generate_heatwave_plots(
+def plot_heatwave_case(
     heatwave_dataset: xr.Dataset,
     single_case: cases.IndividualCase,
     filename: Optional[str] = None,
+    ax: Optional[plt.Axes] = None,
 ):
-    """Plot max timestep of heatwave event and avg regional temp
-    time series on separate plots.
-
+    """Plot the heatwave case
     Args:
         heatwave_dataset: contains 2m_temperature,
         surface_temperature_85th_percentile, time, latitude, longitude
         single_case: cases.IndividualCase object with metadata
         filename: Optional[str] = if not None, the plots will be saved to this filename
+        ax: Optional[plt.Axes] = if not None, the axis to plot the case on
     """
+    if ax is None:
+        fig1, ax1 = plt.subplots(
+            figsize=(12, 6), subplot_kw={"projection": ccrs.PlateCarree()}
+        )
     time_based_heatwave_dataset = heatwave_dataset.mean(["latitude", "longitude"])
     # Plot 1: Min timestep of the heatwave event
-    fig1, ax1 = plt.subplots(
-        figsize=(12, 6), subplot_kw={"projection": ccrs.PlateCarree()}
-    )
+    # if the axis is not provided, create a new figure and axis
+    if ax is None:
+        fig1, ax1 = plt.subplots(
+            figsize=(12, 6), subplot_kw={"projection": ccrs.PlateCarree()}
+        )
+    else:
+        # this will be a subplot within a larger figure so use the existing axis
+        ax1 = ax
+        fig1 = ax.get_figure()
+
     # Select the timestep with the maximum spatially averaged temp
     subset_timestep = time_based_heatwave_dataset["valid_time"][
         time_based_heatwave_dataset["2m_temperature"].argmax()
@@ -198,12 +209,21 @@ def generate_heatwave_plots(
     cbar.set_label("Temperature (C)", size=14)
     cbar.ax.tick_params(labelsize=12)
 
-    plt.tight_layout()
-    if filename is not None:
-        plt.savefig(filename, transparent=True)
+    if ax is None:
+        plt.tight_layout()
+        if filename is not None:
+            plt.savefig(filename, transparent=True)
+        plt.show()
 
-    plt.show()
 
+def plot_heatwave_time_series(
+    heatwave_dataset: xr.Dataset,
+    single_case: cases.IndividualCase,
+    filename: Optional[str] = None,
+):
+    time_based_heatwave_dataset = heatwave_dataset.mean(["latitude", "longitude"])
+
+    """Plot the heatwave time series."""
     # Plot 2: Average regional temperature time series
     fig2, ax2 = plt.subplots(figsize=(10, 6))
     lss = ["-.", "-"]
@@ -284,6 +304,24 @@ def generate_heatwave_plots(
     plt.show()
 
 
+def generate_heatwave_plots(
+    heatwave_dataset: xr.Dataset,
+    single_case: cases.IndividualCase,
+    filename: Optional[str] = None,
+):
+    """Plot max timestep of heatwave event and avg regional temp
+    time series on separate plots.
+
+    Args:
+        heatwave_dataset: contains 2m_temperature,
+        surface_temperature_85th_percentile, time, latitude, longitude
+        single_case: cases.IndividualCase object with metadata
+        filename: Optional[str] = if not None, the plots will be saved to this filename
+    """
+    plot_heatwave_case(heatwave_dataset, single_case, filename)
+    plot_heatwave_time_series(heatwave_dataset, single_case, filename)
+
+
 def generate_freeze_dataset(
     era5: xr.Dataset,
     climatology: xr.Dataset,
@@ -331,25 +369,31 @@ def generate_freeze_dataset(
     return merged_dataset
 
 
-def generate_freeze_plots(
+def plot_freeze_case(
     freeze_dataset: xr.Dataset,
     single_case: cases.IndividualCase,
     filename: Optional[str] = None,
+    ax: Optional[plt.Axes] = None,
 ):
-    """Plot max timestep of freeze event and avg regional temp
-    time series on separate plots.
-
+    """Plot the freeze case
     Args:
         freeze_dataset: contains 2m_temperature,
         surface_temperature_15th_percentile, time, latitude, longitude
         single_case: cases.IndividualCase object with metadata
         filename: Optional[str] = if not None, the plots will be saved to this filename
+        ax: Optional[plt.Axes] = if not None, the axis to plot the case on
     """
+    # if not provided, create a new figure and axis
+    if ax is None:
+        fig1, ax1 = plt.subplots(
+            figsize=(12, 6), subplot_kw={"projection": ccrs.PlateCarree()}
+        )
+    else:
+        # this will be a subplot within a larger figure so use the existing axis
+        ax1 = ax
+        fig1 = ax.get_figure()
+
     time_based_freeze_dataset = freeze_dataset.mean(["latitude", "longitude"])
-    # Plot 1: Min timestep of the freeze event
-    fig1, ax1 = plt.subplots(
-        figsize=(12, 6), subplot_kw={"projection": ccrs.PlateCarree()}
-    )
     # Select the timestep with the maximum spatially averaged temp
     subset_timestep = time_based_freeze_dataset["valid_time"][
         time_based_freeze_dataset["2m_temperature"].argmin()
@@ -421,11 +465,20 @@ def generate_freeze_plots(
     cbar.set_label("Temperature (C)", size=14)
     cbar.ax.tick_params(labelsize=12)
 
-    plt.tight_layout()
-    if filename is not None:
-        plt.savefig(filename, transparent=True)
+    if ax is None:
+        plt.tight_layout()
+        if filename is not None:
+            plt.savefig(filename, transparent=True)
+        plt.show()
 
-    plt.show()
+
+def plot_freeze_time_series(
+    freeze_dataset: xr.Dataset,
+    single_case: cases.IndividualCase,
+    filename: Optional[str] = None,
+):
+    """Plot the freeze time series"""
+    time_based_freeze_dataset = freeze_dataset.mean(["latitude", "longitude"])
 
     # Plot 2: Average regional temperature time series
     fig2, ax2 = plt.subplots(figsize=(10, 6))
@@ -503,3 +556,22 @@ def generate_freeze_plots(
     if filename is not None:
         plt.savefig(filename, transparent=True)
     plt.show()
+
+
+def generate_freeze_plots(
+    freeze_dataset: xr.Dataset,
+    single_case: cases.IndividualCase,
+    filename: Optional[str] = None,
+):
+    """Plot max timestep of freeze event and avg regional temp
+    time series on separate plots.
+
+    Args:
+        freeze_dataset: contains 2m_temperature,
+        surface_temperature_15th_percentile, time, latitude, longitude
+        single_case: cases.IndividualCase object with metadata
+        filename: Optional[str] = if not None, the plots will be saved to this filename
+    """
+
+    plot_freeze_case(freeze_dataset, single_case, filename)
+    plot_freeze_time_series(freeze_dataset, single_case, filename)
