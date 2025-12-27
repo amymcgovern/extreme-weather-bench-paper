@@ -76,9 +76,9 @@ for my_id in my_ids:
     print(my_id)
     my_case = ewb_cases.select_cases("case_id_number", my_id).cases[0]
 
-    print("Computing IVT for HRES")
-    ivt = get_ivt(my_case, hres_forecast)
-    hres_graphics[my_id] = ivt
+    # print("Computing IVT for HRES")
+    # ivt = get_ivt(my_case, hres_forecast)
+    # hres_graphics[my_id] = ivt
 
     # print("Computing IVT for FOURv2")
     # ivt = get_ivt(my_case, cira_AR_FOURv2_GFSforecast)
@@ -88,12 +88,12 @@ for my_id in my_ids:
     # ivt = get_ivt(my_case, cira_AR_GC_GFSforecast)
     # gc_graphics[my_id] = ivt
 
-    # print("Computing IVT for PANG")
-    # ivt = get_ivt(my_case, cira_AR_PANG_GFSforecast)
-    # pang_graphics[my_id] = ivt
+    print("Computing IVT for PANG")
+    ivt = get_ivt(my_case, cira_AR_PANG_GFSforecast)
+    pang_graphics[my_id] = ivt
 
 print("Saving the graphics objects")
-pickle.dump(hres_graphics, open(basepath + "saved_data/hres_ar_graphics.pkl", "wb"))
+# pickle.dump(hres_graphics, open(basepath + "saved_data/hres_ar_graphics.pkl", "wb"))
 # pickle.dump(fourv2_graphics, open(basepath + "saved_data/fourv2_ar_graphics.pkl", "wb"))
 # pickle.dump(gc_graphics, open(basepath + "saved_data/gc_ar_graphics.pkl", "wb"))
-# pickle.dump(pang_graphics, open(basepath + "saved_data/pang_ar_graphics.pkl", "wb"))
+pickle.dump(pang_graphics, open(basepath + "saved_data/pang_ar_graphics.pkl", "wb"))
