@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import Optional, Tuple
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
@@ -16,23 +16,36 @@ import src.plots.plotting_utils as plotting
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-# Create custom colormap from original code
-cmap_colors = [
-    "#ffffff",
-    "#bde6fa",
-    "#7bbae7",
-    "#4892bd",
-    "#49ae62",
-    "#a7d051",
-    "#f9d251",
-    "#f7792f",
-    "#e43d28",
-    "#c11b24",
-    "#921318",
-]
-cmap = mcolors.LinearSegmentedColormap.from_list("custom_cubehelix", cmap_colors)
-bounds = np.arange(0, 1200, 100)
-norm = mcolors.BoundaryNorm(bounds, cmap.N)
+
+def setup_atmospheric_river_colormap_and_levels() -> Tuple[
+    mcolors.ListedColormap, mcolors.BoundaryNorm, np.ndarray
+]:
+    """Setup colormap and normalization for AR plotting.
+
+    Returns:
+        Tuple of (colormap, normalization, levels) for CBSS plotting.
+        Levels based on thresholds: < 10,000 (Low/transparent),
+        10,000-22,500 (Marginal), > 22,500 (Significant).
+    """
+    # Create custom colormap from original code
+    cmap_colors = [
+        "#ffffff",
+        "#bde6fa",
+        "#7bbae7",
+        "#4892bd",
+        "#49ae62",
+        "#a7d051",
+        "#f9d251",
+        "#f7792f",
+        "#e43d28",
+        "#c11b24",
+        "#921318",
+    ]
+    cmap = mcolors.LinearSegmentedColormap.from_list("custom_cubehelix", cmap_colors)
+    bounds = np.arange(0, 1200, 100)
+    norm = mcolors.BoundaryNorm(bounds, cmap.N)
+
+    return cmap, norm
 
 
 def plot_ar_mask_single_timestep(
@@ -56,6 +69,8 @@ def plot_ar_mask_single_timestep(
         Axes object.
     """
 
+    cmap, norm = setup_atmospheric_river_colormap_and_levels()
+
     # Strong checks for dimensions
     if len(ivt_data.dims) != 2 or len(ar_mask.dims) != 2:
         raise ValueError("IVT and AR mask data must have only 2 dimensions.")
@@ -71,8 +86,11 @@ def plot_ar_mask_single_timestep(
         # Leave space for colorbar on right, but center the main plot area
         fig.subplots_adjust(left=0.08, right=0.98, top=0.92, bottom=0.05)
         ax = plt.axes(projection=ccrs.PlateCarree())
+        is_subplot = False
     else:
         fig = ax.figure
+        is_subplot = True
+
     # Use general plotting functions for geographic features
     plotting.add_geographic_features(ax, include_land_ocean=True, land_ocean_alpha=0.1)
     # Override borders with custom linestyle
@@ -116,7 +134,7 @@ def plot_ar_mask_single_timestep(
         cbar.set_label("Integrated Vapor Transport (kgm^-1s^-1)", size=14)
         cbar.ax.tick_params(labelsize=12)
     if title:
-        _ = ax.set_title(title, loc="left")
+        _ = ax.set_title(title, loc="center")
 
     return ax
 
@@ -140,6 +158,8 @@ def plot_ar_mask_animation(
     """
     # Get the time dimension name
     time_dim = "valid_time" if "valid_time" in ivt_data.dims else "time"
+
+    cmap, norm = setup_atmospheric_river_colormap_and_levels()
 
     # Create figure and axes matching original styling with tighter layout
     fig = plt.figure(figsize=(16, 9))
