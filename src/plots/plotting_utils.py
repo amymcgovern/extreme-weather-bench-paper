@@ -140,6 +140,8 @@ def setup_gridlines(
     gl.xformatter = cartopy.mpl.ticker.LongitudeFormatter(
         dms=False, number_format=number_format
     )
+    gl.xlabel_style = {"size": 14}
+    gl.ylabel_style = {"size": 14}
     gl.yformatter = cartopy.mpl.ticker.LatitudeFormatter(number_format=number_format)
 
 
@@ -559,6 +561,8 @@ def plot_all_cases(
     gl.right_labels = False
     gl.xformatter = LongitudeFormatter()
     gl.yformatter = LatitudeFormatter()
+    gl.xlabel_style = {"size": 14}
+    gl.ylabel_style = {"size": 14}
 
     # Define colors for each event type
     # use seaborn color palette for colorblind friendly colors
@@ -717,12 +721,10 @@ def plot_all_cases(
         title = "ExtremeWeatherBench Cases (n = %d)" % sum(counts_by_type.values())
     else:
         title = (
-            f"ExtremeWeatherBench Cases: "
-            f"{event_type.replace('_', ' ').title()} (n = %d)"
-            % counts_by_type[event_type]
+            f"{event_type.replace('_', ' ').title()} (n = {counts_by_type[event_type]})"
         )
 
-    ax.set_title(title, loc="left", fontsize=20)
+    ax.set_title(title, loc="center", fontsize=20)
 
     # save if there is a filename specified (otherwise the user
     # just wants to see the plot)

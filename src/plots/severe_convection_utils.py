@@ -249,7 +249,7 @@ def plot_cbss_forecast_panel(
             + f"Valid: {valid_time.strftime('%Y-%m-%d %H:%M')} UTC"
         )
 
-    ax.set_title(title_str, fontsize=10)
+    ax.set_title(title_str, fontsize=18)
 
     return ax, im
 
