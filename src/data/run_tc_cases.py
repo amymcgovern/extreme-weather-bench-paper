@@ -4,20 +4,10 @@ from pathlib import Path
 from extremeweatherbench import cases, defaults, derived, evaluate, inputs, metrics
 
 # make the basepath - change this to your local path
-basepath = Path.home() / "ExtremeWeatherBench" / ""
+basepath = Path.home() / "extreme-weather-bench-paper" / ""
 basepath = str(basepath) + "/"
 
-# ugly hack to load in our plotting scripts
-import sys  # noqa: E402
-
-sys.path.append(basepath + "/docs/notebooks/")
-
-
 # setup the templates to load in the data
-# setup the templates to load in the data
-
-# Forecast Examples
-
 cira_TC_FOURv2_GFS_forecast = inputs.KerchunkForecast(
     source="gs://extremeweatherbench/FOUR_v200_GFS.parq",
     variables=[
@@ -126,13 +116,18 @@ ewb_hres = evaluate.ExtremeWeatherBench(ewb_cases, HRES_TC_EVALUATION_OBJECTS)
 # if you have already saved them (from running this once), then skip this box
 parallel_config = {"backend": "loky", "n_jobs": 24}
 
-# fourv2_results = ewb_fourv2.run(parallel_config=parallel_config)
-# gc_results = ewb_gc.run(parallel_config=parallel_config)
-# pang_results = ewb_pang.run(parallel_config=parallel_config)
+print("running HRES TC cases")
 hres_results = ewb_hres.run(parallel_config=parallel_config)
+hres_results.to_pickle(basepath + "saved_data/hres_tc_results.pkl")
 
-# save the results to make it more efficient
-# fourv2_results.to_pickle(basepath + "docs/notebooks/figs/fourv2_tc_results.pkl")
-# gc_results.to_pickle(basepath + "docs/notebooks/figs/gc_tc_results.pkl")
-# pang_results.to_pickle(basepath + "docs/notebooks/figs/pang_tc_results.pkl")
-hres_results.to_pickle(basepath + "docs/notebooks/figs/hres_tc_results.pkl")
+print("running FOURV2 TC cases")
+fourv2_results = ewb_fourv2.run(parallel_config=parallel_config)
+fourv2_results.to_pickle(basepath + "saved_data/fourv2_tc_results.pkl")
+
+print("running GC TC cases")
+gc_results = ewb_gc.run(parallel_config=parallel_config)
+gc_results.to_pickle(basepath + "saved_data/gc_tc_results.pkl")
+
+print("running PANG TC cases")
+pang_results = ewb_pang.run(parallel_config=parallel_config)
+pang_results.to_pickle(basepath + "saved_data/pang_tc_results.pkl")

@@ -134,7 +134,11 @@ def plot_ar_mask_single_timestep(
         cbar.set_label("Integrated Vapor Transport (kgm^-1s^-1)", size=14)
         cbar.ax.tick_params(labelsize=12)
     if title:
-        _ = ax.set_title(title, loc="center")
+        if is_subplot:
+            title_size = "xx-large"
+        else:
+            title_size = "large"
+        _ = ax.set_title(title, loc="center", size=title_size)
 
     return ax
 
