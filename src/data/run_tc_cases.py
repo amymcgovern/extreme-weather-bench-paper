@@ -53,18 +53,26 @@ hres_forecast = inputs.ZarrForecast(
     name="ECMWF HRES",
 )
 
-
-tc_metrics = [
-    metrics.LandfallDisplacement(),
-    metrics.LandfallTimeMeanError(),
-    metrics.LandfallIntensityMeanAbsoluteError(),
+# Define composite metric for tropical cyclone track metrics. Using a composite metric
+# prevents recomputation of landfalls, saving significant time. approach="next" sets
+# the evaluation to occur, in the case of multiple landfalls, for the next landfall in
+# time to be evaluated against
+composite_landfall_metrics = [
+    metrics.LandfallMetric(
+        metrics=[
+            metrics.LandfallIntensityMeanAbsoluteError,
+            metrics.LandfallTimeMeanError,
+            metrics.LandfallDisplacement,
+        ],
+        approach="next",
+    )
 ]
 
 
 FOURv2_TC_EVALUATION_OBJECTS = [
     inputs.EvaluationObject(
         event_type="tropical_cyclone",
-        metric_list=tc_metrics,
+        metric_list=composite_landfall_metrics,
         target=defaults.ibtracs_target,
         forecast=cira_TC_FOURv2_GFS_forecast,
     ),
@@ -73,7 +81,7 @@ FOURv2_TC_EVALUATION_OBJECTS = [
 GC_TC_EVALUATION_OBJECTS = [
     inputs.EvaluationObject(
         event_type="tropical_cyclone",
-        metric_list=tc_metrics,
+        metric_list=composite_landfall_metrics,
         target=defaults.ibtracs_target,
         forecast=cira_TC_GC_GFS_forecast,
     ),
@@ -82,7 +90,7 @@ GC_TC_EVALUATION_OBJECTS = [
 PANG_TC_EVALUATION_OBJECTS = [
     inputs.EvaluationObject(
         event_type="tropical_cyclone",
-        metric_list=tc_metrics,
+        metric_list=composite_landfall_metrics,
         target=defaults.ibtracs_target,
         forecast=cira_TC_PANG_GFS_forecast,
     ),
@@ -91,7 +99,7 @@ PANG_TC_EVALUATION_OBJECTS = [
 HRES_TC_EVALUATION_OBJECTS = [
     inputs.EvaluationObject(
         event_type="tropical_cyclone",
-        metric_list=tc_metrics,
+        metric_list=composite_landfall_metrics,
         target=defaults.ibtracs_target,
         forecast=hres_forecast,
     ),
