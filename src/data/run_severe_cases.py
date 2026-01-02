@@ -1,7 +1,6 @@
 # setup all the imports
 from dataclasses import dataclass
 
-import pandas as pd
 import seaborn as sns
 import xarray as xr
 from arraylake import Client
@@ -20,6 +19,23 @@ from pathlib import Path  # noqa: E402
 # make the basepath - change this to your local path
 basepath = Path.home() / "extreme-weather-bench-paper" / ""
 basepath = str(basepath) + "/"
+
+BB_metadata_variable_mapping = {
+    "time": "valid_time",
+    "t2m": "surface_air_temperature",
+    "t": "air_temperature",
+    "q": "specific_humidity",
+    "u": "eastward_wind",
+    "v": "northward_wind",
+    "p": "air_pressure",
+    "z": "geopotential",
+    "r": "relative_humidity",
+    "u10": "surface_eastward_wind",
+    "v10": "surface_northward_wind",
+    "u100": "100m_eastward_wind",
+    "v100": "100m_northward_wind",
+    "msl": "air_pressure_at_mean_sea_level",
+}
 
 
 @dataclass
@@ -98,6 +114,7 @@ bb_hres_forecast = ArraylakeForecast(
     variables=[derived.CravenBrooksSignificantSevere()],
     storage_options={"remote_options": {"anon": True}},
     name="ECMWF HRES",
+    variable_mapping=BB_metadata_variable_mapping,
 )
 
 
@@ -186,7 +203,7 @@ HRES_SEVERE_EVALUATION_OBJECTS = [
     ),
 ]
 
-BB_HRES_HEAT_EVALUATION_OBJECTS = [
+BB_HRES_SEVERE_EVALUATION_OBJECTS = [
     inputs.EvaluationObject(
         event_type="severe_convection",
         metric_list=lsr_metrics,
@@ -207,7 +224,7 @@ ewb_cases = ewb_cases.select_cases("event_type", "severe_convection")
 
 
 ewb_hres = evaluate.ExtremeWeatherBench(ewb_cases, HRES_SEVERE_EVALUATION_OBJECTS)
-ewb_hres_bb = evaluate.ExtremeWeatherBench(ewb_cases, BB_HRES_HEAT_EVALUATION_OBJECTS)
+ewb_hres_bb = evaluate.ExtremeWeatherBench(ewb_cases, BB_HRES_SEVERE_EVALUATION_OBJECTS)
 ewb_fourv2 = evaluate.ExtremeWeatherBench(ewb_cases, FOURv2_SEVERE_EVALUATION_OBJECTS)
 ewb_gc = evaluate.ExtremeWeatherBench(ewb_cases, GC_SEVERE_EVALUATION_OBJECTS)
 ewb_pang = evaluate.ExtremeWeatherBench(ewb_cases, PANG_SEVERE_EVALUATION_OBJECTS)
@@ -216,13 +233,13 @@ ewb_pang = evaluate.ExtremeWeatherBench(ewb_cases, PANG_SEVERE_EVALUATION_OBJECT
 parallel_config = {"backend": "loky", "n_jobs": 24}
 
 print("running HRES part 1")
-hres_results1 = ewb_hres.run(parallel_config=parallel_config)
-print("running HRES part 2")
+# hres_results1 = ewb_hres.run(parallel_config=parallel_config)
+# print("running HRES part 2")
 hres_results2 = ewb_hres_bb.run(parallel_config=parallel_config)
 print("concatenating the results")
-hres_results = pd.concat([hres_results1, hres_results2])
+# hres_results = pd.concat([hres_results1, hres_results2])
 print("saving the results")
-hres_results.to_pickle(basepath + "saved_data/hres_severe_results.pkl")
+# hres_results.to_pickle(basepath + "saved_data/hres_severe_results.pkl")
 
 # fourv2_results = ewb_fourv2.run(parallel_config=parallel_config)
 # gc_results = ewb_gc.run(parallel_config=parallel_config)
