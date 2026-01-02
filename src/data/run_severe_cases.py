@@ -21,7 +21,7 @@ basepath = Path.home() / "extreme-weather-bench-paper" / ""
 basepath = str(basepath) + "/"
 
 BB_metadata_variable_mapping = {
-    "time": "valid_time",
+    "isobaricInhPa": "level",
     "t2m": "surface_air_temperature",
     "t": "air_temperature",
     "q": "specific_humidity",
@@ -233,13 +233,13 @@ ewb_pang = evaluate.ExtremeWeatherBench(ewb_cases, PANG_SEVERE_EVALUATION_OBJECT
 parallel_config = {"backend": "loky", "n_jobs": 24}
 
 print("running HRES part 1")
-# hres_results1 = ewb_hres.run(parallel_config=parallel_config)
+hres_results1 = ewb_hres.run(parallel_config=parallel_config)
 # print("running HRES part 2")
 hres_results2 = ewb_hres_bb.run(parallel_config=parallel_config)
 print("concatenating the results")
-# hres_results = pd.concat([hres_results1, hres_results2])
+hres_results = pd.concat([hres_results1, hres_results2])
 print("saving the results")
-# hres_results.to_pickle(basepath + "saved_data/hres_severe_results.pkl")
+hres_results.to_pickle(basepath + "saved_data/hres_severe_results.pkl")
 
 # fourv2_results = ewb_fourv2.run(parallel_config=parallel_config)
 # gc_results = ewb_gc.run(parallel_config=parallel_config)
