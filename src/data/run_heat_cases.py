@@ -119,7 +119,7 @@ bb_hres_forecast = ArraylakeForecast(
     variable_mapping={
         "t2m": "surface_air_temperature",
     },
-    name="ECMWF HRES, Brightband mirror",
+    name="ECMWF HRES",
 )
 
 
@@ -275,8 +275,12 @@ ewb_hres_later = evaluate.ExtremeWeatherBench(
 # if you have already saved them (from running this once), then skip this box
 parallel_config = {"backend": "loky", "n_jobs": 32}
 
-hres_results = ewb_hres_early.run(parallel_config=parallel_config)
-bb_hres_results = ewb_hres_later.run(parallel_config=parallel_config)
+hres_results = ewb_hres_early.run(
+    parallel_config=parallel_config, preserve_dims=["lead_time", "init_time"]
+)
+bb_hres_results = ewb_hres_later.run(
+    parallel_config=parallel_config, preserve_dims=["lead_time", "init_time"]
+)
 hres_results = pd.concat([hres_results, bb_hres_results])
 
 

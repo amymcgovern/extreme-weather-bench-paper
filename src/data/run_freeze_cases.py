@@ -119,7 +119,7 @@ bb_hres_forecast = ArraylakeForecast(
     variable_mapping={
         "t2m": "surface_air_temperature",
     },
-    name="ECMWF HRES, Brightband mirror",
+    name="ECMWF HRES",
 )
 
 
@@ -262,7 +262,6 @@ ewb_hres_later = evaluate.ExtremeWeatherBench(
 ewb_fourv2 = evaluate.ExtremeWeatherBench(ewb_cases, FOURv2_FREEZE_EVALUATION_OBJECTS)
 ewb_gc = evaluate.ExtremeWeatherBench(ewb_cases, GC_FREEZE_EVALUATION_OBJECTS)
 ewb_pang = evaluate.ExtremeWeatherBench(ewb_cases, PANG_FREEZE_EVALUATION_OBJECTS)
-ewb_hres = evaluate.ExtremeWeatherBench(ewb_cases, HRES_FREEZE_EVALUATION_OBJECTS)
 
 
 # load in the results for all heat waves in parallel
@@ -270,17 +269,17 @@ ewb_hres = evaluate.ExtremeWeatherBench(ewb_cases, HRES_FREEZE_EVALUATION_OBJECT
 # if you have already saved them (from running this once), then skip this box
 parallel_config = {"backend": "loky", "n_jobs": 32}
 
-fourv2_results = ewb_fourv2.run(parallel_config=parallel_config)
-gc_results = ewb_gc.run(parallel_config=parallel_config)
-pang_results = ewb_pang.run(parallel_config=parallel_config)
-# hres_results = ewb_hres_early.run(parallel_config=parallel_config)
-# bb_hres_results = ewb_hres_later.run(parallel_config=parallel_config)
-# hres_results = pd.concat([hres_results, bb_hres_results])
+# fourv2_results = ewb_fourv2.run(parallel_config=parallel_config)
+# gc_results = ewb_gc.run(parallel_config=parallel_config)
+# pang_results = ewb_pang.run(parallel_config=parallel_config)
+hres_results = ewb_hres_early.run(parallel_config=parallel_config)
+bb_hres_results = ewb_hres_later.run(parallel_config=parallel_config)
+hres_results = pd.concat([hres_results, bb_hres_results])
 
 # save the results to make it more efficient
 print("saving results to pickle")
-fourv2_results.to_pickle(basepath + "saved_data/fourv2_freeze_results.pkl")
-gc_results.to_pickle(basepath + "saved_data/gc_freeze_results.pkl")
-pang_results.to_pickle(basepath + "saved_data/pang_freeze_results.pkl")
-# hres_results.to_pickle(basepath + "saved_data/hres_freeze_results.pkl")
+# fourv2_results.to_pickle(basepath + "saved_data/fourv2_freeze_results.pkl")
+# gc_results.to_pickle(basepath + "saved_data/gc_freeze_results.pkl")
+# pang_results.to_pickle(basepath + "saved_data/pang_freeze_results.pkl")
+hres_results.to_pickle(basepath + "saved_data/hres_freeze_results.pkl")
 print("results saved")

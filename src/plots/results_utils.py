@@ -8,7 +8,7 @@ def subset_results_to_xarray(
     forecast_source,
     target_source,
     metric,
-    init_time=None,
+    lead_time_days=None,
     case_id_list=None,
 ):
     """
@@ -19,7 +19,7 @@ def subset_results_to_xarray(
         forecast_source: string, the forecast source
         target_source: string, the target source
         metric: string, the metric to plot
-        init_time: string, the initial time to subset the data to
+        lead_time_days: list of integers, the lead times to subset the data to
             (None if you don't want to subset by init time)
         case_id_list: list of strings, the case ids to subset the data to
             (None if you don't want to subset)
@@ -41,17 +41,16 @@ def subset_results_to_xarray(
             & (results_df["metric"] == metric)
         ]
 
-    subset = subset.astype({"lead_time": "timedelta64[ns]"})
-
-    # if the init time is specified, subset that
-    if init_time == "zeroz":
-        # convert to a timedelta object so we can grab zeroz
-        subset = subset[subset["lead_time"].dt.seconds % 86400 == 0]
-    elif init_time == "twelvez":
-        subset = subset[subset["lead_time"].dt.seconds % 86400 == 43200]
+    lead_times = [
+        np.timedelta64(lead_time_days[i], "D") for i in range(len(lead_time_days))
+    ]
 
     # prepare for xarray conversion
-    subset2 = subset.set_index(["lead_time", "case_id_number"]).sort_index()
+    subset2 = (
+        subset[subset.lead_time.isin(lead_times)]
+        .set_index(["lead_time", "case_id_number"])
+        .sort_index()
+    )
     subset_xa = subset2.to_xarray()
 
     return subset_xa
@@ -62,8 +61,7 @@ def compute_mean_by_lead_time(
     forecast_source,
     target_source,
     metric,
-    init_time,
-    lead_times,
+    lead_time_days,
     case_ids=None,
 ):
     """Computes the mean of the results by lead time.
@@ -72,7 +70,6 @@ def compute_mean_by_lead_time(
         forecast_source: string, the forecast source
         target_source: string, the target source
         metric: string, the metric to plot
-        init_time: string, the initial time to subset the data to
         lead_times: list of timedelta objects, the lead times to compute the mean for
         case_ids: list of strings, the case ids to subset the data to
     returns:
@@ -84,18 +81,11 @@ def compute_mean_by_lead_time(
         forecast_source=forecast_source,
         target_source=target_source,
         metric=metric,
-        init_time=init_time,
+        lead_time_days=lead_time_days,
         case_id_list=case_ids,
     )
-    # if there are results, subset to the right lead times
-    if len(subset.case_id_number.values) > 0:
-        subset = subset.sel(lead_time=lead_times)
-        return subset["value"].mean(dim="case_id_number").values
-    else:
-        print(
-            f"No results found for the given parameters: {forecast_source}, {target_source}, {metric}, {init_time}, {lead_times}, {case_ids}"
-        )
-        return None
+    my_mean = subset["value"].mean("case_id_number")
+    return my_mean
 
 
 def compute_relative_error(
@@ -105,7 +95,6 @@ def compute_relative_error(
     comparison_forecast_source,
     target_source,
     metric,
-    init_time,
     lead_time_days,
     case_ids=None,
     higher_is_better=False,
@@ -125,7 +114,6 @@ def compute_relative_error(
         forecast_source: string, the forecast source
         target_source: string, the target source
         metric: string, the metric to plot
-        init_time: string, the initial time to subset the data to
         lead_time_days: list of integers, the lead times to compute the relative
             error for
         case_ids: list of strings, the case ids to subset the data to
@@ -135,17 +123,13 @@ def compute_relative_error(
         my_relative_error: numpy array containing the relative error of
             the results by lead time
     """
-    # down-select to just a few lead-times
-    lead_times = [
-        np.timedelta64(lead_time_days[i], "D") for i in range(len(lead_time_days))
-    ]
+
     my_mean = compute_mean_by_lead_time(
         results_df,
         forecast_source,
         target_source,
         metric,
-        init_time,
-        lead_times,
+        lead_time_days,
         case_ids,
     )
     comparison_mean = compute_mean_by_lead_time(
@@ -153,10 +137,10 @@ def compute_relative_error(
         comparison_forecast_source,
         target_source,
         metric,
-        init_time,
-        lead_times,
+        lead_time_days,
         case_ids,
     )
+    
     if higher_is_better:
         my_relative_error = (comparison_mean - my_mean) / comparison_mean * 100
     else:

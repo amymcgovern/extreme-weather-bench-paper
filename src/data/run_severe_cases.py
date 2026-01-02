@@ -1,5 +1,10 @@
 # setup all the imports
+from dataclasses import dataclass
+
+import pandas as pd
 import seaborn as sns
+import xarray as xr
+from arraylake import Client
 from extremeweatherbench import (
     cases,
     defaults,
@@ -15,6 +20,40 @@ from pathlib import Path  # noqa: E402
 # make the basepath - change this to your local path
 basepath = Path.home() / "extreme-weather-bench-paper" / ""
 basepath = str(basepath) + "/"
+
+
+@dataclass
+class ArraylakeForecast(inputs.ForecastBase):
+    prefetch: bool = True
+
+    def _prefetch_data(self):
+        client = Client()
+        repo = client.get_repo(f"{self.org_name}/{self.repo_name}")
+        session = repo.readonly_session(self.branch_name)
+        self.ds = xr.open_zarr(session.store, group=self.group_name)
+        self.ds = self.ds.assign_coords(
+            {"lead_time": self.ds.lead_time.astype("timedelta64[h]")}
+        )
+
+    def __post_init__(self):
+        # source should be like arraylake://org_name/repo_name@branch_name/group/name/goes/here
+        if not self.source.startswith("arraylake://"):
+            raise ValueError("source must start with arraylake://")
+        bits = self.source.split("://")[1].split("/")
+        self.org_name = bits[0]
+        if "@" not in bits[1]:
+            self.branch_name = "main"
+            self.repo_name = bits[1]
+        else:
+            self.repo_name, self.branch_name = bits[1].split("@")
+        self.group_name = "/".join(bits[2:])
+        if self.prefetch:
+            self._prefetch_data()
+
+    def _open_data_from_source(self) -> xr.Dataset:
+        if self.ds is None:
+            self._prefetch_data()
+        return self.ds
 
 
 # setup the templates to load in the data
@@ -53,6 +92,14 @@ hres_severe_forecast = inputs.ZarrForecast(
     storage_options={"remote_options": {"anon": True}},
     name="ECMWF HRES",
 )
+
+bb_hres_forecast = ArraylakeForecast(
+    source="arraylake://brightband/ecmwf@main/forecast-archive/ewb-hres",
+    variables=[derived.CravenBrooksSignificantSevere()],
+    storage_options={"remote_options": {"anon": True}},
+    name="ECMWF HRES",
+)
+
 
 # Define threshold metrics
 pph_metrics = [
@@ -139,25 +186,48 @@ HRES_SEVERE_EVALUATION_OBJECTS = [
     ),
 ]
 
+BB_HRES_HEAT_EVALUATION_OBJECTS = [
+    inputs.EvaluationObject(
+        event_type="severe_convection",
+        metric_list=lsr_metrics,
+        target=defaults.lsr_target,
+        forecast=bb_hres_forecast,
+    ),
+    inputs.EvaluationObject(
+        event_type="severe_convection",
+        metric_list=pph_metrics,
+        target=defaults.pph_target,
+        forecast=bb_hres_forecast,
+    ),
+]
+
 # load in all of the events in the yaml file
 ewb_cases = cases.load_ewb_events_yaml_into_case_collection()
 ewb_cases = ewb_cases.select_cases("event_type", "severe_convection")
 
+
+ewb_hres = evaluate.ExtremeWeatherBench(ewb_cases, HRES_SEVERE_EVALUATION_OBJECTS)
+ewb_hres_bb = evaluate.ExtremeWeatherBench(ewb_cases, BB_HRES_HEAT_EVALUATION_OBJECTS)
 ewb_fourv2 = evaluate.ExtremeWeatherBench(ewb_cases, FOURv2_SEVERE_EVALUATION_OBJECTS)
 ewb_gc = evaluate.ExtremeWeatherBench(ewb_cases, GC_SEVERE_EVALUATION_OBJECTS)
 ewb_pang = evaluate.ExtremeWeatherBench(ewb_cases, PANG_SEVERE_EVALUATION_OBJECTS)
-ewb_hres = evaluate.ExtremeWeatherBench(ewb_cases, HRES_SEVERE_EVALUATION_OBJECTS)
+
 
 parallel_config = {"backend": "loky", "n_jobs": 24}
 
-print("running the cases")
-fourv2_results = ewb_fourv2.run(parallel_config=parallel_config)
+print("running HRES part 1")
+hres_results1 = ewb_hres.run(parallel_config=parallel_config)
+print("running HRES part 2")
+hres_results2 = ewb_hres_bb.run(parallel_config=parallel_config)
+print("concatenating the results")
+hres_results = pd.concat([hres_results1, hres_results2])
+print("saving the results")
+hres_results.to_pickle(basepath + "saved_data/hres_severe_results.pkl")
+
+# fourv2_results = ewb_fourv2.run(parallel_config=parallel_config)
 # gc_results = ewb_gc.run(parallel_config=parallel_config)
 # pang_results = ewb_pang.run(parallel_config=parallel_config)
-# hres_results = ewb_hres.run(parallel_config=parallel_config)
 
-print("saving the results")
-fourv2_results.to_pickle(basepath + "saved_data/fourv2_severe_results.pkl")
+# fourv2_results.to_pickle(basepath + "saved_data/fourv2_severe_results.pkl")
 # gc_results.to_pickle(basepath + "saved_data/gc_severe_results.pkl")
 # pang_results.to_pickle(basepath + "saved_data/pang_severe_results.pkl")
-# hres_results.to_pickle(basepath + "saved_data/hres_severe_results.pkl")
