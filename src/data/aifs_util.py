@@ -3,8 +3,8 @@
 import dataclasses
 import datetime
 from typing import Callable
-import icechunk
 
+import icechunk
 import xarray as xr
 from extremeweatherbench import inputs
 
@@ -73,6 +73,12 @@ AIFS_VARIABLE_MAPPING = {
     "2m_wind_gust": "surface_wind_gust",
     "2m_wind_gust_direction": "surface_wind_gust_direction",
     "2m_wind_gust_speed": "surface_wind_gust_speed",
+    "temperature": "air_temperature",
+    "u_component_of_wind": "eastward_wind",
+    "v_component_of_wind": "northward_wind",
+    "10m_u_component_of_wind": "surface_eastward_wind",
+    "10m_v_component_of_wind": "surface_northward_wind",
+    "mean_sea_level_pressure": "air_pressure_at_mean_sea_level",
 }
 
 # TODO: Change me as needed
