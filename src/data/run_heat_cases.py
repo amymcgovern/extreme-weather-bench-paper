@@ -235,6 +235,12 @@ AIFS_HEAT_EVALUATION_OBJECTS = [
         target=defaults.era5_heatwave_target,
         forecast=aifs_forecast,
     ),
+    inputs.EvaluationObject(
+        event_type="heat_wave",
+        metric_list=heat_metrics,
+        target=defaults.ghcn_heatwave_target,
+        forecast=aifs_forecast,
+    ),
 ]
 
 if __name__ == "__main__":
@@ -287,21 +293,6 @@ if __name__ == "__main__":
         "event_type", "heat_wave"
     )
 
-    # split the cases into early and later for HRES (just for ease of evaluation)
-    early_cases = cases.IndividualCaseCollection(
-        [i for i in ewb_cases.cases if i.end_date < pd.Timestamp("2023-01-01")]
-    )
-    later_cases = cases.IndividualCaseCollection(
-        [i for i in ewb_cases.cases if i.start_date > pd.Timestamp("2023-01-01")]
-    )
-
-    ewb_hres_early = evaluate.ExtremeWeatherBench(
-        early_cases, HRES_HEAT_EVALUATION_OBJECTS
-    )
-    ewb_hres_later = evaluate.ExtremeWeatherBench(
-        later_cases, BB_HRES_HEAT_EVALUATION_OBJECTS
-    )
-
     parallel_config = {"backend": "loky", "n_jobs": 32}
 
     if args.run_aifs:
@@ -314,13 +305,28 @@ if __name__ == "__main__":
     if args.run_hres:
         print("running HRES evaluation")
         ewb_hres = evaluate.ExtremeWeatherBench(ewb_cases, HRES_HEAT_EVALUATION_OBJECTS)
-        hres_results = ewb_hres.run(
+        # split the cases into early and later for HRES (just for ease of evaluation)
+        early_cases = cases.IndividualCaseCollection(
+            [i for i in ewb_cases.cases if i.end_date < pd.Timestamp("2023-01-01")]
+        )
+        later_cases = cases.IndividualCaseCollection(
+            [i for i in ewb_cases.cases if i.start_date > pd.Timestamp("2023-01-01")]
+        )
+
+        ewb_hres_early = evaluate.ExtremeWeatherBench(
+            early_cases, HRES_HEAT_EVALUATION_OBJECTS
+        )
+        ewb_hres_later = evaluate.ExtremeWeatherBench(
+            later_cases, BB_HRES_HEAT_EVALUATION_OBJECTS
+        )
+
+        hres_results_early = ewb_hres_early.run(
             parallel_config=parallel_config, preserve_dims=["lead_time", "init_time"]
         )
-        bb_hres_results = ewb_hres_later.run(
+        bb_hres_results_later = ewb_hres_later.run(
             parallel_config=parallel_config, preserve_dims=["lead_time", "init_time"]
         )
-        hres_results = pd.concat([hres_results, bb_hres_results])
+        hres_results = pd.concat([hres_results_early, bb_hres_results_later])
         hres_results.to_pickle(basepath + "saved_data/hres_heat_results.pkl")
         print("HRES evaluation complete. Results saved to pickle.")
 

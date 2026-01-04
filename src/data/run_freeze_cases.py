@@ -7,46 +7,18 @@ from extremeweatherbench import cases, defaults, evaluate, inputs, metrics
 basepath = Path.home() / "extreme-weather-bench-paper" / ""
 basepath = str(basepath) + "/"
 
-from dataclasses import dataclass
+import argparse
 
 import pandas as pd
-import xarray as xr
-from arraylake import Client
-
-
-@dataclass
-class ArraylakeForecast(inputs.ForecastBase):
-    prefetch: bool = True
-
-    def _prefetch_data(self):
-        client = Client()
-        repo = client.get_repo(f"{self.org_name}/{self.repo_name}")
-        session = repo.readonly_session(self.branch_name)
-        self.ds = xr.open_zarr(session.store, group=self.group_name)
-        self.ds = self.ds.assign_coords(
-            {"lead_time": self.ds.lead_time.astype("timedelta64[h]")}
-        )
-
-    def __post_init__(self):
-        # source should be like arraylake://org_name/repo_name@branch_name/group/name/goes/here
-        if not self.source.startswith("arraylake://"):
-            raise ValueError("source must start with arraylake://")
-        bits = self.source.split("://")[1].split("/")
-        self.org_name = bits[0]
-        if "@" not in bits[1]:
-            self.branch_name = "main"
-            self.repo_name = bits[1]
-        else:
-            self.repo_name, self.branch_name = bits[1].split("@")
-        self.group_name = "/".join(bits[2:])
-        if self.prefetch:
-            self._prefetch_data()
-
-    def _open_data_from_source(self) -> xr.Dataset:
-        if self.ds is None:
-            self._prefetch_data()
-        return self.ds
-
+from aifs_util import (
+    AIFS_VARIABLE_MAPPING,
+    DEFAULT_ICECHUNK_BUCKET,
+    DEFAULT_ICECHUNK_PREFIX,
+    DEFAULT_SOURCE_CREDENTIALS_PREFIX,
+    InMemoryForecast,
+    open_icechunk_dataset,
+)
+from arraylake_utils import ArraylakeForecast
 
 # setup the templates to load in the data
 
@@ -120,6 +92,20 @@ bb_hres_forecast = ArraylakeForecast(
         "t2m": "surface_air_temperature",
     },
     name="ECMWF HRES",
+)
+ds = open_icechunk_dataset(
+    bucket=DEFAULT_ICECHUNK_BUCKET,
+    prefix=DEFAULT_ICECHUNK_PREFIX,
+    variable_mapping=AIFS_VARIABLE_MAPPING,
+    chunks="auto",
+    source_credentials_prefix=DEFAULT_SOURCE_CREDENTIALS_PREFIX,
+)
+
+aifs_forecast = InMemoryForecast(
+    ds,
+    name="AIFS",
+    variables=["surface_air_temperature"],
+    variable_mapping=AIFS_VARIABLE_MAPPING,
 )
 
 
@@ -240,46 +226,126 @@ HRES_FREEZE_EVALUATION_OBJECTS = [
     ),
 ]
 
-# load in all of the events in the yaml file
-ewb_cases = cases.load_ewb_events_yaml_into_case_collection()
-ewb_cases = ewb_cases.select_cases("event_type", "freeze")
+AIFS_FREEZE_EVALUATION_OBJECTS = [
+    inputs.EvaluationObject(
+        event_type="freeze",
+        metric_list=freeze_metrics,
+        target=defaults.ghcn_heatwave_target,
+        forecast=aifs_forecast,
+    ),
+    inputs.EvaluationObject(
+        event_type="freeze",
+        metric_list=freeze_metrics,
+        target=defaults.era5_heatwave_target,
+        forecast=aifs_forecast,
+    ),
+]
 
-early_cases = cases.IndividualCaseCollection(
-    [i for i in ewb_cases.cases if i.end_date < pd.Timestamp("2023-01-01")]
-)
-later_cases = cases.IndividualCaseCollection(
-    [i for i in ewb_cases.cases if i.start_date > pd.Timestamp("2023-01-01")]
-)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Run heat wave evaluation against ExtremeWeatherBench cases."
+    )
 
-ewb_hres_early = evaluate.ExtremeWeatherBench(
-    early_cases, HRES_FREEZE_EVALUATION_OBJECTS
-)
-ewb_hres_later = evaluate.ExtremeWeatherBench(
-    later_cases, BB_HRES_FREEZE_EVALUATION_OBJECTS
-)
+    # run whichever cases the user specifies
 
+    # Icechunk options
+    parser.add_argument(
+        "--run_aifs",
+        action="store_true",
+        default=False,
+        help="Run AIFS evaluation (default: False)",
+    )
 
-ewb_fourv2 = evaluate.ExtremeWeatherBench(ewb_cases, FOURv2_FREEZE_EVALUATION_OBJECTS)
-ewb_gc = evaluate.ExtremeWeatherBench(ewb_cases, GC_FREEZE_EVALUATION_OBJECTS)
-ewb_pang = evaluate.ExtremeWeatherBench(ewb_cases, PANG_FREEZE_EVALUATION_OBJECTS)
+    parser.add_argument(
+        "--run_hres",
+        action="store_true",
+        default=False,
+        help="Run HRES evaluation (default: False)",
+    )
 
+    parser.add_argument(
+        "--run_pangu",
+        action="store_true",
+        default=False,
+        help="Run Pangu evaluation (default: False)",
+    )
 
-# load in the results for all heat waves in parallel
-# this will take awhile to run if you do them all in one code box
-# if you have already saved them (from running this once), then skip this box
-parallel_config = {"backend": "loky", "n_jobs": 32}
+    parser.add_argument(
+        "--run_fourv2",
+        action="store_true",
+        default=False,
+        help="Run FOURv2 evaluation (default: False)",
+    )
 
-# fourv2_results = ewb_fourv2.run(parallel_config=parallel_config)
-# gc_results = ewb_gc.run(parallel_config=parallel_config)
-# pang_results = ewb_pang.run(parallel_config=parallel_config)
-hres_results = ewb_hres_early.run(parallel_config=parallel_config)
-bb_hres_results = ewb_hres_later.run(parallel_config=parallel_config)
-hres_results = pd.concat([hres_results, bb_hres_results])
+    parser.add_argument(
+        "--run_gc",
+        action="store_true",
+        default=False,
+        help="Run GC evaluation (default: False)",
+    )
 
-# save the results to make it more efficient
-print("saving results to pickle")
-# fourv2_results.to_pickle(basepath + "saved_data/fourv2_freeze_results.pkl")
-# gc_results.to_pickle(basepath + "saved_data/gc_freeze_results.pkl")
-# pang_results.to_pickle(basepath + "saved_data/pang_freeze_results.pkl")
-hres_results.to_pickle(basepath + "saved_data/hres_freeze_results.pkl")
-print("results saved")
+    args = parser.parse_args()
+
+    # load in all of the events in the yaml file
+    ewb_cases = cases.load_ewb_events_yaml_into_case_collection()
+    ewb_cases = ewb_cases.select_cases("event_type", "freeze")
+
+    # load in the results for all freeze cases in parallel
+    # this will take awhile to run if you do them all in one code box
+    # if you have already saved them (from running this once), then skip this box
+    parallel_config = {"backend": "loky", "n_jobs": 32}
+
+    if args.run_aifs:
+        print("running AIFS evaluation")
+        ewb_aifs = evaluate.ExtremeWeatherBench(
+            ewb_cases, AIFS_FREEZE_EVALUATION_OBJECTS
+        )
+        aifs_results = ewb_aifs.run(parallel_config=parallel_config)
+        aifs_results.to_pickle(basepath + "saved_data/aifs_freeze_results.pkl")
+        print("AIFS evaluation complete. Results saved to pickle.")
+
+    if args.run_hres:
+        print("running HRES evaluation")
+        early_cases = cases.IndividualCaseCollection(
+            [i for i in ewb_cases.cases if i.end_date < pd.Timestamp("2023-01-01")]
+        )
+        later_cases = cases.IndividualCaseCollection(
+            [i for i in ewb_cases.cases if i.start_date > pd.Timestamp("2023-01-01")]
+        )
+
+        ewb_hres_early = evaluate.ExtremeWeatherBench(
+            early_cases, HRES_FREEZE_EVALUATION_OBJECTS
+        )
+        ewb_hres_later = evaluate.ExtremeWeatherBench(
+            later_cases, BB_HRES_FREEZE_EVALUATION_OBJECTS
+        )
+        hres_results_early = ewb_hres_early.run(parallel_config=parallel_config)
+        bb_hres_results_later = ewb_hres_later.run(parallel_config=parallel_config)
+        hres_results = pd.concat([hres_results_early, bb_hres_results_later])
+        hres_results.to_pickle(basepath + "saved_data/hres_freeze_results.pkl")
+        print("HRES evaluation complete. Results saved to pickle.")
+
+    if args.run_pangu:
+        print("running Pangu evaluation")
+        ewb_pang = evaluate.ExtremeWeatherBench(
+            ewb_cases, PANG_FREEZE_EVALUATION_OBJECTS
+        )
+        pang_results = ewb_pang.run(parallel_config=parallel_config)
+        pang_results.to_pickle(basepath + "saved_data/pang_freeze_results.pkl")
+        print("Pangu evaluation complete. Results saved to pickle.")
+
+    if args.run_fourv2:
+        print("running FOURv2 evaluation")
+        ewb_fourv2 = evaluate.ExtremeWeatherBench(
+            ewb_cases, FOURv2_FREEZE_EVALUATION_OBJECTS
+        )
+        fourv2_results = ewb_fourv2.run(parallel_config=parallel_config)
+        fourv2_results.to_pickle(basepath + "saved_data/fourv2_freeze_results.pkl")
+        print("FOURv2 evaluation complete. Results saved to pickle.")
+
+    if args.run_gc:
+        print("running GC evaluation")
+        ewb_gc = evaluate.ExtremeWeatherBench(ewb_cases, GC_FREEZE_EVALUATION_OBJECTS)
+        gc_results = ewb_gc.run(parallel_config=parallel_config)
+        gc_results.to_pickle(basepath + "saved_data/gc_freeze_results.pkl")
+        print("GC evaluation complete. Results saved to pickle.")
