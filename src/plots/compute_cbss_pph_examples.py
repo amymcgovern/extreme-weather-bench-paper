@@ -184,37 +184,45 @@ gc_graphics = dict()
 pang_graphics = dict()
 fourv2_graphics = dict()
 hres_graphics = dict()
+aifs_graphics = dict()
 
 for my_id in my_ids:
     # compute CBSS and PPH for all the AI models and HRES for the case we chose
     print(my_id)
     my_case = ewb_cases.select_cases("case_id_number", my_id).cases[0]
 
-    print("Computing CBSS and PPH for HRES")
-    [cbss, pph] = get_cbss_and_pph_outputs(my_case, hres_severe_forecast)
-    hres_graphics[my_id, "cbss"] = cbss
-    hres_graphics[my_id, "pph"] = pph
+    # print("Computing CBSS and PPH for HRES")
+    # [cbss, pph] = get_cbss_and_pph_outputs(my_case, hres_severe_forecast)
+    # hres_graphics[my_id, "cbss"] = cbss
+    # hres_graphics[my_id, "pph"] = pph
 
-    print("Computing CBSS and PPH for FOURV2")
-    [cbss, pph] = get_cbss_and_pph_outputs(
-        my_case, cira_severe_convection_forecast_FOURV2_GFS
-    )
-    fourv2_graphics[my_id, "cbss"] = cbss
-    fourv2_graphics[my_id, "pph"] = pph
+    # print("Computing CBSS and PPH for FOURV2")
+    # [cbss, pph] = get_cbss_and_pph_outputs(
+    #     my_case, cira_severe_convection_forecast_FOURV2_GFS
+    # )
+    # fourv2_graphics[my_id, "cbss"] = cbss
+    # fourv2_graphics[my_id, "pph"] = pph
 
-    print("Computing CBSS and PPH for GC")
-    [cbss, pph] = get_cbss_and_pph_outputs(
-        my_case, cira_severe_convection_forecast_GC_GFS
-    )
-    gc_graphics[my_id, "cbss"] = cbss
-    gc_graphics[my_id, "pph"] = pph
+    # print("Computing CBSS and PPH for GC")
+    # [cbss, pph] = get_cbss_and_pph_outputs(
+    #     my_case, cira_severe_convection_forecast_GC_GFS
+    # )
+    # gc_graphics[my_id, "cbss"] = cbss
+    # gc_graphics[my_id, "pph"] = pph
 
-    print("Computing CBSS and PPH for PANG")
+    # print("Computing CBSS and PPH for PANG")
+    # [cbss, pph] = get_cbss_and_pph_outputs(
+    #     my_case, cira_severe_convection_forecast_PANG_GFS
+    # )
+    # pang_graphics[my_id, "cbss"] = cbss
+    # pang_graphics[my_id, "pph"] = pph
+
+    print("Computing CBSS and PPH for AIFS")
     [cbss, pph] = get_cbss_and_pph_outputs(
-        my_case, cira_severe_convection_forecast_PANG_GFS
+        my_case, aifs_severe_forecast
     )
-    pang_graphics[my_id, "cbss"] = cbss
-    pang_graphics[my_id, "pph"] = pph
+    aifs_graphics[my_id, "cbss"] = cbss
+    aifs_graphics[my_id, "pph"] = pph
 
 print("Saving the graphics objects")
 pickle.dump(hres_graphics, open(basepath + "saved_data/hres_graphics.pkl", "wb"))

@@ -85,7 +85,9 @@ AIFS_VARIABLE_MAPPING = {
 # Default Icechunk configuration - "Small" dataset
 # DEFAULT_ICECHUNK_BUCKET = "extremeweatherbench"
 # DEFAULT_ICECHUNK_PREFIX = "aifs-small-icechunk"
-# DEFAULT_SOURCE_CREDENTIALS_PREFIX = "gs://brightband-scratch/darothen/ewb-forecast-archive/aifs-single/"  # Credentials prefix must match the exact prefix stored in the repository config
+# DEFAULT_SOURCE_CREDENTIALS_PREFIX =
+# "gs://brightband-scratch/darothen/ewb-forecast-archive/aifs-single/"
+# # Credentials prefix must match the exact prefix stored in the repository config
 # REF_INTERVAL = DateInterval(
 #     start_date=datetime.date(2024, 3, 1),
 #     end_date=datetime.date(2024, 6, 30),
@@ -94,7 +96,10 @@ AIFS_VARIABLE_MAPPING = {
 # Alternative Icechunk configuration - Full 4-year archive
 DEFAULT_ICECHUNK_BUCKET = "extremeweatherbench"
 DEFAULT_ICECHUNK_PREFIX = "aifs-single_20210102-20241231_icechunk"
-DEFAULT_SOURCE_CREDENTIALS_PREFIX = "gs://brightband-scratch/darothen/aifs-single-archive/"  # Credentials prefix must match the exact prefix stored in the repository config
+# Credentials prefix must match the exact prefix stored in the repository config
+DEFAULT_SOURCE_CREDENTIALS_PREFIX = (
+    "gs://brightband-scratch/darothen/aifs-single-archive/"
+)
 REF_INTERVAL = DateInterval(
     start_date=datetime.date(2021, 1, 2),
     end_date=datetime.date(2024, 12, 31),
