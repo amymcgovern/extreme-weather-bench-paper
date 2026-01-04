@@ -4,6 +4,23 @@ import xarray as xr
 from arraylake import Client
 from extremeweatherbench import inputs
 
+BB_metadata_variable_mapping = {
+    "isobaricInhPa": "level",
+    "t2m": "surface_air_temperature",
+    "t": "air_temperature",
+    "q": "specific_humidity",
+    "u": "eastward_wind",
+    "v": "northward_wind",
+    "p": "air_pressure",
+    "z": "geopotential",
+    "r": "relative_humidity",
+    "u10": "surface_eastward_wind",
+    "v10": "surface_northward_wind",
+    "u100": "100m_eastward_wind",
+    "v100": "100m_northward_wind",
+    "msl": "air_pressure_at_mean_sea_level",
+}
+
 
 @dataclass
 class ArraylakeForecast(inputs.ForecastBase):

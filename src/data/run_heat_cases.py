@@ -2,13 +2,6 @@
 import argparse
 from pathlib import Path
 
-from extremeweatherbench import cases, defaults, evaluate, inputs, metrics
-
-# make the basepath - change this to your local path
-basepath = Path.home() / "extreme-weather-bench-paper" / ""
-basepath = str(basepath) + "/"
-
-import pandas as pd
 from aifs_util import (
     AIFS_VARIABLE_MAPPING,
     DEFAULT_ICECHUNK_BUCKET,
@@ -16,8 +9,15 @@ from aifs_util import (
     DEFAULT_SOURCE_CREDENTIALS_PREFIX,
     InMemoryForecast,
     open_icechunk_dataset,
-)
-from arraylake_utils import ArraylakeForecast
+)  # noqa: E402
+from extremeweatherbench import cases, defaults, evaluate, inputs, metrics
+
+# make the basepath - change this to your local path
+basepath = Path.home() / "extreme-weather-bench-paper" / ""
+basepath = str(basepath) + "/"
+
+import pandas as pd  # noqa: E402
+from arraylake_utils import ArraylakeForecast  # noqa: E402
 
 # setup the templates to load in the data
 # Forecast Examples
