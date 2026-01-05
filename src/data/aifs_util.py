@@ -64,7 +64,7 @@ class InMemoryForecast(inputs.ForecastBase):
         return self.ds
 
 
-AIFS_VARIABLE_MAPPING = {
+BB_MLWP_VARIABLE_MAPPING = {
     "2m_temperature": "surface_air_temperature",
     "2m_dewpoint_temperature": "surface_dewpoint_temperature",
     "2m_relative_humidity": "surface_relative_humidity",
@@ -95,10 +95,16 @@ AIFS_VARIABLE_MAPPING = {
 
 # Alternative Icechunk configuration - Full 4-year archive
 DEFAULT_ICECHUNK_BUCKET = "extremeweatherbench"
-DEFAULT_ICECHUNK_PREFIX = "aifs-single_20210102-20241231_icechunk"
+AIFS_ICECHUNK_PREFIX = "aifs-single_20210102-20241231_icechunk"
+GRAPHCAST_ICECHUNK_PREFIX = "graphcast-20210102-20241231_icechunk"
+PANGU_ICECHUNK_PREFIX = "panguweather-20210102-20241231_icechunk"
 # Credentials prefix must match the exact prefix stored in the repository config
-DEFAULT_SOURCE_CREDENTIALS_PREFIX = (
-    "gs://brightband-scratch/darothen/aifs-single-archive/"
+AIFS_SOURCE_CREDENTIALS_PREFIX = "gs://brightband-scratch/darothen/aifs-single-archive/"
+GRAPHCAST_SOURCE_CREDENTIALS_PREFIX = (
+    "gs://brightband-scratch/darothen/graphcast-archive/"
+)
+PANGU_SOURCE_CREDENTIALS_PREFIX = (
+    "gs://brightband-scratch/darothen/panguweather-archive/"
 )
 REF_INTERVAL = DateInterval(
     start_date=datetime.date(2021, 1, 2),
@@ -108,10 +114,10 @@ REF_INTERVAL = DateInterval(
 
 def open_icechunk_dataset(
     bucket: str = DEFAULT_ICECHUNK_BUCKET,
-    prefix: str = DEFAULT_ICECHUNK_PREFIX,
+    prefix: str = AIFS_ICECHUNK_PREFIX,
     variable_mapping: dict[str, str] | None = None,
     chunks: str | dict | None = "auto",
-    source_credentials_prefix: str = DEFAULT_SOURCE_CREDENTIALS_PREFIX,
+    source_credentials_prefix: str = AIFS_SOURCE_CREDENTIALS_PREFIX,
 ) -> xr.Dataset:
     """Open a dataset from an Icechunk repository with preprocessing.
 
