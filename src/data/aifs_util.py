@@ -96,8 +96,8 @@ BB_MLWP_VARIABLE_MAPPING = {
 # Alternative Icechunk configuration - Full 4-year archive
 DEFAULT_ICECHUNK_BUCKET = "extremeweatherbench"
 AIFS_ICECHUNK_PREFIX = "aifs-single_20210102-20241231_icechunk"
-GRAPHCAST_ICECHUNK_PREFIX = "graphcast-20210102-20241231_icechunk"
-PANGU_ICECHUNK_PREFIX = "panguweather-20210102-20241231_icechunk"
+GRAPHCAST_ICECHUNK_PREFIX = "graphcast_20210102-20241231_icechunk"
+PANGU_ICECHUNK_PREFIX = "panguweather_20210102-20241231_icechunk"
 # Credentials prefix must match the exact prefix stored in the repository config
 AIFS_SOURCE_CREDENTIALS_PREFIX = "gs://brightband-scratch/darothen/aifs-single-archive/"
 GRAPHCAST_SOURCE_CREDENTIALS_PREFIX = (

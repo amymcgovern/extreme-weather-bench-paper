@@ -167,12 +167,3 @@ if __name__ == "__main__":
         bb_pangu_results = ewb_bb_pangu.run(parallel_config=parallel_config)
         bb_pangu_results.to_pickle(basepath + "saved_data/bb_pangu_heat_results.pkl")
         print("BB Pangu evaluation complete. Results saved to pickle.")
-
-    if args.run_bb_pangu:
-        print("running BB Pangu evaluation")
-        ewb_bb_pangu = evaluate.ExtremeWeatherBench(
-            ewb_cases, BB_HEAT_PANGU_EVALUATION_OBJECTS
-        )
-        bb_pangu_results = ewb_bb_pangu.run(parallel_config=parallel_config)
-        bb_pangu_results.to_pickle(basepath + "saved_data/bb_pangu_heat_results.pkl")
-        print("BB Pangu evaluation complete. Results saved to pickle.")
