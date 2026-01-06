@@ -95,7 +95,7 @@ class heat_freeze_forecast_setup:
         )
         return bb_hres_heat_freeze_forecast
 
-    def get_bb_heat_freeze_forecast(self, model_name, init_type):
+    def get_bb_heat_freeze_forecast(self, model_name):
         bb_heat_freeze_ds = open_icechunk_dataset(
             bucket=DEFAULT_ICECHUNK_BUCKET,
             prefix=self.BB_MODEL_NAME_TO_PREFIX[model_name],
