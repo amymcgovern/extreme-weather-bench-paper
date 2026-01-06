@@ -129,6 +129,14 @@ class heat_freeze_evaluation_setup:
                     forecast=forecast,
                 )
             )
+            evaluation_objects.append(
+                inputs.EvaluationObject(
+                    event_type="heat_wave",
+                    metric_list=heat_metrics,
+                    target=defaults.era5_heatwave_target,
+                    forecast=forecast,
+                )
+            )
         return evaluation_objects
 
     def get_freeze_evaluation_objects(self, forecasts):
@@ -139,6 +147,14 @@ class heat_freeze_evaluation_setup:
                     event_type="freeze",
                     metric_list=freeze_metrics,
                     target=defaults.ghcn_heatwave_target,
+                    forecast=forecast,
+                )
+            )
+            evaluation_objects.append(
+                inputs.EvaluationObject(
+                    event_type="freeze",
+                    metric_list=freeze_metrics,
+                    target=defaults.era5_freeze_target,
                     forecast=forecast,
                 )
             )
