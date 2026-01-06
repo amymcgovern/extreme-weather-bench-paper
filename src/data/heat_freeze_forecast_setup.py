@@ -19,124 +19,6 @@ from extremeweatherbench import defaults, inputs, metrics
 basepath = Path.home() / "extreme-weather-bench-paper" / ""
 basepath = str(basepath) + "/"
 
-# setup the templates to load in the data
-# Forecast Examples
-cira_heat_freeze_forecast_FOURv2_IFS = inputs.KerchunkForecast(
-    source="gs://extremeweatherbench/FOUR_v200_IFS.parq",
-    variables=["surface_air_temperature"],
-    variable_mapping={"t2": "surface_air_temperature"},
-    storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
-    preprocess=defaults._preprocess_bb_cira_forecast_dataset,
-    name="CIRA FOURv2 IFS",
-)
-
-cira_heat_freeze_forecast_GC_IFS = inputs.KerchunkForecast(
-    source="gs://extremeweatherbench/GRAP_v100_IFS.parq",
-    variables=["surface_air_temperature"],
-    variable_mapping={"t2": "surface_air_temperature"},
-    storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
-    preprocess=defaults._preprocess_bb_cira_forecast_dataset,
-    name="CIRA GC IFS",
-)
-
-cira_heat_freeze_forecast_PANG_IFS = inputs.KerchunkForecast(
-    source="gs://extremeweatherbench/PANG_v100_IFS.parq",
-    variables=["surface_air_temperature"],
-    variable_mapping={"t2": "surface_air_temperature"},
-    storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
-    preprocess=defaults._preprocess_bb_cira_forecast_dataset,
-    name="CIRA PANG IFS",
-)
-
-cira_heat_freeze_forecast_FOURv2_GFS = inputs.KerchunkForecast(
-    source="gs://extremeweatherbench/FOUR_v200_GFS.parq",
-    variables=["surface_air_temperature"],
-    variable_mapping={"t2": "surface_air_temperature"},
-    storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
-    preprocess=defaults._preprocess_bb_cira_forecast_dataset,
-    name="CIRA FOURv2 GFS",
-)
-
-cira_heat_freeze_forecast_GC_GFS = inputs.KerchunkForecast(
-    source="gs://extremeweatherbench/GRAP_v100_GFS.parq",
-    variables=["surface_air_temperature"],
-    variable_mapping={"t2": "surface_air_temperature"},
-    storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
-    preprocess=defaults._preprocess_bb_cira_forecast_dataset,
-    name="CIRA GC GFS",
-)
-
-cira_heat_freeze_forecast_PANG_GFS = inputs.KerchunkForecast(
-    source="gs://extremeweatherbench/PANG_v100_GFS.parq",
-    variables=["surface_air_temperature"],
-    variable_mapping={"t2": "surface_air_temperature"},
-    storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
-    preprocess=defaults._preprocess_bb_cira_forecast_dataset,
-    name="CIRA PANG GFS",
-)
-
-hres_heat_freeze_forecast = inputs.ZarrForecast(
-    source="gs://weatherbench2/datasets/hres/2016-2022-0012-1440x721.zarr",
-    variables=["surface_air_temperature"],
-    variable_mapping=inputs.HRES_metadata_variable_mapping,
-    storage_options={"remote_options": {"anon": True}},
-    name="ECMWF HRES",
-)
-
-bb_hres_heat_freeze_forecast = ArraylakeForecast(
-    source="arraylake://brightband/ecmwf@main/forecast-archive/ewb-hres",
-    variables=["surface_air_temperature"],
-    variable_mapping={
-        "t2m": "surface_air_temperature",
-    },
-    name="ECMWF HRES",
-)
-
-bb_heat_freeze_aifs_ds = open_icechunk_dataset(
-    bucket=DEFAULT_ICECHUNK_BUCKET,
-    prefix=AIFS_ICECHUNK_PREFIX,
-    variable_mapping=BB_MLWP_VARIABLE_MAPPING,
-    chunks="auto",
-    source_credentials_prefix=AIFS_SOURCE_CREDENTIALS_PREFIX,
-)
-
-bb_heat_freeze_aifs_forecast = InMemoryForecast(
-    bb_heat_freeze_aifs_ds,
-    name="BB AIFS",
-    variables=["surface_air_temperature"],
-    variable_mapping=BB_MLWP_VARIABLE_MAPPING,
-)
-
-bb_heat_freeze_graphcast_ds = open_icechunk_dataset(
-    bucket=DEFAULT_ICECHUNK_BUCKET,
-    prefix=GRAPHCAST_ICECHUNK_PREFIX,
-    variable_mapping=BB_MLWP_VARIABLE_MAPPING,
-    chunks="auto",
-    source_credentials_prefix=GRAPHCAST_SOURCE_CREDENTIALS_PREFIX,
-)
-
-bb_heat_freeze_graphcast_forecast = InMemoryForecast(
-    bb_heat_freeze_graphcast_ds,
-    name="BB Graphcast",
-    variables=["surface_air_temperature"],
-    variable_mapping=BB_MLWP_VARIABLE_MAPPING,
-)
-
-bb_heat_freeze_pangu_ds = open_icechunk_dataset(
-    bucket=DEFAULT_ICECHUNK_BUCKET,
-    prefix=PANGU_ICECHUNK_PREFIX,
-    variable_mapping=BB_MLWP_VARIABLE_MAPPING,
-    chunks="auto",
-    source_credentials_prefix=PANGU_SOURCE_CREDENTIALS_PREFIX,
-)
-
-bb_heat_freeze_pangu_forecast = InMemoryForecast(
-    bb_heat_freeze_pangu_ds,
-    name="BB Pangu",
-    variables=["surface_air_temperature"],
-    variable_mapping=BB_MLWP_VARIABLE_MAPPING,
-)
-
 heat_metrics = [
     metrics.MaximumMeanAbsoluteError,
     metrics.RootMeanSquaredError,
@@ -146,323 +28,119 @@ heat_metrics = [
     # ),
 ]
 
-CIRA_FOURv2_HEAT_EVALUATION_OBJECTS = [
-    inputs.EvaluationObject(
-        event_type="heat_wave",
-        metric_list=heat_metrics,
-        target=defaults.ghcn_heatwave_target,
-        forecast=cira_heat_freeze_forecast_FOURv2_IFS,
-    ),
-    inputs.EvaluationObject(
-        event_type="heat_wave",
-        metric_list=heat_metrics,
-        target=defaults.ghcn_heatwave_target,
-        forecast=cira_heat_freeze_forecast_FOURv2_GFS,
-    ),
-    inputs.EvaluationObject(
-        event_type="heat_wave",
-        metric_list=heat_metrics,
-        target=defaults.era5_heatwave_target,
-        forecast=cira_heat_freeze_forecast_FOURv2_IFS,
-    ),
-    inputs.EvaluationObject(
-        event_type="heat_wave",
-        metric_list=heat_metrics,
-        target=defaults.era5_heatwave_target,
-        forecast=cira_heat_freeze_forecast_FOURv2_GFS,
-    ),
-]
-
-CIRA_GC_HEAT_EVALUATION_OBJECTS = [
-    inputs.EvaluationObject(
-        event_type="heat_wave",
-        metric_list=heat_metrics,
-        target=defaults.ghcn_heatwave_target,
-        forecast=cira_heat_freeze_forecast_GC_IFS,
-    ),
-    inputs.EvaluationObject(
-        event_type="heat_wave",
-        metric_list=heat_metrics,
-        target=defaults.ghcn_heatwave_target,
-        forecast=cira_heat_freeze_forecast_GC_GFS,
-    ),
-    inputs.EvaluationObject(
-        event_type="heat_wave",
-        metric_list=heat_metrics,
-        target=defaults.era5_heatwave_target,
-        forecast=cira_heat_freeze_forecast_GC_IFS,
-    ),
-    inputs.EvaluationObject(
-        event_type="heat_wave",
-        metric_list=heat_metrics,
-        target=defaults.era5_heatwave_target,
-        forecast=cira_heat_freeze_forecast_GC_GFS,
-    ),
-]
-
-CIRA_PANG_HEAT_EVALUATION_OBJECTS = [
-    inputs.EvaluationObject(
-        event_type="heat_wave",
-        metric_list=heat_metrics,
-        target=defaults.ghcn_heatwave_target,
-        forecast=cira_heat_freeze_forecast_PANG_IFS,
-    ),
-    inputs.EvaluationObject(
-        event_type="heat_wave",
-        metric_list=heat_metrics,
-        target=defaults.ghcn_heatwave_target,
-        forecast=cira_heat_freeze_forecast_PANG_GFS,
-    ),
-    inputs.EvaluationObject(
-        event_type="heat_wave",
-        metric_list=heat_metrics,
-        target=defaults.era5_heatwave_target,
-        forecast=cira_heat_freeze_forecast_PANG_IFS,
-    ),
-    inputs.EvaluationObject(
-        event_type="heat_wave",
-        metric_list=heat_metrics,
-        target=defaults.era5_heatwave_target,
-        forecast=cira_heat_freeze_forecast_PANG_GFS,
-    ),
-]
-
-HRES_HEAT_EVALUATION_OBJECTS = [
-    inputs.EvaluationObject(
-        event_type="heat_wave",
-        metric_list=heat_metrics,
-        target=defaults.ghcn_heatwave_target,
-        forecast=hres_heat_freeze_forecast,
-    ),
-    inputs.EvaluationObject(
-        event_type="heat_wave",
-        metric_list=heat_metrics,
-        target=defaults.era5_heatwave_target,
-        forecast=hres_heat_freeze_forecast,
-    ),
-]
-
-BB_HRES_HEAT_EVALUATION_OBJECTS = [
-    inputs.EvaluationObject(
-        event_type="heat_wave",
-        metric_list=heat_metrics,
-        target=defaults.era5_heatwave_target,
-        forecast=bb_hres_heat_freeze_forecast,
-    ),
-    inputs.EvaluationObject(
-        event_type="heat_wave",
-        metric_list=heat_metrics,
-        target=defaults.ghcn_heatwave_target,
-        forecast=bb_hres_heat_freeze_forecast,
-    ),
-]
-
-BB_HEAT_AIFS_EVALUATION_OBJECTS = [
-    inputs.EvaluationObject(
-        event_type="heat_wave",
-        metric_list=heat_metrics,
-        target=defaults.era5_heatwave_target,
-        forecast=bb_heat_freeze_aifs_forecast,
-    ),
-    inputs.EvaluationObject(
-        event_type="heat_wave",
-        metric_list=heat_metrics,
-        target=defaults.ghcn_heatwave_target,
-        forecast=bb_heat_freeze_aifs_forecast,
-    ),
-]
-
-BB_HEAT_GRAPHCAST_EVALUATION_OBJECTS = [
-    inputs.EvaluationObject(
-        event_type="heat_wave",
-        metric_list=heat_metrics,
-        target=defaults.era5_heatwave_target,
-        forecast=bb_heat_freeze_graphcast_forecast,
-    ),
-    inputs.EvaluationObject(
-        event_type="heat_wave",
-        metric_list=heat_metrics,
-        target=defaults.ghcn_heatwave_target,
-        forecast=bb_heat_freeze_graphcast_forecast,
-    ),
-]
-
-BB_HEAT_PANGU_EVALUATION_OBJECTS = [
-    inputs.EvaluationObject(
-        event_type="heat_wave",
-        metric_list=heat_metrics,
-        target=defaults.era5_heatwave_target,
-        forecast=bb_heat_freeze_pangu_forecast,
-    ),
-    inputs.EvaluationObject(
-        event_type="heat_wave",
-        metric_list=heat_metrics,
-        target=defaults.ghcn_heatwave_target,
-        forecast=bb_heat_freeze_pangu_forecast,
-    ),
-]
-
-################################################################################
-# freeze metrics and evaluation objects below here
-################################################################################
 freeze_metrics = [
     metrics.MinimumMeanAbsoluteError,
     metrics.RootMeanSquaredError,
 ]
 
-BB_HRES_FREEZE_EVALUATION_OBJECTS = [
-    inputs.EvaluationObject(
-        event_type="freeze",
-        metric_list=freeze_metrics,
-        target=defaults.era5_freeze_target,
-        forecast=bb_hres_heat_freeze_forecast,
-    ),
-    inputs.EvaluationObject(
-        event_type="freeze",
-        metric_list=freeze_metrics,
-        target=defaults.ghcn_freeze_target,
-        forecast=bb_hres_heat_freeze_forecast,
-    ),
-]
+
+class heat_freeze_forecast_setup:
+    INIT_TYPES = ["IFS", "GFS"]
+    CIRA_MODEL_NAMES = ["Fourv2", "Graphcast", "Pangu"]
+    CIRA_MODEL_NAME_TO_SOURCE = {
+        "Fourv2": "FOUR_v200",
+        "Graphcast": "GRAP_v100",
+        "Pangu": "PANG_v100",
+    }
+
+    BB_MODEL_NAMES = ["AIFS", "Graphcast", "Pangu"]
+    BB_MODEL_NAME_TO_PREFIX = {
+        "AIFS": AIFS_ICECHUNK_PREFIX,
+        "Graphcast": GRAPHCAST_ICECHUNK_PREFIX,
+        "Pangu": PANGU_ICECHUNK_PREFIX,
+    }
+    BB_MODEL_NAME_TO_CREDENTIALS_PREFIX = {
+        "AIFS": AIFS_SOURCE_CREDENTIALS_PREFIX,
+        "Graphcast": GRAPHCAST_SOURCE_CREDENTIALS_PREFIX,
+        "Pangu": PANGU_SOURCE_CREDENTIALS_PREFIX,
+    }
+
+    def __init__(self):
+        pass
+
+    def get_cira_heat_freeze_forecast(self, model_name, init_type):
+        model_str = self.CIRA_MODEL_NAMES.index(model_name)
+        init_str = self.INIT_TYPES.index(init_type)
+        source_str = f"gs://extremeweatherbench/{model_str}_{init_str}.parq"
+        name_str = f"CIRA {model_name} {init_type}"
+
+        cira_heat_freeze_forecast = inputs.KerchunkForecast(
+            source=source_str,
+            variables=["surface_air_temperature"],
+            variable_mapping={"t2": "surface_air_temperature"},
+            storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
+            preprocess=defaults._preprocess_bb_cira_forecast_dataset,
+            name=name_str,
+        )
+        return cira_heat_freeze_forecast
+
+    def get_hres_heat_freeze_forecast(self):
+        hres_heat_freeze_forecast = inputs.ZarrForecast(
+            source="gs://weatherbench2/datasets/hres/2016-2022-0012-1440x721.zarr",
+            variables=["surface_air_temperature"],
+            variable_mapping=inputs.HRES_metadata_variable_mapping,
+            storage_options={"remote_options": {"anon": True}},
+            name="ECMWF HRES",
+        )
+        return hres_heat_freeze_forecast
+
+    def get_bb_hres_heat_freeze_forecast(self):
+        bb_hres_heat_freeze_forecast = ArraylakeForecast(
+            source="arraylake://brightband/ecmwf@main/forecast-archive/ewb-hres",
+            variables=["surface_air_temperature"],
+            variable_mapping={
+                "t2m": "surface_air_temperature",
+            },
+            name="ECMWF HRES",
+        )
+        return bb_hres_heat_freeze_forecast
+
+    def get_bb_heat_freeze_forecast(self, model_name, init_type):
+        bb_heat_freeze_ds = open_icechunk_dataset(
+            bucket=DEFAULT_ICECHUNK_BUCKET,
+            prefix=self.BB_MODEL_NAME_TO_PREFIX[model_name],
+            variable_mapping=BB_MLWP_VARIABLE_MAPPING,
+            chunks="auto",
+            source_credentials_prefix=self.BB_MODEL_NAME_TO_CREDENTIALS_PREFIX[
+                model_name
+            ],
+        )
+        bb_heat_freeze_forecast = InMemoryForecast(
+            bb_heat_freeze_ds,
+            name=f"BB {model_name}",
+            variables=["surface_air_temperature"],
+            variable_mapping=BB_MLWP_VARIABLE_MAPPING,
+        )
+        return bb_heat_freeze_forecast
 
 
-FOURv2_FREEZE_EVALUATION_OBJECTS = [
-    inputs.EvaluationObject(
-        event_type="freeze",
-        metric_list=freeze_metrics,
-        target=defaults.ghcn_heatwave_target,
-        forecast=cira_heat_freeze_forecast_FOURv2_IFS,
-    ),
-    inputs.EvaluationObject(
-        event_type="freeze",
-        metric_list=freeze_metrics,
-        target=defaults.ghcn_heatwave_target,
-        forecast=cira_heat_freeze_forecast_FOURv2_GFS,
-    ),
-    inputs.EvaluationObject(
-        event_type="freeze",
-        metric_list=freeze_metrics,
-        target=defaults.era5_heatwave_target,
-        forecast=cira_heat_freeze_forecast_FOURv2_IFS,
-    ),
-    inputs.EvaluationObject(
-        event_type="freeze",
-        metric_list=freeze_metrics,
-        target=defaults.era5_heatwave_target,
-        forecast=cira_heat_freeze_forecast_FOURv2_GFS,
-    ),
-]
+class heat_freeze_evaluation_setup:
+    def __init__(self):
+        pass
 
-GC_FREEZE_EVALUATION_OBJECTS = [
-    inputs.EvaluationObject(
-        event_type="freeze",
-        metric_list=freeze_metrics,
-        target=defaults.ghcn_heatwave_target,
-        forecast=cira_heat_freeze_forecast_GC_IFS,
-    ),
-    inputs.EvaluationObject(
-        event_type="freeze",
-        metric_list=freeze_metrics,
-        target=defaults.ghcn_heatwave_target,
-        forecast=cira_heat_freeze_forecast_GC_GFS,
-    ),
-    inputs.EvaluationObject(
-        event_type="freeze",
-        metric_list=freeze_metrics,
-        target=defaults.era5_heatwave_target,
-        forecast=cira_heat_freeze_forecast_GC_IFS,
-    ),
-    inputs.EvaluationObject(
-        event_type="freeze",
-        metric_list=freeze_metrics,
-        target=defaults.era5_heatwave_target,
-        forecast=cira_heat_freeze_forecast_GC_GFS,
-    ),
-]
+    def get_heat_evaluation_objects(self, forecasts):
+        evaluation_objects = []
+        for forecast in forecasts:
+            evaluation_objects.append(
+                inputs.EvaluationObject(
+                    event_type="heat_wave",
+                    metric_list=heat_metrics,
+                    target=defaults.ghcn_heatwave_target,
+                    forecast=forecast,
+                )
+            )
+        return evaluation_objects
 
-PANG_FREEZE_EVALUATION_OBJECTS = [
-    inputs.EvaluationObject(
-        event_type="freeze",
-        metric_list=freeze_metrics,
-        target=defaults.ghcn_heatwave_target,
-        forecast=cira_heat_freeze_forecast_PANG_IFS,
-    ),
-    inputs.EvaluationObject(
-        event_type="freeze",
-        metric_list=freeze_metrics,
-        target=defaults.ghcn_heatwave_target,
-        forecast=cira_heat_freeze_forecast_PANG_GFS,
-    ),
-    inputs.EvaluationObject(
-        event_type="freeze",
-        metric_list=freeze_metrics,
-        target=defaults.era5_heatwave_target,
-        forecast=cira_heat_freeze_forecast_PANG_IFS,
-    ),
-    inputs.EvaluationObject(
-        event_type="freeze",
-        metric_list=freeze_metrics,
-        target=defaults.era5_heatwave_target,
-        forecast=cira_heat_freeze_forecast_PANG_GFS,
-    ),
-]
+    def get_freeze_evaluation_objects(self, forecasts):
+        evaluation_objects = []
+        for forecast in forecasts:
+            evaluation_objects.append(
+                inputs.EvaluationObject(
+                    event_type="freeze",
+                    metric_list=freeze_metrics,
+                    target=defaults.ghcn_heatwave_target,
+                    forecast=forecast,
+                )
+            )
 
-HRES_FREEZE_EVALUATION_OBJECTS = [
-    inputs.EvaluationObject(
-        event_type="freeze",
-        metric_list=freeze_metrics,
-        target=defaults.ghcn_heatwave_target,
-        forecast=hres_heat_freeze_forecast,
-    ),
-    inputs.EvaluationObject(
-        event_type="freeze",
-        metric_list=freeze_metrics,
-        target=defaults.era5_heatwave_target,
-        forecast=hres_heat_freeze_forecast,
-    ),
-]
-
-BB_FREEZE_AIFS_EVALUATION_OBJECTS = [
-    inputs.EvaluationObject(
-        event_type="freeze",
-        metric_list=freeze_metrics,
-        target=defaults.ghcn_heatwave_target,
-        forecast=bb_heat_freeze_aifs_forecast,
-    ),
-    inputs.EvaluationObject(
-        event_type="freeze",
-        metric_list=freeze_metrics,
-        target=defaults.era5_heatwave_target,
-        forecast=bb_heat_freeze_aifs_forecast,
-    ),
-]
-
-BB_FREEZE_GRAPHCAST_EVALUATION_OBJECTS = [
-    inputs.EvaluationObject(
-        event_type="freeze",
-        metric_list=freeze_metrics,
-        target=defaults.ghcn_heatwave_target,
-        forecast=bb_heat_freeze_graphcast_forecast,
-    ),
-    inputs.EvaluationObject(
-        event_type="freeze",
-        metric_list=freeze_metrics,
-        target=defaults.era5_heatwave_target,
-        forecast=bb_heat_freeze_graphcast_forecast,
-    ),
-]
-
-BB_FREEZE_PANGU_EVALUATION_OBJECTS = [
-    inputs.EvaluationObject(
-        event_type="freeze",
-        metric_list=freeze_metrics,
-        target=defaults.ghcn_heatwave_target,
-        forecast=bb_heat_freeze_pangu_forecast,
-    ),
-    inputs.EvaluationObject(
-        event_type="freeze",
-        metric_list=freeze_metrics,
-        target=defaults.era5_heatwave_target,
-        forecast=bb_heat_freeze_pangu_forecast,
-    ),
-]
+        return evaluation_objects
