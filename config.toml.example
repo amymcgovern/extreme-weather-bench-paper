@@ -1,0 +1,11 @@
+# Example configuration for ewb-paper
+# Copy to config.toml and customize for your setup
+
+[paths]
+# Base directory for data and results
+basepath = "~/extreme-weather-bench-paper"
+
+[parallel]
+# Joblib parallel execution settings
+backend = "loky"
+n_jobs = 32

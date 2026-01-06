@@ -1,0 +1,61 @@
+[project]
+name = "ewb-paper"
+version = "0.1.0"
+description = "Analysis code for the Extreme Weather Bench paper"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+
+dependencies = [
+    # NOTE: extremeweatherbench must be installed separately due to private repo access
+    # Install with: uv pip install -e external/ExtremeWeatherBench
+    # "extremeweatherbench @ git+https://github.com/brightbandtech/ExtremeWeatherBench.git@feature/new-event-types",
+    "xarray>=2024.1.0",
+    "pandas>=2.1.0",
+    "numpy>=1.26.0",
+    "matplotlib>=3.8.0",
+    "cartopy>=0.22.0",
+    "seaborn>=0.13.0",
+    "icechunk>=0.1.0",
+    "arraylake>=0.3.0",
+    "shapely>=2.0.0",
+    "geopandas>=0.14.0",
+    "joblib>=1.3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "jupyter>=1.0.0",
+    "ipykernel>=6.27.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+# Define uv scripts for running analyses
+heat-analysis = "ewb_paper.data.run_heat_cases:main"
+freeze-analysis = "ewb_paper.data.run_freeze_cases:main"
+severe-analysis = "ewb_paper.data.run_severe_cases:main"
+tc-analysis = "ewb_paper.data.run_tc_cases:main"
+ar-analysis = "ewb_paper.data.run_ar_cases:main"
+compute-ar-plots = "ewb_paper.plots.compute_ar_plot_data:main"
+compute-cbss-plots = "ewb_paper.plots.compute_cbss_pph_examples:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "jupyter>=1.0.0",
+    "ipykernel>=6.27.0",
+    "ruff>=0.1.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+select = ["E", "F", "I", "UP"]
+ignore = ["E402"]  # Allow imports not at top
+
+[tool.ruff.isort]
+known-first-party = ["ewb_paper"]

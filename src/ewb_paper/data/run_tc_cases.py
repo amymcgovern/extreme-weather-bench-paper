@@ -1,0 +1,148 @@
+# setup all the imports
+from pathlib import Path
+
+from extremeweatherbench import cases, defaults, derived, evaluate, inputs, metrics
+from ewb_paper.config import Config
+
+# Get config
+config = Config.default()
+basepath = str(config.saved_data_path) + "/"
+
+# setup the templates to load in the data
+cira_TC_FOURv2_GFS_forecast = inputs.KerchunkForecast(
+    source="gs://extremeweatherbench/FOUR_v200_GFS.parq",
+    variables=[
+        derived.TropicalCycloneTrackVariables(),
+    ],
+    variable_mapping=inputs.CIRA_metadata_variable_mapping,
+    storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
+    preprocess=defaults._preprocess_bb_cira_tc_forecast_dataset,
+    name="CIRA FOURv2 GFS",
+)
+
+cira_TC_GC_GFS_forecast = inputs.KerchunkForecast(
+    source="gs://extremeweatherbench/GRAP_v100_GFS.parq",
+    variables=[
+        derived.TropicalCycloneTrackVariables(),
+    ],
+    variable_mapping=inputs.CIRA_metadata_variable_mapping,
+    storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
+    preprocess=defaults._preprocess_bb_cira_tc_forecast_dataset,
+    name="CIRA GC GFS",
+)
+
+
+cira_TC_PANG_GFS_forecast = inputs.KerchunkForecast(
+    source="gs://extremeweatherbench/PANG_v100_GFS.parq",
+    variables=[
+        derived.TropicalCycloneTrackVariables(),
+    ],
+    variable_mapping=inputs.CIRA_metadata_variable_mapping,
+    storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
+    preprocess=defaults._preprocess_bb_cira_tc_forecast_dataset,
+    name="CIRA PANG GFS",
+)
+
+hres_forecast = inputs.ZarrForecast(
+    source="gs://weatherbench2/datasets/hres/2016-2022-0012-1440x721.zarr",
+    variables=[
+        derived.TropicalCycloneTrackVariables(),
+    ],
+    variable_mapping=inputs.HRES_metadata_variable_mapping,
+    storage_options={"remote_options": {"anon": True}},
+    preprocess=defaults._preprocess_bb_hres_tc_forecast_dataset,
+    name="ECMWF HRES",
+)
+
+# Define composite metric for tropical cyclone track metrics. Using a composite metric
+# prevents recomputation of landfalls, saving significant time. approach="next" sets
+# the evaluation to occur, in the case of multiple landfalls, for the next landfall in
+# time to be evaluated against
+composite_landfall_metrics = [
+    metrics.LandfallMetric(
+        metrics=[
+            metrics.LandfallIntensityMeanAbsoluteError,
+            metrics.LandfallTimeMeanError,
+            metrics.LandfallDisplacement,
+        ],
+        approach="next",
+    )
+]
+
+
+FOURv2_TC_EVALUATION_OBJECTS = [
+    inputs.EvaluationObject(
+        event_type="tropical_cyclone",
+        metric_list=composite_landfall_metrics,
+        target=defaults.ibtracs_target,
+        forecast=cira_TC_FOURv2_GFS_forecast,
+    ),
+]
+
+GC_TC_EVALUATION_OBJECTS = [
+    inputs.EvaluationObject(
+        event_type="tropical_cyclone",
+        metric_list=composite_landfall_metrics,
+        target=defaults.ibtracs_target,
+        forecast=cira_TC_GC_GFS_forecast,
+    ),
+]
+
+PANG_TC_EVALUATION_OBJECTS = [
+    inputs.EvaluationObject(
+        event_type="tropical_cyclone",
+        metric_list=composite_landfall_metrics,
+        target=defaults.ibtracs_target,
+        forecast=cira_TC_PANG_GFS_forecast,
+    ),
+]
+
+HRES_TC_EVALUATION_OBJECTS = [
+    inputs.EvaluationObject(
+        event_type="tropical_cyclone",
+        metric_list=composite_landfall_metrics,
+        target=defaults.ibtracs_target,
+        forecast=hres_forecast,
+    ),
+]
+
+# load in all of the events in the yaml file
+ewb_cases = cases.load_ewb_events_yaml_into_case_collection()
+ewb_cases = ewb_cases.select_cases("event_type", "tropical_cyclone")
+
+# # downselect the TC cases to only include those before case_id_number 202
+# my_cases = [case for case in ewb_cases.cases if case.case_id_number < 175]
+# ewb_cases = cases.IndividualCaseCollection(cases=my_cases)
+
+ewb_fourv2 = evaluate.ExtremeWeatherBench(ewb_cases, FOURv2_TC_EVALUATION_OBJECTS)
+ewb_gc = evaluate.ExtremeWeatherBench(ewb_cases, GC_TC_EVALUATION_OBJECTS)
+ewb_pang = evaluate.ExtremeWeatherBench(ewb_cases, PANG_TC_EVALUATION_OBJECTS)
+ewb_hres = evaluate.ExtremeWeatherBench(ewb_cases, HRES_TC_EVALUATION_OBJECTS)
+
+
+def main():
+    """Run tropical cyclone evaluation against ExtremeWeatherBench cases."""
+    # load in the results for all heat waves in parallel
+    # this will take awhile to run if you do them all in one code box
+    # if you have already saved them (from running this once), then skip this box
+    parallel_config = config.get_parallel_config()
+
+    print("running HRES TC cases")
+    hres_results = ewb_hres.run(parallel_config=parallel_config)
+    hres_results.to_pickle(basepath + "saved_data/hres_tc_results.pkl")
+
+    print("running FOURV2 TC cases")
+    fourv2_results = ewb_fourv2.run(parallel_config=parallel_config)
+    fourv2_results.to_pickle(basepath + "saved_data/fourv2_tc_results.pkl")
+
+    print("running GC TC cases")
+    gc_results = ewb_gc.run(parallel_config=parallel_config)
+    gc_results.to_pickle(basepath + "saved_data/gc_tc_results.pkl")
+
+    print("running PANG TC cases")
+    pang_results = ewb_pang.run(parallel_config=parallel_config)
+    pang_results.to_pickle(basepath + "saved_data/pang_tc_results.pkl")
+
+
+if __name__ == "__main__":
+    main()
