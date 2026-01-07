@@ -3,7 +3,8 @@ import argparse  # noqa: E402
 from pathlib import Path
 
 from extremeweatherbench import cases, evaluate
-from heat_freeze_forecast_setup import (
+
+from src.data.heat_freeze_forecast_setup import (
     heat_freeze_evaluation_setup,
     heat_freeze_forecast_setup,
 )

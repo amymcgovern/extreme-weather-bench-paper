@@ -1,6 +1,8 @@
 from pathlib import Path
 
-from aifs_util import (
+from extremeweatherbench import defaults, inputs, metrics
+
+from src.data.aifs_util import (
     AIFS_ICECHUNK_PREFIX,
     AIFS_SOURCE_CREDENTIALS_PREFIX,
     BB_MLWP_VARIABLE_MAPPING,
@@ -12,8 +14,7 @@ from aifs_util import (
     InMemoryForecast,
     open_icechunk_dataset,
 )  # noqa: E402
-from arraylake_utils import ArraylakeForecast  # noqa: E402
-from extremeweatherbench import defaults, inputs, metrics
+from src.data.arraylake_utils import ArraylakeForecast  # noqa: E402
 
 # make the basepath - change this to your local path
 basepath = Path.home() / "extreme-weather-bench-paper" / ""

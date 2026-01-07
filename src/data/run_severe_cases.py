@@ -7,7 +7,8 @@ from extremeweatherbench import (  # noqa: E402
     cases,
     evaluate,
 )
-from severe_forecast_setup import (
+
+from src.data.severe_forecast_setup import (
     AIFS_SEVERE_EVALUATION_OBJECTS,
     BB_HRES_SEVERE_EVALUATION_OBJECTS,
     GC_SEVERE_EVALUATION_OBJECTS,

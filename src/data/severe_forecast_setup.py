@@ -1,6 +1,6 @@
 from pathlib import Path  # noqa: E402
 
-from aifs_util import (
+from src.data.aifs_util import (
     AIFS_VARIABLE_MAPPING,
     DEFAULT_ICECHUNK_BUCKET,
     DEFAULT_ICECHUNK_PREFIX,
@@ -8,7 +8,7 @@ from aifs_util import (
     InMemoryForecast,
     open_icechunk_dataset,
 )
-from arraylake_utils import (  # noqa: E402
+from src.data.arraylake_utils import (  # noqa: E402
     ArraylakeForecast,
     BB_metadata_variable_mapping,
 )
