@@ -9,27 +9,17 @@ from extremeweatherbench import (  # noqa: E402
 )
 
 from src.data.severe_forecast_setup import (
-    AIFS_SEVERE_EVALUATION_OBJECTS,
-    BB_HRES_SEVERE_EVALUATION_OBJECTS,
-    GC_SEVERE_EVALUATION_OBJECTS,
-    HRES_SEVERE_EVALUATION_OBJECTS,
-    PANG_SEVERE_EVALUATION_OBJECTS,
-    FOURv2_SEVERE_EVALUATION_OBJECTS,
+    severe_evaluation_setup,
+    severe_forecast_setup,
 )
 
-# make the basepath - change this to your local path
-basepath = Path.home() / "extreme-weather-bench-paper" / ""
-basepath = str(basepath) + "/"
-
 if __name__ == "__main__":
+    # make the basepath - change this to your local path
+    basepath = Path.home() / "extreme-weather-bench-paper" / ""
+    basepath = str(basepath) + "/"
+
     parser = argparse.ArgumentParser(
         description="Run severe evaluation against ExtremeWeatherBench cases."
-    )
-    parser.add_argument(
-        "--run_aifs",
-        action="store_true",
-        default=False,
-        help="Run AIFS evaluation (default: False)",
     )
     parser.add_argument(
         "--run_hres",
@@ -38,23 +28,42 @@ if __name__ == "__main__":
         help="Run HRES evaluation (default: False)",
     )
     parser.add_argument(
-        "--run_fourv2",
+        "--run_cira_fourv2",
         action="store_true",
         default=False,
-        help="Run FOURv2 evaluation (default: False)",
+        help="Run CIRA FOURv2 evaluation (default: False)",
     )
     parser.add_argument(
-        "--run_gc",
+        "--run_cira_gc",
         action="store_true",
         default=False,
-        help="Run GC evaluation (default: False)",
+        help="Run CIRA GC evaluation (default: False)",
     )
     parser.add_argument(
-        "--run_pangu",
+        "--run_cira_pangu",
         action="store_true",
         default=False,
         help="Run PANG evaluation (default: False)",
     )
+    parser.add_argument(
+        "--run_bb_aifs",
+        action="store_true",
+        default=False,
+        help="Run BB AIFS evaluation (default: False)",
+    )
+    parser.add_argument(
+        "--run_bb_graphcast",
+        action="store_true",
+        default=False,
+        help="Run BB Graphcast evaluation (default: False)",
+    )
+    parser.add_argument(
+        "--run_bb_pangu",
+        action="store_true",
+        default=False,
+        help="Run BB Pangu evaluation (default: False)",
+    )
+
     args = parser.parse_args()
 
     # load in all of the events in the yaml file
@@ -63,23 +72,35 @@ if __name__ == "__main__":
 
     parallel_config = {"backend": "loky", "n_jobs": 24}
 
-    if args.run_aifs:
-        print("running AIFS evaluation")
-        ewb_aifs = evaluate.ExtremeWeatherBench(
-            ewb_cases, AIFS_SEVERE_EVALUATION_OBJECTS
-        )
-        aifs_results = ewb_aifs.run(parallel_config=parallel_config)
-        aifs_results.to_pickle(basepath + "saved_data/aifs_severe_results.pkl")
-        print("AIFS evaluation complete. Results saved to pickle.")
+    severe_forecast_setup = severe_forecast_setup()
+    severe_evaluation_setup = severe_evaluation_setup()
 
     if args.run_hres:
         print("running HRES evaluation")
+
+        hres_severe_forecast = (
+            severe_forecast_setup.get_hres_severe_convection_forecast()
+        )
+        hres_severe_evaluation_objects = (
+            severe_evaluation_setup.get_severe_evaluation_objects(
+                [hres_severe_forecast]
+            )
+        )
+        bb_hres_severe_forecast = (
+            severe_forecast_setup.get_bb_hres_severe_convection_forecast()
+        )
+        bb_hres_severe_evaluation_objects = (
+            severe_evaluation_setup.get_severe_evaluation_objects(
+                [bb_hres_severe_forecast]
+            )
+        )
         ewb_hres = evaluate.ExtremeWeatherBench(
-            ewb_cases, HRES_SEVERE_EVALUATION_OBJECTS
+            ewb_cases, hres_severe_evaluation_objects
         )
         ewb_hres_bb = evaluate.ExtremeWeatherBench(
-            ewb_cases, BB_HRES_SEVERE_EVALUATION_OBJECTS
+            ewb_cases, bb_hres_severe_evaluation_objects
         )
+
         hres_results1 = ewb_hres.run(parallel_config=parallel_config)
         print("running HRES part 2")
         hres_results2 = ewb_hres_bb.run(parallel_config=parallel_config)
@@ -88,27 +109,114 @@ if __name__ == "__main__":
         hres_results.to_pickle(basepath + "saved_data/hres_severe_results.pkl")
         print("HRES evaluation complete. Results saved to pickle.")
 
-    if args.run_fourv2:
+    if args.run_cira_fourv2:
         print("running FOURv2 evaluation")
+
+        cira_fourv2_severe_forecast = (
+            severe_forecast_setup.get_cira_severe_convection_forecast("FOURv2", "GFS")
+        )
+        cira_fourv2_severe_evaluation_objects = (
+            severe_evaluation_setup.get_severe_evaluation_objects(
+                [cira_fourv2_severe_forecast]
+            )
+        )
         ewb_fourv2 = evaluate.ExtremeWeatherBench(
-            ewb_cases, FOURv2_SEVERE_EVALUATION_OBJECTS
+            ewb_cases, cira_fourv2_severe_evaluation_objects
         )
         fourv2_results = ewb_fourv2.run(parallel_config=parallel_config)
         fourv2_results.to_pickle(basepath + "saved_data/fourv2_severe_results.pkl")
         print("FOURv2 evaluation complete. Results saved to pickle.")
 
-    if args.run_gc:
+    if args.run_cira_gc:
         print("running GC evaluation")
-        ewb_gc = evaluate.ExtremeWeatherBench(ewb_cases, GC_SEVERE_EVALUATION_OBJECTS)
+
+        cira_gc_severe_forecast = (
+            severe_forecast_setup.get_cira_severe_convection_forecast(
+                "Graphcast", "GFS"
+            )
+        )
+        cira_gc_severe_evaluation_objects = (
+            severe_evaluation_setup.get_severe_evaluation_objects(
+                [cira_gc_severe_forecast]
+            )
+        )
+        ewb_gc = evaluate.ExtremeWeatherBench(
+            ewb_cases, cira_gc_severe_evaluation_objects
+        )
         gc_results = ewb_gc.run(parallel_config=parallel_config)
         gc_results.to_pickle(basepath + "saved_data/gc_severe_results.pkl")
         print("GC evaluation complete. Results saved to pickle.")
 
-    if args.run_pangu:
+    if args.run_cira_pangu:
         print("running PANGU evaluation")
+
+        cira_pangu_severe_forecast = (
+            severe_forecast_setup.get_cira_severe_convection_forecast("Pangu", "IFS")
+        )
+        cira_pangu_severe_evaluation_objects = (
+            severe_evaluation_setup.get_severe_evaluation_objects(
+                [cira_pangu_severe_forecast]
+            )
+        )
         ewb_pang = evaluate.ExtremeWeatherBench(
-            ewb_cases, PANG_SEVERE_EVALUATION_OBJECTS
+            ewb_cases, cira_pangu_severe_evaluation_objects
         )
         pang_results = ewb_pang.run(parallel_config=parallel_config)
         pang_results.to_pickle(basepath + "saved_data/pang_severe_results.pkl")
         print("PANG evaluation complete. Results saved to pickle.")
+
+    if args.run_bb_aifs:
+        print("running AIFS evaluation")
+
+        bb_aifs_severe_forecast = (
+            severe_forecast_setup.get_bb_severe_convection_forecast("AIFS")
+        )
+        bb_aifs_severe_evaluation_objects = (
+            severe_evaluation_setup.get_severe_evaluation_objects(
+                [bb_aifs_severe_forecast]
+            )
+        )
+        ewb_aifs = evaluate.ExtremeWeatherBench(
+            ewb_cases, bb_aifs_severe_evaluation_objects
+        )
+        aifs_results = ewb_aifs.run(parallel_config=parallel_config)
+        aifs_results.to_pickle(basepath + "saved_data/aifs_severe_results.pkl")
+        print("AIFS evaluation complete. Results saved to pickle.")
+
+    if args.run_bb_graphcast:
+        print("running Graphcast evaluation")
+
+        bb_graphcast_severe_forecast = (
+            severe_forecast_setup.get_bb_severe_convection_forecast("Graphcast")
+        )
+        bb_graphcast_severe_evaluation_objects = (
+            severe_evaluation_setup.get_severe_evaluation_objects(
+                [bb_graphcast_severe_forecast]
+            )
+        )
+        ewb_graphcast = evaluate.ExtremeWeatherBench(
+            ewb_cases, bb_graphcast_severe_evaluation_objects
+        )
+        graphcast_results = ewb_graphcast.run(parallel_config=parallel_config)
+        graphcast_results.to_pickle(
+            basepath + "saved_data/bb_graphcast_severe_results.pkl"
+        )
+        print("Graphcast evaluation complete. Results saved to pickle.")
+
+    if args.run_bb_pangu:
+        print("running Pangu evaluation")
+
+        bb_pangu_severe_forecast = (
+            severe_forecast_setup.get_bb_severe_convection_forecast("Pangu")
+        )
+        bb_pangu_severe_evaluation_objects = (
+            severe_evaluation_setup.get_severe_evaluation_objects(
+                [bb_pangu_severe_forecast]
+            )
+        )
+        ewb_pangu = evaluate.ExtremeWeatherBench(
+            ewb_cases, bb_pangu_severe_evaluation_objects
+        )
+        pangu_results = ewb_pangu.run(parallel_config=parallel_config)
+        pangu_results.to_pickle(basepath + "saved_data/bb_pangu_severe_results.pkl")
+        print("Pangu evaluation complete. Results saved to pickle.")

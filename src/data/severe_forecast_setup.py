@@ -1,17 +1,3 @@
-from pathlib import Path  # noqa: E402
-
-from src.data.aifs_util import (
-    AIFS_VARIABLE_MAPPING,
-    DEFAULT_ICECHUNK_BUCKET,
-    DEFAULT_ICECHUNK_PREFIX,
-    DEFAULT_SOURCE_CREDENTIALS_PREFIX,
-    InMemoryForecast,
-    open_icechunk_dataset,
-)
-from src.data.arraylake_utils import (  # noqa: E402
-    ArraylakeForecast,
-    BB_metadata_variable_mapping,
-)
 from extremeweatherbench import (  # noqa: E402
     defaults,
     derived,
@@ -19,67 +5,20 @@ from extremeweatherbench import (  # noqa: E402
     metrics,
 )
 
-# make the basepath - change this to your local path
-basepath = Path.home() / "extreme-weather-bench-paper" / ""
-basepath = str(basepath) + "/"
-
-# setup the templates to load in the data
-cira_severe_convection_forecast_FOURV2_GFS = inputs.KerchunkForecast(
-    source="gs://extremeweatherbench/FOUR_v200_GFS.parq",
-    variables=[derived.CravenBrooksSignificantSevere()],
-    variable_mapping=inputs.CIRA_metadata_variable_mapping,
-    storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
-    name="CIRA FOURv2 GFS",
-    preprocess=defaults._preprocess_bb_severe_cira_forecast_dataset,
+from src.data.aifs_util import (
+    BB_MLWP_VARIABLE_MAPPING,
+    DEFAULT_ICECHUNK_BUCKET,
+    InMemoryForecast,
+    open_icechunk_dataset,
 )
-
-cira_severe_convection_forecast_GC_GFS = inputs.KerchunkForecast(
-    source="gs://extremeweatherbench/GRAP_v100_GFS.parq",
-    variables=[derived.CravenBrooksSignificantSevere()],
-    variable_mapping=inputs.CIRA_metadata_variable_mapping,
-    storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
-    name="CIRA GC GFS",
-    preprocess=defaults._preprocess_bb_severe_cira_forecast_dataset,
+from src.data.arraylake_utils import (  # noqa: E402
+    ArraylakeForecast,
+    BB_metadata_variable_mapping,
 )
-
-cira_severe_convection_forecast_PANG_GFS = inputs.KerchunkForecast(
-    source="gs://extremeweatherbench/PANG_v100_GFS.parq",
-    variables=[derived.CravenBrooksSignificantSevere()],
-    variable_mapping=inputs.CIRA_metadata_variable_mapping,
-    storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
-    name="CIRA PANG GFS",
-    preprocess=defaults._preprocess_bb_severe_cira_forecast_dataset,
-)
-
-hres_severe_forecast = inputs.ZarrForecast(
-    source="gs://weatherbench2/datasets/hres/2016-2022-0012-1440x721.zarr",
-    variables=[derived.CravenBrooksSignificantSevere()],
-    variable_mapping=inputs.HRES_metadata_variable_mapping,
-    storage_options={"remote_options": {"anon": True}},
-    name="ECMWF HRES",
-)
-
-bb_hres_forecast = ArraylakeForecast(
-    source="arraylake://brightband/ecmwf@main/forecast-archive/ewb-hres",
-    variables=[derived.CravenBrooksSignificantSevere()],
-    storage_options={"remote_options": {"anon": True}},
-    name="ECMWF HRES",
-    variable_mapping=BB_metadata_variable_mapping,
-)
-
-ds = open_icechunk_dataset(
-    bucket=DEFAULT_ICECHUNK_BUCKET,
-    prefix=DEFAULT_ICECHUNK_PREFIX,
-    variable_mapping=AIFS_VARIABLE_MAPPING,
-    chunks="auto",
-    source_credentials_prefix=DEFAULT_SOURCE_CREDENTIALS_PREFIX,
-)
-
-aifs_forecast = InMemoryForecast(
-    ds=ds,
-    variables=[derived.CravenBrooksSignificantSevere()],
-    variable_mapping=AIFS_VARIABLE_MAPPING,
-    name="AIFS",
+from src.data.model_name_setup import (
+    BB_MODEL_NAME_TO_CREDENTIALS_PREFIX,
+    BB_MODEL_NAME_TO_PREFIX,
+    CIRA_MODEL_NAME_TO_SOURCE,
 )
 
 # Define threshold metrics
@@ -107,92 +46,84 @@ lsr_metrics = [
     )
 ]
 
-FOURv2_SEVERE_EVALUATION_OBJECTS = [
-    inputs.EvaluationObject(
-        event_type="severe_convection",
-        metric_list=lsr_metrics,
-        target=defaults.lsr_target,
-        forecast=cira_severe_convection_forecast_FOURV2_GFS,
-    ),
-    inputs.EvaluationObject(
-        event_type="severe_convection",
-        metric_list=pph_metrics,
-        target=defaults.pph_target,
-        forecast=cira_severe_convection_forecast_FOURV2_GFS,
-    ),
-]
 
-GC_SEVERE_EVALUATION_OBJECTS = [
-    inputs.EvaluationObject(
-        event_type="severe_convection",
-        metric_list=lsr_metrics,
-        target=defaults.lsr_target,
-        forecast=cira_severe_convection_forecast_GC_GFS,
-    ),
-    inputs.EvaluationObject(
-        event_type="severe_convection",
-        metric_list=pph_metrics,
-        target=defaults.pph_target,
-        forecast=cira_severe_convection_forecast_GC_GFS,
-    ),
-]
+class severe_forecast_setup:
+    def __init__(self):
+        pass
 
-PANG_SEVERE_EVALUATION_OBJECTS = [
-    inputs.EvaluationObject(
-        event_type="severe_convection",
-        metric_list=lsr_metrics,
-        target=defaults.lsr_target,
-        forecast=cira_severe_convection_forecast_PANG_GFS,
-    ),
-    inputs.EvaluationObject(
-        event_type="severe_convection",
-        metric_list=pph_metrics,
-        target=defaults.pph_target,
-        forecast=cira_severe_convection_forecast_PANG_GFS,
-    ),
-]
+    def get_cira_severe_convection_forecast(self, model_name, init_type):
+        model_str = CIRA_MODEL_NAME_TO_SOURCE[model_name]
+        source_str = f"gs://extremeweatherbench/{model_str}_{init_type}.parq"
+        name_str = f"CIRA {model_name} {init_type}"
 
-HRES_SEVERE_EVALUATION_OBJECTS = [
-    inputs.EvaluationObject(
-        event_type="severe_convection",
-        metric_list=lsr_metrics,
-        target=defaults.lsr_target,
-        forecast=hres_severe_forecast,
-    ),
-    inputs.EvaluationObject(
-        event_type="severe_convection",
-        metric_list=pph_metrics,
-        target=defaults.pph_target,
-        forecast=hres_severe_forecast,
-    ),
-]
+        cira_severe_convection_forecast = inputs.KerchunkForecast(
+            source=source_str,
+            variables=[derived.CravenBrooksSignificantSevere()],
+            variable_mapping=inputs.CIRA_metadata_variable_mapping,
+            storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
+            name=name_str,
+        )
+        return cira_severe_convection_forecast
 
-BB_HRES_SEVERE_EVALUATION_OBJECTS = [
-    inputs.EvaluationObject(
-        event_type="severe_convection",
-        metric_list=lsr_metrics,
-        target=defaults.lsr_target,
-        forecast=bb_hres_forecast,
-    ),
-    inputs.EvaluationObject(
-        event_type="severe_convection",
-        metric_list=pph_metrics,
-        target=defaults.pph_target,
-        forecast=bb_hres_forecast,
-    ),
-]
+    def get_hres_severe_convection_forecast(self):
+        hres_severe_convection_forecast = inputs.ZarrForecast(
+            source="gs://weatherbench2/datasets/hres/2016-2022-0012-1440x721.zarr",
+            variables=[derived.CravenBrooksSignificantSevere()],
+            variable_mapping=inputs.HRES_metadata_variable_mapping,
+            storage_options={"remote_options": {"anon": True}},
+            name="ECMWF HRES",
+        )
+        return hres_severe_convection_forecast
 
-AIFS_SEVERE_EVALUATION_OBJECTS = [
-    inputs.EvaluationObject(
-        event_type="severe_convection",
-        metric_list=lsr_metrics,
-        target=defaults.lsr_target,
-        forecast=aifs_forecast,
-    ),
-    inputs.EvaluationObject(
-        event_type="severe_convection",
-        metric_list=pph_metrics,
-        target=defaults.pph_target,
-        forecast=aifs_forecast,
-    ),
-]
+    def get_bb_hres_severe_convection_forecast(self):
+        bb_hres_severe_convection_forecast = ArraylakeForecast(
+            source="arraylake://brightband/ecmwf@main/forecast-archive/ewb-hres",
+            variables=[derived.CravenBrooksSignificantSevere()],
+            storage_options={"remote_options": {"anon": True}},
+            name="ECMWF HRES",
+            variable_mapping=BB_metadata_variable_mapping,
+        )
+        return bb_hres_severe_convection_forecast
+
+    def get_bb_severe_convection_forecast(self, model_name):
+        bb_severe_ds = open_icechunk_dataset(
+            bucket=DEFAULT_ICECHUNK_BUCKET,
+            prefix=BB_MODEL_NAME_TO_PREFIX[model_name],
+            variable_mapping=BB_MLWP_VARIABLE_MAPPING,
+            chunks="auto",
+            source_credentials_prefix=BB_MODEL_NAME_TO_CREDENTIALS_PREFIX[model_name],
+        )
+
+        bb_severe_convection_forecast = InMemoryForecast(
+            ds=bb_severe_ds,
+            variables=[derived.CravenBrooksSignificantSevere()],
+            variable_mapping=BB_MLWP_VARIABLE_MAPPING,
+            name=f"BB {model_name}",
+        )
+        return bb_severe_convection_forecast
+
+
+class severe_evaluation_setup:
+    def __init__(self):
+        pass
+
+    def get_severe_evaluation_objects(self, forecasts):
+        evaluation_objects = []
+        for forecast in forecasts:
+            evaluation_objects.append(
+                inputs.EvaluationObject(
+                    event_type="severe_convection",
+                    metric_list=lsr_metrics,
+                    target=defaults.lsr_target,
+                    forecast=forecast,
+                )
+            )
+            evaluation_objects.append(
+                inputs.EvaluationObject(
+                    event_type="severe_convection",
+                    metric_list=pph_metrics,
+                    target=defaults.pph_target,
+                    forecast=forecast,
+                )
+            )
+        return evaluation_objects

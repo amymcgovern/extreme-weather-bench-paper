@@ -1,7 +1,8 @@
 # setup all the imports
 import argparse  # noqa: E402
-from pathlib import Path
+from pathlib import Path  # noqa: E402
 
+import pandas as pd  # noqa: E402
 from extremeweatherbench import cases, evaluate
 
 from src.data.heat_freeze_forecast_setup import (
@@ -9,13 +10,11 @@ from src.data.heat_freeze_forecast_setup import (
     heat_freeze_forecast_setup,
 )
 
-# make the basepath - change this to your local path
-basepath = Path.home() / "extreme-weather-bench-paper" / ""
-basepath = str(basepath) + "/"
-
-import pandas as pd  # noqa: E402
-
 if __name__ == "__main__":
+    # make the basepath for saving the results - change this to your local path
+    basepath = Path.home() / "extreme-weather-bench-paper" / ""
+    basepath = str(basepath) + "/"
+
     parser = argparse.ArgumentParser(
         description="Run freeze case evaluation against ExtremeWeatherBench cases."
     )

@@ -3,18 +3,17 @@ from pathlib import Path
 from extremeweatherbench import defaults, inputs, metrics
 
 from src.data.aifs_util import (
-    AIFS_ICECHUNK_PREFIX,
-    AIFS_SOURCE_CREDENTIALS_PREFIX,
     BB_MLWP_VARIABLE_MAPPING,
     DEFAULT_ICECHUNK_BUCKET,
-    GRAPHCAST_ICECHUNK_PREFIX,
-    GRAPHCAST_SOURCE_CREDENTIALS_PREFIX,
-    PANGU_ICECHUNK_PREFIX,
-    PANGU_SOURCE_CREDENTIALS_PREFIX,
     InMemoryForecast,
     open_icechunk_dataset,
 )  # noqa: E402
 from src.data.arraylake_utils import ArraylakeForecast  # noqa: E402
+from src.data.model_name_setup import (
+    BB_MODEL_NAME_TO_CREDENTIALS_PREFIX,
+    BB_MODEL_NAME_TO_PREFIX,
+    CIRA_MODEL_NAME_TO_SOURCE,
+)
 
 # make the basepath - change this to your local path
 basepath = Path.home() / "extreme-weather-bench-paper" / ""
@@ -36,33 +35,12 @@ freeze_metrics = [
 
 
 class heat_freeze_forecast_setup:
-    INIT_TYPES = ["IFS", "GFS"]
-    CIRA_MODEL_NAMES = ["Fourv2", "Graphcast", "Pangu"]
-    CIRA_MODEL_NAME_TO_SOURCE = {
-        "Fourv2": "FOUR_v200",
-        "Graphcast": "GRAP_v100",
-        "Pangu": "PANG_v100",
-    }
-
-    BB_MODEL_NAMES = ["AIFS", "Graphcast", "Pangu"]
-    BB_MODEL_NAME_TO_PREFIX = {
-        "AIFS": AIFS_ICECHUNK_PREFIX,
-        "Graphcast": GRAPHCAST_ICECHUNK_PREFIX,
-        "Pangu": PANGU_ICECHUNK_PREFIX,
-    }
-    BB_MODEL_NAME_TO_CREDENTIALS_PREFIX = {
-        "AIFS": AIFS_SOURCE_CREDENTIALS_PREFIX,
-        "Graphcast": GRAPHCAST_SOURCE_CREDENTIALS_PREFIX,
-        "Pangu": PANGU_SOURCE_CREDENTIALS_PREFIX,
-    }
-
     def __init__(self):
         pass
 
     def get_cira_heat_freeze_forecast(self, model_name, init_type):
-        model_str = self.CIRA_MODEL_NAMES.index(model_name)
-        init_str = self.INIT_TYPES.index(init_type)
-        source_str = f"gs://extremeweatherbench/{model_str}_{init_str}.parq"
+        model_str = CIRA_MODEL_NAME_TO_SOURCE[model_name]
+        source_str = f"gs://extremeweatherbench/{model_str}_{init_type}.parq"
         name_str = f"CIRA {model_name} {init_type}"
 
         cira_heat_freeze_forecast = inputs.KerchunkForecast(
@@ -99,12 +77,10 @@ class heat_freeze_forecast_setup:
     def get_bb_heat_freeze_forecast(self, model_name):
         bb_heat_freeze_ds = open_icechunk_dataset(
             bucket=DEFAULT_ICECHUNK_BUCKET,
-            prefix=self.BB_MODEL_NAME_TO_PREFIX[model_name],
+            prefix=BB_MODEL_NAME_TO_PREFIX[model_name],
             variable_mapping=BB_MLWP_VARIABLE_MAPPING,
             chunks="auto",
-            source_credentials_prefix=self.BB_MODEL_NAME_TO_CREDENTIALS_PREFIX[
-                model_name
-            ],
+            source_credentials_prefix=BB_MODEL_NAME_TO_CREDENTIALS_PREFIX[model_name],
         )
         bb_heat_freeze_forecast = InMemoryForecast(
             bb_heat_freeze_ds,
