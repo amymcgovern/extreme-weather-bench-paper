@@ -58,7 +58,7 @@ pangu_gfs_cira_settings = {
 pangu_bb_settings = {"forecast_source": "BB Pangu", "label_str": "Pangu Weather"}
 gc_bb_settings = {"forecast_source": "BB Graphcast", "label_str": "GraphCast"}
 aifs_bb_settings = {"forecast_source": "BB AIFS", "label_str": "AIFS"}
-hres_ifs_settings = {"forecast_source": "ECMWF HRES", "label_str": "HRES"}
+hres_ifs_settings = {"forecast_source": "ECMWF HRES", "label_str": "HRES"} 
 
 fourv2_ifs_settings = fourv2_ifs_cira_settings | fourv2_style | ifs_group_style
 gc_ifs_settings = gc_ifs_cira_settings | gc_style | ifs_group_style
