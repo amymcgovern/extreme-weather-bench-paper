@@ -34,7 +34,7 @@ freeze_metrics = [
 ]
 
 
-class heat_freeze_forecast_setup:
+class HeatFreezeForecastSetup:
     def __init__(self):
         pass
 
@@ -91,7 +91,7 @@ class heat_freeze_forecast_setup:
         return bb_heat_freeze_forecast
 
 
-class heat_freeze_evaluation_setup:
+class HeatFreezeEvaluationSetup:
     def __init__(self):
         pass
 

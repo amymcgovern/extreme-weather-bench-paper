@@ -47,7 +47,7 @@ lsr_metrics = [
 ]
 
 
-class severe_forecast_setup:
+class SevereForecastSetup:
     def __init__(self):
         pass
 
@@ -103,7 +103,7 @@ class severe_forecast_setup:
         return bb_severe_convection_forecast
 
 
-class severe_evaluation_setup:
+class SevereEvaluationSetup:
     def __init__(self):
         pass
 

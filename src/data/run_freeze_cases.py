@@ -6,8 +6,8 @@ import pandas as pd  # noqa: E402
 from extremeweatherbench import cases, evaluate
 
 from src.data.heat_freeze_forecast_setup import (
-    heat_freeze_evaluation_setup,
-    heat_freeze_forecast_setup,
+    HeatFreezeEvaluationSetup,
+    HeatFreezeForecastSetup,
 )
 
 if __name__ == "__main__":
@@ -76,8 +76,8 @@ if __name__ == "__main__":
     ewb_cases = cases.load_ewb_events_yaml_into_case_collection()
     ewb_cases = ewb_cases.select_cases("event_type", "freeze")
 
-    heat_freeze_forecast_setup = heat_freeze_forecast_setup()
-    heat_freeze_evaluation_setup = heat_freeze_evaluation_setup()
+    heat_freeze_forecast_setup = HeatFreezeForecastSetup()
+    heat_freeze_evaluation_setup = HeatFreezeEvaluationSetup()
 
     # load in the results for all freeze cases in parallel
     # this will take awhile to run if you do them all in one code box

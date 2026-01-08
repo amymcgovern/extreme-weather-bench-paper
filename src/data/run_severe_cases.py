@@ -9,8 +9,8 @@ from extremeweatherbench import (  # noqa: E402
 )
 
 from src.data.severe_forecast_setup import (
-    severe_evaluation_setup,
-    severe_forecast_setup,
+    SevereEvaluationSetup,
+    SevereForecastSetup,
 )
 
 if __name__ == "__main__":
@@ -72,8 +72,8 @@ if __name__ == "__main__":
 
     parallel_config = {"backend": "loky", "n_jobs": 24}
 
-    severe_forecast_setup = severe_forecast_setup()
-    severe_evaluation_setup = severe_evaluation_setup()
+    severe_forecast_setup = SevereForecastSetup()
+    severe_evaluation_setup = SevereEvaluationSetup()
 
     if args.run_hres:
         print("running HRES evaluation")

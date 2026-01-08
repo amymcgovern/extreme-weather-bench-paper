@@ -6,8 +6,8 @@ import pandas as pd  # noqa: E402
 from extremeweatherbench import cases, evaluate
 
 from src.data.heat_freeze_forecast_setup import (
-    heat_freeze_evaluation_setup,
-    heat_freeze_forecast_setup,
+    HeatFreezeEvaluationSetup,
+    HeatFreezeForecastSetup,
 )
 
 if __name__ == "__main__":
@@ -78,8 +78,8 @@ if __name__ == "__main__":
 
     parallel_config = {"backend": "loky", "n_jobs": 32}
 
-    heat_freeze_forecast_setup = heat_freeze_forecast_setup()
-    heat_freeze_evaluation_setup = heat_freeze_evaluation_setup()
+    heat_freeze_forecast_setup = HeatFreezeForecastSetup()
+    heat_freeze_evaluation_setup = HeatFreezeEvaluationSetup()
 
     if args.run_hres:
         print("running HRES evaluation")
