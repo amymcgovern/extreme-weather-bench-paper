@@ -124,7 +124,7 @@ if __name__ == "__main__":
             ewb_cases, cira_fourv2_severe_evaluation_objects
         )
         fourv2_results = ewb_fourv2.run(parallel_config=parallel_config)
-        fourv2_results.to_pickle(basepath + "saved_data/fourv2_severe_results.pkl")
+        fourv2_results.to_pickle(basepath + "saved_data/cira_fourv2_severe_results.pkl")
         print("FOURv2 evaluation complete. Results saved to pickle.")
 
     if args.run_cira_gc:
@@ -144,7 +144,7 @@ if __name__ == "__main__":
             ewb_cases, cira_gc_severe_evaluation_objects
         )
         gc_results = ewb_gc.run(parallel_config=parallel_config)
-        gc_results.to_pickle(basepath + "saved_data/gc_severe_results.pkl")
+        gc_results.to_pickle(basepath + "saved_data/cira_gc_severe_results.pkl")
         print("GC evaluation complete. Results saved to pickle.")
 
     if args.run_cira_pangu:
@@ -162,7 +162,7 @@ if __name__ == "__main__":
             ewb_cases, cira_pangu_severe_evaluation_objects
         )
         pang_results = ewb_pang.run(parallel_config=parallel_config)
-        pang_results.to_pickle(basepath + "saved_data/pang_severe_results.pkl")
+        pang_results.to_pickle(basepath + "saved_data/cira_pangu_severe_results.pkl")
         print("PANG evaluation complete. Results saved to pickle.")
 
     if args.run_bb_aifs:
@@ -180,7 +180,7 @@ if __name__ == "__main__":
             ewb_cases, bb_aifs_severe_evaluation_objects
         )
         aifs_results = ewb_aifs.run(parallel_config=parallel_config)
-        aifs_results.to_pickle(basepath + "saved_data/aifs_severe_results.pkl")
+        aifs_results.to_pickle(basepath + "saved_data/bb_aifs_severe_results.pkl")
         print("AIFS evaluation complete. Results saved to pickle.")
 
     if args.run_bb_graphcast:

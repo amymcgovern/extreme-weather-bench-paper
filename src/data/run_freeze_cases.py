@@ -227,5 +227,5 @@ if __name__ == "__main__":
             ewb_cases, pang_freeze_evaluation_objects
         )
         pang_results = ewb_pang.run(parallel_config=parallel_config)
-        pang_results.to_pickle(basepath + "saved_data/bb_pang_freeze_results.pkl")
+        pang_results.to_pickle(basepath + "saved_data/bb_pangu_freeze_results.pkl")
         print("Pangu evaluation complete. Results saved to pickle.")
