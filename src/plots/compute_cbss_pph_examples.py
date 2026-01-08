@@ -94,6 +94,15 @@ if __name__ == "__main__":
     severe_forecast_setup = severe_forecast_setup()
     severe_evaluation_setup = severe_evaluation_setup()
 
+    # this is a hack to handle only opening icechunk once
+    hres_severe_forecast = None
+    cira_fourv2_severe_forecast = None
+    gc_severe_forecast = None
+    pang_severe_forecast = None
+    bb_graphcast_severe_forecast = None
+    bb_pangu_severe_forecast = None
+    bb_aifs_severe_forecast = None
+
     for my_id in my_ids:
         # compute CBSS and PPH for all the AI models and HRES for the case we chose
         print(my_id)
@@ -101,8 +110,8 @@ if __name__ == "__main__":
 
         if args.run_hres:
             print("Computing CBSS and PPH for HRES")
-
-            hres_severe_forecast = severe_forecast_setup.get_hres_severe_convection_forecast()
+            if hres_severe_forecast is None:
+                hres_severe_forecast = severe_forecast_setup.get_hres_severe_convection_forecast()
             [cbss, pph] = get_cbss_and_pph_outputs(my_case, hres_severe_forecast)
             hres_graphics[my_id, "cbss"] = cbss
             hres_graphics[my_id, "pph"] = pph
@@ -112,7 +121,8 @@ if __name__ == "__main__":
 
         if args.run_cira_fourv2:
             print("Computing CBSS and PPH for FOURV2")
-            cira_fourv2_severe_forecast = severe_forecast_setup.get_cira_severe_convection_forecast("FOURv2", "IFS")
+            if cira_fourv2_severe_forecast is None:
+                cira_fourv2_severe_forecast = severe_forecast_setup.get_cira_severe_convection_forecast("FOURv2", "IFS")
             [cbss, pph] = get_cbss_and_pph_outputs(my_case, cira_fourv2_severe_forecast)
             fourv2_graphics[my_id, "cbss"] = cbss
             fourv2_graphics[my_id, "pph"] = pph
@@ -122,7 +132,8 @@ if __name__ == "__main__":
 
         if args.run_cira_gc:
             print("Computing CBSS and PPH for GC")
-            gc_severe_forecast = severe_forecast_setup.get_cira_severe_convection_forecast("Graphcast", "GFS")
+            if gc_severe_forecast is None:  
+                gc_severe_forecast = severe_forecast_setup.get_cira_severe_convection_forecast("Graphcast", "GFS")
             [cbss, pph] = get_cbss_and_pph_outputs(my_case, gc_severe_forecast)
             gc_graphics[my_id, "cbss"] = cbss
             gc_graphics[my_id, "pph"] = pph
@@ -132,7 +143,8 @@ if __name__ == "__main__":
 
         if args.run_cira_pangu:
             print("Computing CBSS and PPH for PANG")
-            pang_severe_forecast = severe_forecast_setup.get_cira_severe_convection_forecast("Pangu", "IFS")
+            if pang_severe_forecast is None:
+                pang_severe_forecast = severe_forecast_setup.get_cira_severe_convection_forecast("Pangu", "IFS")
             [cbss, pph] = get_cbss_and_pph_outputs(my_case, pang_severe_forecast)
             pang_graphics[my_id, "cbss"] = cbss
             pang_graphics[my_id, "pph"] = pph
@@ -142,7 +154,8 @@ if __name__ == "__main__":
 
         if args.run_bb_graphcast:
             print("Computing CBSS and PPH for Graphcast")
-            bb_graphcast_severe_forecast = severe_forecast_setup.get_bb_severe_convection_forecast("Graphcast")
+            if bb_graphcast_severe_forecast is None:
+                bb_graphcast_severe_forecast = severe_forecast_setup.get_bb_severe_convection_forecast("Graphcast")
             [cbss, pph] = get_cbss_and_pph_outputs(my_case, bb_graphcast_severe_forecast)
             gc_graphics[my_id, "cbss"] = cbss
             gc_graphics[my_id, "pph"] = pph
@@ -152,7 +165,8 @@ if __name__ == "__main__":
 
         if args.run_bb_pangu:
             print("Computing CBSS and PPH for Pangu")
-            bb_pangu_severe_forecast = severe_forecast_setup.get_bb_severe_convection_forecast("Pangu")
+            if bb_pangu_severe_forecast is None:
+                bb_pangu_severe_forecast = severe_forecast_setup.get_bb_severe_convection_forecast("Pangu")
             [cbss, pph] = get_cbss_and_pph_outputs(my_case, bb_pangu_severe_forecast)
             pang_graphics[my_id, "cbss"] = cbss
             pang_graphics[my_id, "pph"] = pph
@@ -162,7 +176,8 @@ if __name__ == "__main__":
 
         if args.run_bb_aifs:
             print("Computing CBSS and PPH for AIFS")
-            bb_aifs_severe_forecast = severe_forecast_setup.get_bb_severe_convection_forecast("AIFS")
+            if bb_aifs_severe_forecast is None:
+                bb_aifs_severe_forecast = severe_forecast_setup.get_bb_severe_convection_forecast("AIFS")
             [cbss, pph] = get_cbss_and_pph_outputs(my_case, bb_aifs_severe_forecast)
             aifs_graphics[my_id, "cbss"] = cbss
             aifs_graphics[my_id, "pph"] = pph
