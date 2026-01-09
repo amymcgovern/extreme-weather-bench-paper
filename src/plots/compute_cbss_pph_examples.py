@@ -10,8 +10,8 @@ from extremeweatherbench import (
 )
 
 from src.data.severe_forecast_setup import (
-    severe_evaluation_setup,
-    severe_forecast_setup,
+    SevereEvaluationSetup,
+    SevereForecastSetup,
 )
 
 # to plot the targets, we need to run the pipeline for each case and target
@@ -82,7 +82,11 @@ if __name__ == "__main__":
     ewb_cases = cases.load_ewb_events_yaml_into_case_collection()
     ewb_cases = ewb_cases.select_cases("event_type", "severe_convection")
 
-    my_ids = [269, 318]
+    my_ids = [36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 
+        52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 
+        269, 270, 271, 272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 
+        283, 284, 285, 286, 287, 288, 316, 317, 318, 319, 320, 321, 322, 323, 
+        324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336, 337]
 
     # hres_graphics = dict()
     gc_graphics = dict()
@@ -91,11 +95,12 @@ if __name__ == "__main__":
     hres_graphics = dict()
     aifs_graphics = dict()
 
-    severe_forecast_setup = severe_forecast_setup()
-    severe_evaluation_setup = severe_evaluation_setup()
+    severe_forecast_setup = SevereForecastSetup()
+    severe_evaluation_setup = SevereEvaluationSetup()
 
     # this is a hack to handle only opening icechunk once
     hres_severe_forecast = None
+    bb_hres_severe_forecast = None
     cira_fourv2_severe_forecast = None
     gc_severe_forecast = None
     pang_severe_forecast = None
@@ -112,7 +117,13 @@ if __name__ == "__main__":
             print("Computing CBSS and PPH for HRES")
             if hres_severe_forecast is None:
                 hres_severe_forecast = severe_forecast_setup.get_hres_severe_convection_forecast()
+            if bb_hres_severe_forecast is None:
+                bb_hres_severe_forecast = severe_forecast_setup.get_bb_hres_severe_convection_forecast()
             [cbss, pph] = get_cbss_and_pph_outputs(my_case, hres_severe_forecast)
+            if len(cbss) == 0:
+                print("Computing CBSS and PPH for BB HRES")
+                [cbss, pph] = get_cbss_and_pph_outputs(my_case, bb_hres_severe_forecast)
+            
             hres_graphics[my_id, "cbss"] = cbss
             hres_graphics[my_id, "pph"] = pph
             pickle.dump(

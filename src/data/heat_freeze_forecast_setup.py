@@ -15,10 +15,6 @@ from src.data.model_name_setup import (
     CIRA_MODEL_NAME_TO_SOURCE,
 )
 
-# make the basepath - change this to your local path
-basepath = Path.home() / "extreme-weather-bench-paper" / ""
-basepath = str(basepath) + "/"
-
 heat_metrics = [
     metrics.MaximumMeanAbsoluteError,
     metrics.RootMeanSquaredError,

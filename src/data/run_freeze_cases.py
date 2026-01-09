@@ -126,12 +126,15 @@ if __name__ == "__main__":
     if args.run_cira_pangu:
         print("running Pangu evaluation")
 
-        pang_freeze_forecast = heat_freeze_forecast_setup.get_cira_heat_freeze_forecast(
+        pang_freeze_ifs_forecast = heat_freeze_forecast_setup.get_cira_heat_freeze_forecast(
             "Pangu", "IFS"
+        )
+        pang_freeze_gfs_forecast = (
+            heat_freeze_forecast_setup.get_cira_heat_freeze_forecast("Pangu", "GFS")
         )
         pang_freeze_evaluation_objects = (
             heat_freeze_evaluation_setup.get_freeze_evaluation_objects(
-                [pang_freeze_forecast]
+                [pang_freeze_ifs_forecast, pang_freeze_gfs_forecast]
             )
         )
         ewb_pang = evaluate.ExtremeWeatherBench(
@@ -143,12 +146,15 @@ if __name__ == "__main__":
 
     if args.run_cira_fourv2:
         print("running FOURv2 evaluation")
-        fourv2_freeze_forecast = (
+        fourv2_freeze_ifs_forecast = (
             heat_freeze_forecast_setup.get_cira_heat_freeze_forecast("Fourv2", "IFS")
+        )
+        fourv2_freeze_gfs_forecast = (
+            heat_freeze_forecast_setup.get_cira_heat_freeze_forecast("Fourv2", "GFS")
         )
         fourv2_freeze_evaluation_objects = (
             heat_freeze_evaluation_setup.get_freeze_evaluation_objects(
-                [fourv2_freeze_forecast]
+                [fourv2_freeze_ifs_forecast, fourv2_freeze_gfs_forecast]
             )
         )
         ewb_fourv2 = evaluate.ExtremeWeatherBench(
@@ -161,12 +167,15 @@ if __name__ == "__main__":
     if args.run_cira_gc:
         print("running GC evaluation")
 
-        gc_freeze_forecast = heat_freeze_forecast_setup.get_cira_heat_freeze_forecast(
+        gc_freeze_ifs_forecast = heat_freeze_forecast_setup.get_cira_heat_freeze_forecast(
             "Graphcast", "IFS"
+        )
+        gc_freeze_gfs_forecast = heat_freeze_forecast_setup.get_cira_heat_freeze_forecast(
+            "Graphcast", "GFS"
         )
         gc_freeze_evaluation_objects = (
             heat_freeze_evaluation_setup.get_freeze_evaluation_objects(
-                [gc_freeze_forecast]
+                [gc_freeze_ifs_forecast, gc_freeze_gfs_forecast]
             )
         )
         ewb_gc = evaluate.ExtremeWeatherBench(ewb_cases, gc_freeze_evaluation_objects)

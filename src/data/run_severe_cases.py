@@ -112,12 +112,15 @@ if __name__ == "__main__":
     if args.run_cira_fourv2:
         print("running FOURv2 evaluation")
 
-        cira_fourv2_severe_forecast = (
+        cira_fourv2_gfs_severe_forecast = (
             severe_forecast_setup.get_cira_severe_convection_forecast("FOURv2", "GFS")
+        )
+        cira_fourv2_ifs_severe_forecast = (
+            severe_forecast_setup.get_cira_severe_convection_forecast("FOURv2", "IFS")
         )
         cira_fourv2_severe_evaluation_objects = (
             severe_evaluation_setup.get_severe_evaluation_objects(
-                [cira_fourv2_severe_forecast]
+                [cira_fourv2_ifs_severe_forecast, cira_fourv2_gfs_severe_forecast]
             )
         )
         ewb_fourv2 = evaluate.ExtremeWeatherBench(
@@ -130,14 +133,19 @@ if __name__ == "__main__":
     if args.run_cira_gc:
         print("running GC evaluation")
 
-        cira_gc_severe_forecast = (
+        cira_gc_gfs_severe_forecast = (
             severe_forecast_setup.get_cira_severe_convection_forecast(
                 "Graphcast", "GFS"
             )
         )
+        cira_gc_ifs_severe_forecast = (
+            severe_forecast_setup.get_cira_severe_convection_forecast(
+                "Graphcast", "IFS"
+            )
+        )
         cira_gc_severe_evaluation_objects = (
             severe_evaluation_setup.get_severe_evaluation_objects(
-                [cira_gc_severe_forecast]
+                [cira_gc_ifs_severe_forecast, cira_gc_gfs_severe_forecast]
             )
         )
         ewb_gc = evaluate.ExtremeWeatherBench(
@@ -150,12 +158,15 @@ if __name__ == "__main__":
     if args.run_cira_pangu:
         print("running PANGU evaluation")
 
-        cira_pangu_severe_forecast = (
+        cira_pangu_gfs_severe_forecast = (
+            severe_forecast_setup.get_cira_severe_convection_forecast("Pangu", "GFS")
+        )
+        cira_pangu_ifs_severe_forecast = (
             severe_forecast_setup.get_cira_severe_convection_forecast("Pangu", "IFS")
         )
         cira_pangu_severe_evaluation_objects = (
             severe_evaluation_setup.get_severe_evaluation_objects(
-                [cira_pangu_severe_forecast]
+                [cira_pangu_ifs_severe_forecast, cira_pangu_gfs_severe_forecast]
             )
         )
         ewb_pang = evaluate.ExtremeWeatherBench(
