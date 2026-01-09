@@ -143,7 +143,7 @@ if __name__ == "__main__":
     if args.run_bb_aifs:
         print("running BB AIFS evaluation")
 
-        bb_aifs_ar_forecast = atmospheric_river_forecast_setup.get_bb_forecast("AIFS")
+        bb_aifs_ar_forecast = atmospheric_river_forecast_setup.get_bb_ar_forecast("AIFS")
         bb_aifs_ar_evaluation_objects = atmospheric_river_evaluation_setup.get_ar_evaluation_objects([bb_aifs_ar_forecast])
 
         ewb_bb_aifs = evaluate.ExtremeWeatherBench(ewb_cases, bb_aifs_ar_evaluation_objects)
@@ -156,7 +156,7 @@ if __name__ == "__main__":
     if args.run_bb_graphcast:
         print("running BB Graphcast evaluation")
 
-        bb_graphcast_ar_forecast = atmospheric_river_forecast_setup.get_bb_forecast("Graphcast")
+        bb_graphcast_ar_forecast = atmospheric_river_forecast_setup.get_bb_ar_forecast("Graphcast")
         bb_graphcast_ar_evaluation_objects = atmospheric_river_evaluation_setup.get_ar_evaluation_objects([bb_graphcast_ar_forecast])
 
         ewb_bb_graphcast = evaluate.ExtremeWeatherBench(ewb_cases, bb_graphcast_ar_evaluation_objects)
@@ -169,7 +169,7 @@ if __name__ == "__main__":
     if args.run_bb_pangu:
         print("running BB PANGU evaluation")
 
-        bb_pangu_ar_forecast = atmospheric_river_forecast_setup.get_bb_forecast("Pangu")
+        bb_pangu_ar_forecast = atmospheric_river_forecast_setup.get_bb_ar_forecast("Pangu")
         bb_pangu_ar_evaluation_objects = atmospheric_river_evaluation_setup.get_ar_evaluation_objects([bb_pangu_ar_forecast])
 
         ewb_bb_pangu = evaluate.ExtremeWeatherBench(ewb_cases, bb_pangu_ar_evaluation_objects)

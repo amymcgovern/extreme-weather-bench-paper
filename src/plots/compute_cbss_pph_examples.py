@@ -126,9 +126,6 @@ if __name__ == "__main__":
             
             hres_graphics[my_id, "cbss"] = cbss
             hres_graphics[my_id, "pph"] = pph
-            pickle.dump(
-                hres_graphics, open(basepath + "saved_data/hres_graphics.pkl", "wb")
-            )
 
         if args.run_cira_fourv2:
             print("Computing CBSS and PPH for FOURV2")
@@ -137,9 +134,6 @@ if __name__ == "__main__":
             [cbss, pph] = get_cbss_and_pph_outputs(my_case, cira_fourv2_severe_forecast)
             fourv2_graphics[my_id, "cbss"] = cbss
             fourv2_graphics[my_id, "pph"] = pph
-            pickle.dump(
-                fourv2_graphics, open(basepath + "saved_data/fourv2_cira_graphics.pkl", "wb")
-            )
 
         if args.run_cira_gc:
             print("Computing CBSS and PPH for GC")
@@ -148,9 +142,6 @@ if __name__ == "__main__":
             [cbss, pph] = get_cbss_and_pph_outputs(my_case, gc_severe_forecast)
             gc_graphics[my_id, "cbss"] = cbss
             gc_graphics[my_id, "pph"] = pph
-            pickle.dump(
-                gc_graphics, open(basepath + "saved_data/gc_cira_graphics.pkl", "wb")
-            )
 
         if args.run_cira_pangu:
             print("Computing CBSS and PPH for PANG")
@@ -159,9 +150,6 @@ if __name__ == "__main__":
             [cbss, pph] = get_cbss_and_pph_outputs(my_case, pang_severe_forecast)
             pang_graphics[my_id, "cbss"] = cbss
             pang_graphics[my_id, "pph"] = pph
-            pickle.dump(
-                pang_graphics, open(basepath + "saved_data/pang_cira_graphics.pkl", "wb")
-            )
 
         if args.run_bb_graphcast:
             print("Computing CBSS and PPH for Graphcast")
@@ -170,9 +158,6 @@ if __name__ == "__main__":
             [cbss, pph] = get_cbss_and_pph_outputs(my_case, bb_graphcast_severe_forecast)
             gc_graphics[my_id, "cbss"] = cbss
             gc_graphics[my_id, "pph"] = pph
-            pickle.dump(
-                gc_graphics, open(basepath + "saved_data/gc_bb_graphics.pkl", "wb")
-            )
 
         if args.run_bb_pangu:
             print("Computing CBSS and PPH for Pangu")
@@ -181,9 +166,6 @@ if __name__ == "__main__":
             [cbss, pph] = get_cbss_and_pph_outputs(my_case, bb_pangu_severe_forecast)
             pang_graphics[my_id, "cbss"] = cbss
             pang_graphics[my_id, "pph"] = pph
-            pickle.dump(
-                pang_graphics, open(basepath + "saved_data/pang_bb_graphics.pkl", "wb")
-            )
 
         if args.run_bb_aifs:
             print("Computing CBSS and PPH for AIFS")
@@ -192,6 +174,33 @@ if __name__ == "__main__":
             [cbss, pph] = get_cbss_and_pph_outputs(my_case, bb_aifs_severe_forecast)
             aifs_graphics[my_id, "cbss"] = cbss
             aifs_graphics[my_id, "pph"] = pph
-            pickle.dump(
-                aifs_graphics, open(basepath + "saved_data/aifs_bb_graphics.pkl", "wb")
-            )
+
+    print("Saving the graphics objects")
+    if args.run_hres:
+        pickle.dump(
+            hres_graphics, open(basepath + "saved_data/hres_graphics.pkl", "wb")
+        )
+    if args.run_cira_fourv2:
+        pickle.dump(
+            fourv2_graphics, open(basepath + "saved_data/fourv2_cira_graphics.pkl", "wb")
+        )
+    if args.run_cira_gc:
+        pickle.dump(
+            gc_graphics, open(basepath + "saved_data/gc_cira_graphics.pkl", "wb")
+        )
+    if args.run_cira_pangu:
+        pickle.dump(
+            pang_graphics, open(basepath + "saved_data/pang_cira_graphics.pkl", "wb")
+        )  
+    if args.run_bb_graphcast:
+        pickle.dump(
+            gc_graphics, open(basepath + "saved_data/gc_bb_graphics.pkl", "wb")
+        )
+    if args.run_bb_pangu:
+        pickle.dump(
+            pang_graphics, open(basepath + "saved_data/pang_bb_graphics.pkl", "wb")
+        )
+    if args.run_bb_aifs:
+        pickle.dump(
+            aifs_graphics, open(basepath + "saved_data/aifs_bb_graphics.pkl", "wb")
+        )

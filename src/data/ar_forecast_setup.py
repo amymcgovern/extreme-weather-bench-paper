@@ -64,9 +64,27 @@ class AtmosphericRiverForecastSetup:
             variables=[derived.AtmosphericRiverVariables(output_variables=["atmospheric_river_land_intersection"])],
             storage_options={"remote_options": {"anon": True}},
             name="ECMWF HRES",
-            variable_mapping=BB_MLWP_VARIABLE_MAPPING,
+            variable_mapping=inputs.HRES_metadata_variable_mapping,
         )
         return bb_hres_forecast
+
+    def get_bb_ar_forecast(self, model_name):
+        bb_ar_ds = open_icechunk_dataset(
+            bucket=DEFAULT_ICECHUNK_BUCKET,
+            prefix=BB_MODEL_NAME_TO_PREFIX[model_name],
+            variable_mapping=BB_MLWP_VARIABLE_MAPPING,
+            chunks="auto",
+            source_credentials_prefix=BB_MODEL_NAME_TO_CREDENTIALS_PREFIX[model_name],
+        )
+
+        bb_severe_convection_forecast = InMemoryForecast(
+            ds=bb_ar_ds,
+            variables=[derived.AtmosphericRiverVariables(output_variables=["atmospheric_river_land_intersection"])],
+            variable_mapping=BB_MLWP_VARIABLE_MAPPING,
+            name=f"BB {model_name}",
+        )
+        return bb_severe_convection_forecast
+        
 
 class AtmosphericRiverEvaluationSetup:
     def __init__(self):
