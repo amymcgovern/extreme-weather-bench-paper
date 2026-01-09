@@ -8,7 +8,10 @@ from src.data.aifs_util import (
     InMemoryForecast,
     open_icechunk_dataset,
 )  # noqa: E402
-from src.data.arraylake_utils import ArraylakeForecast  # noqa: E402
+from src.data.arraylake_utils import (
+    ArraylakeForecast, BB_metadata_variable_mapping,
+) # noqa: E402
+
 from src.data.model_name_setup import (
     BB_MODEL_NAME_TO_CREDENTIALS_PREFIX,
     BB_MODEL_NAME_TO_PREFIX,
@@ -64,7 +67,7 @@ class AtmosphericRiverForecastSetup:
             variables=[derived.AtmosphericRiverVariables(output_variables=["atmospheric_river_land_intersection"])],
             storage_options={"remote_options": {"anon": True}},
             name="ECMWF HRES",
-            variable_mapping=inputs.HRES_metadata_variable_mapping,
+            variable_mapping=BB_metadata_variable_mapping,
         )
         return bb_hres_forecast
 
