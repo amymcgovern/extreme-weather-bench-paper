@@ -82,12 +82,6 @@ if __name__ == "__main__":
     ewb_cases = cases.load_ewb_events_yaml_into_case_collection()
     ewb_cases = ewb_cases.select_cases("event_type", "severe_convection")
 
-    my_ids = [36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 
-        52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 
-        269, 270, 271, 272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 
-        283, 284, 285, 286, 287, 288, 316, 317, 318, 319, 320, 321, 322, 323, 
-        324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336, 337]
-
     # hres_graphics = dict()
     gc_graphics = dict()
     pang_graphics = dict()
@@ -108,10 +102,11 @@ if __name__ == "__main__":
     bb_pangu_severe_forecast = None
     bb_aifs_severe_forecast = None
 
-    for my_id in my_ids:
+    for my_case in ewb_cases.cases:
         # compute CBSS and PPH for all the AI models and HRES for the case we chose
+        my_id = my_case.case_id_number
         print(my_id)
-        my_case = ewb_cases.select_cases("case_id_number", my_id).cases[0]
+        # my_case = ewb_cases.select_cases("case_id_number", my_id).cases[0]
 
         if args.run_hres:
             print("Computing CBSS and PPH for HRES")
