@@ -48,6 +48,15 @@ class AtmosphericRiverForecastSetup:
         )
         return cira_forecast
 
+    def get_era5(self, include_ivt=False):
+        if include_ivt:
+            my_variables = [derived.AtmosphericRiverVariables()]
+        else:
+            my_variables = [derived.AtmosphericRiverVariables(output_variables=["atmospheric_river_land_intersection"])]
+        
+        era5 = inputs.ERA5(variables=my_variables)
+        return era5
+
     def get_hres_forecast(self, include_ivt=False):
         if include_ivt:
             my_variables = [derived.AtmosphericRiverVariables()]
@@ -62,6 +71,7 @@ class AtmosphericRiverForecastSetup:
             name="ECMWF HRES",
         )
         return hres_forecast
+        
 
     def get_bb_hres_forecast(self, include_ivt=False):
         if include_ivt:

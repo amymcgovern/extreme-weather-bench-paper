@@ -54,6 +54,7 @@ def plot_ar_mask_single_timestep(
     title: Optional[str] = None,
     ax: Optional[plt.Axes] = None,
     colorbar: bool = True,
+    show_axes: bool = False,
 ) -> plt.Axes:
     """Plot the AR mask for a single timestep.
 
@@ -95,7 +96,10 @@ def plot_ar_mask_single_timestep(
     plotting.add_geographic_features(ax, include_land_ocean=True, land_ocean_alpha=0.1)
     # Override borders with custom linestyle
     ax.add_feature(cfeature.BORDERS, linestyle=":")
-    plotting.setup_gridlines(ax, show_top_labels=False, show_right_labels=False)
+    if show_axes:
+        plotting.setup_gridlines(ax, show_top_labels=False, show_right_labels=False, show_left_labels=True, show_bottom_labels=True)
+    else:
+        plotting.setup_gridlines(ax, show_top_labels=False, show_right_labels=False, show_left_labels=False, show_bottom_labels=False)
 
     center_latitude = (ar_mask.latitude.min() + ar_mask.latitude.max()) / 2
     center_longitude = (ar_mask.longitude.min() + ar_mask.longitude.max()) / 2

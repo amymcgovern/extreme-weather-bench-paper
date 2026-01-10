@@ -68,6 +68,13 @@ if __name__ == "__main__":
         help="Run BB Pangu evaluation (default: False)",
     )
 
+    parser.add_argument(
+        "--run_era5",
+        action="store_true",
+        default=False,
+        help="Run ERA5 evaluation (default: False)",
+    )
+
     args = parser.parse_args()
 
     # make the basepath - change this to your local path
@@ -88,6 +95,7 @@ if __name__ == "__main__":
     fourv2_graphics = dict()
     hres_graphics = dict()
     aifs_graphics = dict()
+    era5_graphics = dict()
 
     atmospheric_river_forecast_setup = AtmosphericRiverForecastSetup()
     atmospheric_river_evaluation_setup = AtmosphericRiverEvaluationSetup()
@@ -101,7 +109,9 @@ if __name__ == "__main__":
     bb_graphcast_ar_forecast = None
     bb_pangu_ar_forecast = None
     bb_aifs_ar_forecast = None
+    era5 = None
 
+    #ewb_cases = ewb_cases.select_cases("case_id_number", 95)
     for my_case in ewb_cases.cases:
         # compute IVT for all the AI models and HRES for the case we chose
         print(my_case.case_id_number)
@@ -164,6 +174,13 @@ if __name__ == "__main__":
             ivt = get_ivt(my_case, bb_aifs_ar_forecast)
             aifs_graphics[my_id, "ivt"] = ivt
 
+        if args.run_era5:
+            print("Computing IVT for ERA5")
+            if era5 is None:
+                era5 = atmospheric_river_forecast_setup.get_era5(include_ivt=True)
+            ivt = get_ivt(my_case, era5)
+            era5_graphics[my_id, "ivt"] = ivt
+
     print("Saving the graphics objects")
     if args.run_hres:
         pickle.dump(
@@ -192,6 +209,10 @@ if __name__ == "__main__":
     if args.run_bb_aifs:
         pickle.dump(
             aifs_graphics, open(basepath + "saved_data/aifs_bb_ar_graphics.pkl", "wb")
+        )
+    if args.run_era5:
+        pickle.dump(
+            era5_graphics, open(basepath + "saved_data/era5_ar_graphics.pkl", "wb")
         )
 
     print("Done")
