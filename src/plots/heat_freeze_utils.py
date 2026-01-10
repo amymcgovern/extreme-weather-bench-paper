@@ -461,11 +461,11 @@ def plot_freeze_case(
     cbar.set_label("Temperature (C)", size=14)
     cbar.ax.tick_params(labelsize=12)
 
-    if ax is None:
-        plt.tight_layout()
-        if filename is not None:
-            plt.savefig(filename, transparent=True)
-        plt.show()
+    # if ax is None:
+    #     plt.tight_layout()
+    #     if filename is not None:
+    #         plt.savefig(filename, transparent=True)
+    #     plt.show()
 
 
 def plot_freeze_time_series(
