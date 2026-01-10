@@ -197,5 +197,5 @@ if __name__ == "__main__":
 
         # make the overall title and save it        
         fig.suptitle(f"Case {my_id}: {my_case.title} on {my_case.start_date}", fontsize=32)
-        fig.savefig(basepath + f"saved_data/ar_case_{my_id}.png", dpi=300, bbox_inches="tight")
+        fig.savefig(basepath + f"graphics/atmospheric_river/ar_case_{my_id}.png", dpi=300, bbox_inches="tight")
         plt.close(fig)
