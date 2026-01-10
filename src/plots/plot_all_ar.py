@@ -89,7 +89,7 @@ if __name__ == "__main__":
 
     lead_times_to_plot = [24, 3*24, 5*24,7*24,10*24]
 
-    #ewb_cases = ewb_cases.select_cases("case_id_number", 95)
+    # ewb_cases = ewb_cases.select_cases("case_id_number", 95)
     # for debugging, downselect the cases
     print("Plotting the cases")
     for my_case in ewb_cases.cases:
@@ -105,7 +105,7 @@ if __name__ == "__main__":
             for i in range(len(lead_times_to_plot)):
                 era5_ivt, era5_ar_mask = select_ivt_and_maks_era5(era5_graphics[my_id, "ivt"])
                 if (i == 0):
-                    title = "ERA5"
+                    title = "ERA5\n"
                 else:
                     title = None
                 ar_plot_utils.plot_ar_mask_single_timestep(ivt_data=era5_ivt, ar_mask=era5_ar_mask, 
@@ -118,7 +118,7 @@ if __name__ == "__main__":
                 hres_ivt, hres_ar_mask = select_ivt_and_maks(hres_graphics[my_id, "ivt"], lead_time_hours)
                 if hres_ivt is not None and hres_ar_mask is not None:
                     if (i == 0):
-                        title = f"HRES {lead_time_hours} hours"
+                        title = f"HRES\n{lead_time_hours} hours"
                     else:
                         title = f"{lead_time_hours} hours"
                     ar_plot_utils.plot_ar_mask_single_timestep(ivt_data=hres_ivt, ar_mask=hres_ar_mask, 
@@ -135,7 +135,7 @@ if __name__ == "__main__":
                 gc_ivt, gc_ar_mask = select_ivt_and_maks(bb_graphcast_graphics[my_id, "ivt"], lead_time_hours)
                 if gc_ivt is not None and gc_ar_mask is not None:
                     if (i == 0):
-                        title = f"Graphcast {lead_time_hours} hours"
+                        title = f"Graphcast\n{lead_time_hours} hours"
                     else:
                         title = f"{lead_time_hours} hours"
                     ar_plot_utils.plot_ar_mask_single_timestep(ivt_data=gc_ivt, ar_mask=gc_ar_mask, 
@@ -150,7 +150,7 @@ if __name__ == "__main__":
                 pang_ivt, pang_ar_mask = select_ivt_and_maks(bb_pangu_graphics[my_id, "ivt"], lead_time_hours)
                 if pang_ivt is not None and pang_ar_mask is not None:
                     if (i == 0):
-                        title = f"Pangu {lead_time_hours} hours"
+                        title = f"Pangu\n{lead_time_hours} hours"
                     else:
                         title = f"{lead_time_hours} hours"
                     ar_plot_utils.plot_ar_mask_single_timestep(ivt_data=pang_ivt, ar_mask=pang_ar_mask, 
@@ -165,7 +165,7 @@ if __name__ == "__main__":
                 aifs_ivt, aifs_ar_mask = select_ivt_and_maks(bb_aifs_graphics[my_id, "ivt"], lead_time_hours)
                 if aifs_ivt is not None and aifs_ar_mask is not None:
                     if (i == 0):
-                        title = f"AIFS {lead_time_hours} hours"
+                        title = f"AIFS\n{lead_time_hours} hours"
                     else:
                         title = f"{lead_time_hours} hours"
                     ar_plot_utils.plot_ar_mask_single_timestep(ivt_data=aifs_ivt, ar_mask=aifs_ar_mask, 

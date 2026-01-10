@@ -212,7 +212,13 @@ if __name__ == "__main__":
         if (my_id, "cbss") in hres_graphics and (my_id, "pph") in hres_graphics:
             cbss_hres, pph_hres = hres_graphics[my_id, "cbss"], hres_graphics[my_id, "pph"]
             for i, lead_time_hours in enumerate(lead_times_to_plot):
-                plot_cbss_pph_panel(cbss_hres, pph_hres, my_case, lsrs=my_lsr, ax=axs[i, 0], title=f"HRES {lead_time_hours} hours", lead_time_hours=lead_time_hours)
+                if (i == 0):
+                    title = f"HRES\n{lead_time_hours} hours"
+                else:
+                    title = f"{lead_time_hours} hours"
+                plot_cbss_pph_panel(cbss_hres, pph_hres, my_case, lsrs=my_lsr, 
+                    ax=axs[i, 0], title=title, lead_time_hours=lead_time_hours,
+                    gridlines_kwargs={"show_left_labels": True, "show_bottom_labels": True})
         #     [tp, fn, csi, far, es] = get_stats(hres_severe_results, 
         #         ps.hres_ifs_settings['forecast_source'], my_case, lead_time_days=[int(lead_time_hours / 24)])
         # # print(f"HRES: {tp[0]:.2f}, {fn[0]:.2f}, {csi[0]:.2f}, {far[0]:.2f}, {es[0]:.2f}")
@@ -233,7 +239,13 @@ if __name__ == "__main__":
         if (my_id, "cbss") in bb_graphcast_graphics and (my_id, "pph") in bb_graphcast_graphics:
             cbss_gc, pph_gc = bb_graphcast_graphics[my_id, "cbss"], bb_graphcast_graphics[my_id, "pph"]
             for i, lead_time_hours in enumerate(lead_times_to_plot):
-                plot_cbss_pph_panel(cbss_gc, pph_gc, my_case, lsrs=my_lsr, ax=axs[i, 1], title=f"GraphCast {lead_time_hours} hours", lead_time_hours=lead_time_hours)
+                if (i == 0):
+                    title = f"GraphCast\n{lead_time_hours} hours"
+                else:
+                    title = f"{lead_time_hours} hours"
+                plot_cbss_pph_panel(cbss_gc, pph_gc, my_case, lsrs=my_lsr, ax=axs[i, 1], 
+                    title=title, lead_time_hours=lead_time_hours,
+                    gridlines_kwargs={"show_left_labels": False, "show_bottom_labels": False})
             
             # [tp, fn, csi, far, es] = get_stats(gc_severe_results, 
             #     ps.gc_bb_ifs_settings['forecast_source'], my_case, lead_time_days=[int(lead_time_hours / 24)])
@@ -255,7 +267,13 @@ if __name__ == "__main__":
         if (my_id, "cbss") in bb_pangu_graphics and (my_id, "pph") in bb_pangu_graphics:
             cbss_pang, pph_pang = bb_pangu_graphics[my_id, "cbss"], bb_pangu_graphics[my_id, "pph"]
             for i, lead_time_hours in enumerate(lead_times_to_plot):
-                plot_cbss_pph_panel(cbss_pang, pph_pang, my_case, lsrs=my_lsr, ax=axs[i, 2], title=f"Pangu {lead_time_hours} hours", lead_time_hours=lead_time_hours)
+                if (i == 0):
+                    title = f"Pangu\n{lead_time_hours} hours"
+                else:
+                    title = f"{lead_time_hours} hours"
+                plot_cbss_pph_panel(cbss_pang, pph_pang, my_case, lsrs=my_lsr, ax=axs[i, 2], 
+                    title=title, lead_time_hours=lead_time_hours,
+                    gridlines_kwargs={"show_left_labels": False, "show_bottom_labels": False})
             # [tp, fn, csi, far, es] = get_stats(pang_severe_results, 
             #     ps.pangu_bb_ifs_settings['forecast_source'], my_case, lead_time_days=[int(lead_time_hours / 24)])
             # print(f"Pangu: {tp[0]:.2f}, {fn[0]:.2f}, {csi[0]:.2f}, {far[0]:.2f}, {es[0]:.2f}")
@@ -275,7 +293,13 @@ if __name__ == "__main__":
         if (my_id, "cbss") in bb_aifs_graphics and (my_id, "pph") in bb_aifs_graphics:
             cbss_aifs, pph_aifs = bb_aifs_graphics[my_id, "cbss"], bb_aifs_graphics[my_id, "pph"]
             for i, lead_time_hours in enumerate(lead_times_to_plot):
-                plot_cbss_pph_panel(cbss_aifs, pph_aifs, my_case, lsrs=my_lsr, ax=axs[i, 3], title=f"AIFS {lead_time_hours} hours", lead_time_hours=lead_time_hours)
+                if (i == 0):
+                    title = f"AIFS\n{lead_time_hours} hours"
+                else:
+                    title = f"{lead_time_hours} hours"
+                plot_cbss_pph_panel(cbss_aifs, pph_aifs, my_case, lsrs=my_lsr, ax=axs[i, 3], 
+                    title=title, lead_time_hours=lead_time_hours,
+                    gridlines_kwargs={"show_left_labels": False, "show_bottom_labels": False})
             # [tp, fn, csi, far, es] = get_stats(aifs_severe_results, 
             #     ps.aifs_ifs_settings['forecast_source'], my_case, lead_time_days=[2])
             # # print(f"AIFS: {tp[0]:.2f}, {fn[0]:.2f}, {csi[0]:.2f}, {far[0]:.2f}, {es[0]:.2f}")

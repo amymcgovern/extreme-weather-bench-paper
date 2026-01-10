@@ -238,11 +238,12 @@ def plot_cbss_forecast_panel(
     # Set title
     valid_time = target_date
     if title is not None:
-        title_str = (
-            title
-            + f" CBSS +{lead_time_hours}h\n"
-            + f"Valid: {valid_time.strftime('%Y-%m-%d %H:%M')} UTC"
-        )
+        # title_str = (
+        #     title
+        #     + f" CBSS +{lead_time_hours}h\n"
+        #     + f"Valid: {valid_time.strftime('%Y-%m-%d %H:%M')} UTC"
+        # )
+        title_str = title
     else:
         title_str = (
             f"CBSS +{lead_time_hours}h\n"
