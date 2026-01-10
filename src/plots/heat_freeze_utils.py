@@ -122,17 +122,14 @@ def plot_heatwave_case(
         filename: Optional[str] = if not None, the plots will be saved to this filename
         ax: Optional[plt.Axes] = if not None, the axis to plot the case on
     """
-    if ax is None:
-        fig1, ax1 = plt.subplots(
-            figsize=(12, 6), subplot_kw={"projection": ccrs.PlateCarree()}
-        )
+    
     time_based_heatwave_dataset = heatwave_dataset.mean(["latitude", "longitude"])
+    
     # Plot 1: Min timestep of the heatwave event
     # if the axis is not provided, create a new figure and axis
     if ax is None:
-        fig1, ax1 = plt.subplots(
-            figsize=(12, 6), subplot_kw={"projection": ccrs.PlateCarree()}
-        )
+        fig1 = plt.figure(figsize=(12, 6))
+        ax1 = plt.axes(projection=ccrs.PlateCarree())
     else:
         # this will be a subplot within a larger figure so use the existing axis
         ax1 = ax
@@ -209,11 +206,11 @@ def plot_heatwave_case(
     cbar.set_label("Temperature (C)", size=14)
     cbar.ax.tick_params(labelsize=12)
 
-    if ax is None:
-        plt.tight_layout()
-        if filename is not None:
-            plt.savefig(filename, transparent=True)
-        plt.show()
+    # if ax is None:
+    #     plt.tight_layout()
+    #     if filename is not None:
+    #         plt.savefig(filename, transparent=True)
+    #     plt.show()
 
 
 def plot_heatwave_time_series(
@@ -385,9 +382,8 @@ def plot_freeze_case(
     """
     # if not provided, create a new figure and axis
     if ax is None:
-        fig1, ax1 = plt.subplots(
-            figsize=(12, 6), subplot_kw={"projection": ccrs.PlateCarree()}
-        )
+        fig1 = plt.figure(figsize=(12, 6))
+        ax1 = plt.axes(projection=ccrs.PlateCarree())
     else:
         # this will be a subplot within a larger figure so use the existing axis
         ax1 = ax
