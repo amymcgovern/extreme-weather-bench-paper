@@ -16,7 +16,37 @@ import src.plots.plotting_utils as plotting
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+def select_ivt_and_maks(graphics_obect, lead_time_hours):
+    # select the right lead time
+    try:
+        lead_time_td = pd.Timedelta(hours=lead_time_hours)
+        ivt = graphics_obect["integrated_vapor_transport"].sel(lead_time=lead_time_td, method="nearest")
+        ar_mask = graphics_obect["atmospheric_river_mask"].sel(lead_time=lead_time_td, method="nearest")
 
+        # select the right valid time (hack for now to always select the first valid time)
+        valid_time = graphics_obect["integrated_vapor_transport"].valid_time[0]
+        ivt2 = ivt.sel(valid_time=valid_time, method="nearest")
+        ar_mask2 = ar_mask.sel(valid_time=valid_time, method="nearest")
+        return ivt2, ar_mask2
+    except (KeyError, AttributeError) as e:
+        case_id = getattr(graphics_obect, 'case_id_number', 'unknown')
+        print(f"Skipping {lead_time_hours} hours for case {case_id}: missing data. Error: {e}")
+        return None, None
+    except Exception as e:
+        case_id = getattr(graphics_obect, 'case_id_number', 'unknown')
+        print(f"Skipping {lead_time_hours} hours for case {case_id}: missing data. Error: {e}")
+        return None, None
+
+def select_ivt_and_maks_era5(graphics_obect):
+    ivt = graphics_obect["integrated_vapor_transport"]
+    ar_mask = graphics_obect["atmospheric_river_mask"]
+
+    # select the right valid time (hack for now to always select the first valid time)
+    valid_time = graphics_obect["integrated_vapor_transport"].valid_time[0]
+    ivt = ivt.sel(valid_time=valid_time, method="nearest")
+    ar_mask = ar_mask.sel(valid_time=valid_time, method="nearest")
+    return ivt, ar_mask
+    
 def setup_atmospheric_river_colormap_and_levels() -> Tuple[
     mcolors.ListedColormap, mcolors.BoundaryNorm, np.ndarray
 ]:

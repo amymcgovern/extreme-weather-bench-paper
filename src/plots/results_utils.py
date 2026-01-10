@@ -140,7 +140,6 @@ def compute_relative_error(
         lead_time_days,
         case_ids,
     )
-    
     if higher_is_better:
         my_relative_error = (comparison_mean - my_mean) / comparison_mean * 100
     else:

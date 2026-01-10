@@ -22,37 +22,6 @@ import src.plots.severe_convection_utils as severe_utils
 import src.plots.plotting_styles as ps
 import src.plots.atmospheric_river_utils as ar_plot_utils
 
-def select_ivt_and_maks(graphics_obect, lead_time_hours):
-    # select the right lead time
-    try:
-        lead_time_td = pd.Timedelta(hours=lead_time_hours)
-        ivt = graphics_obect["integrated_vapor_transport"].sel(lead_time=lead_time_td, method="nearest")
-        ar_mask = graphics_obect["atmospheric_river_mask"].sel(lead_time=lead_time_td, method="nearest")
-
-        # select the right valid time (hack for now to always select the first valid time)
-        valid_time = graphics_obect["integrated_vapor_transport"].valid_time[0]
-        ivt2 = ivt.sel(valid_time=valid_time, method="nearest")
-        ar_mask2 = ar_mask.sel(valid_time=valid_time, method="nearest")
-        return ivt2, ar_mask2
-    except (KeyError, AttributeError) as e:
-        case_id = getattr(graphics_obect, 'case_id_number', 'unknown')
-        print(f"Skipping {lead_time_hours} hours for case {case_id}: missing data. Error: {e}")
-        return None, None
-    except Exception as e:
-        case_id = getattr(graphics_obect, 'case_id_number', 'unknown')
-        print(f"Skipping {lead_time_hours} hours for case {case_id}: missing data. Error: {e}")
-        return None, None
-
-def select_ivt_and_maks_era5(graphics_obect):
-    ivt = graphics_obect["integrated_vapor_transport"]
-    ar_mask = graphics_obect["atmospheric_river_mask"]
-
-    # select the right valid time (hack for now to always select the first valid time)
-    valid_time = graphics_obect["integrated_vapor_transport"].valid_time[0]
-    ivt = ivt.sel(valid_time=valid_time, method="nearest")
-    ar_mask = ar_mask.sel(valid_time=valid_time, method="nearest")
-    return ivt, ar_mask
-
 if __name__ == "__main__":
     # make the basepath - change this to your local path
     basepath = Path.home() / "extreme-weather-bench-paper" / ""
@@ -103,7 +72,7 @@ if __name__ == "__main__":
 
         if (my_id, "ivt") in era5_graphics:
             for i in range(len(lead_times_to_plot)):
-                era5_ivt, era5_ar_mask = select_ivt_and_maks_era5(era5_graphics[my_id, "ivt"])
+                era5_ivt, era5_ar_mask = ar_plot_utils.select_ivt_and_maks_era5(era5_graphics[my_id, "ivt"])
                 if (i == 0):
                     title = "ERA5\n"
                 else:
@@ -115,7 +84,7 @@ if __name__ == "__main__":
 
         if (my_id, "ivt") in hres_graphics:
             for i, lead_time_hours in enumerate(lead_times_to_plot):
-                hres_ivt, hres_ar_mask = select_ivt_and_maks(hres_graphics[my_id, "ivt"], lead_time_hours)
+                hres_ivt, hres_ar_mask = ar_plot_utils.select_ivt_and_maks(hres_graphics[my_id, "ivt"], lead_time_hours)
                 if hres_ivt is not None and hres_ar_mask is not None:
                     if (i == 0):
                         title = f"HRES\n{lead_time_hours} hours"
@@ -132,7 +101,7 @@ if __name__ == "__main__":
 
         if (my_id, "ivt") in bb_graphcast_graphics:
             for i, lead_time_hours in enumerate(lead_times_to_plot):
-                gc_ivt, gc_ar_mask = select_ivt_and_maks(bb_graphcast_graphics[my_id, "ivt"], lead_time_hours)
+                gc_ivt, gc_ar_mask = ar_plot_utils.select_ivt_and_maks(bb_graphcast_graphics[my_id, "ivt"], lead_time_hours)
                 if gc_ivt is not None and gc_ar_mask is not None:
                     if (i == 0):
                         title = f"Graphcast\n{lead_time_hours} hours"
@@ -147,7 +116,7 @@ if __name__ == "__main__":
         
         if (my_id, "ivt") in bb_pangu_graphics:
             for i, lead_time_hours in enumerate(lead_times_to_plot):
-                pang_ivt, pang_ar_mask = select_ivt_and_maks(bb_pangu_graphics[my_id, "ivt"], lead_time_hours)
+                pang_ivt, pang_ar_mask = ar_plot_utils.select_ivt_and_maks(bb_pangu_graphics[my_id, "ivt"], lead_time_hours)
                 if pang_ivt is not None and pang_ar_mask is not None:
                     if (i == 0):
                         title = f"Pangu\n{lead_time_hours} hours"
@@ -162,7 +131,7 @@ if __name__ == "__main__":
         
         if (my_id, "ivt") in bb_aifs_graphics:
             for i, lead_time_hours in enumerate(lead_times_to_plot):
-                aifs_ivt, aifs_ar_mask = select_ivt_and_maks(bb_aifs_graphics[my_id, "ivt"], lead_time_hours)
+                aifs_ivt, aifs_ar_mask = ar_plot_utils.select_ivt_and_maks(bb_aifs_graphics[my_id, "ivt"], lead_time_hours)
                 if aifs_ivt is not None and aifs_ar_mask is not None:
                     if (i == 0):
                         title = f"AIFS\n{lead_time_hours} hours"

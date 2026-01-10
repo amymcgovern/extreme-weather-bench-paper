@@ -88,8 +88,15 @@ if __name__ == "__main__":
         bb_hres_ar_evaluation_objects = atmospheric_river_evaluation_setup.get_ar_evaluation_objects([bb_hres_ar_forecast])
         print(bb_hres_ar_evaluation_objects)
 
-        ewb_hres = evaluate.ExtremeWeatherBench(ewb_cases, hres_ar_evaluation_objects)
-        ewb_bb_hres = evaluate.ExtremeWeatherBench(ewb_cases, bb_hres_ar_evaluation_objects)
+        early_cases = cases.IndividualCaseCollection(
+            [i for i in ewb_cases.cases if i.end_date < pd.Timestamp("2023-01-01")]
+        )
+        later_cases = cases.IndividualCaseCollection(
+            [i for i in ewb_cases.cases if i.start_date > pd.Timestamp("2023-01-01")]
+        )
+
+        ewb_hres = evaluate.ExtremeWeatherBench(early_cases, hres_ar_evaluation_objects)
+        ewb_bb_hres = evaluate.ExtremeWeatherBench(later_cases, bb_hres_ar_evaluation_objects)
 
         print("running HRES")
         hres_results = ewb_hres.run(parallel_config=parallel_config)
