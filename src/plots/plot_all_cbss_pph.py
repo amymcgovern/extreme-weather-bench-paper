@@ -47,15 +47,42 @@ def plot_cbss_pph_panel(cbss, pph, my_case, lsrs, ax=None, title=None, lead_time
 
     # grab the lsrs and convert to a dataframe
     lsrs = lsrs.sel(valid_time=valid_time)
-    non_sparse_lsrs = utils.stack_dataarray_from_dims(
-                        lsrs["report_type"], ["latitude", "longitude"]
-                    ).squeeze()
-    # make sure there are hail before you grab them
-    print(non_sparse_lsrs)
-    hail_data = non_sparse_lsrs[non_sparse_lsrs == 2]
-    tornado_data = non_sparse_lsrs[non_sparse_lsrs == 3]
-    hail_data = hail_data.to_dataframe().reset_index()
-    tornado_data = tornado_data.to_dataframe().reset_index()
+    try:
+        non_sparse_lsrs = utils.stack_dataarray_from_dims(
+                            lsrs["report_type"], ["latitude", "longitude"]
+                        ).squeeze()
+        
+        # Handle empty or single-element cases
+        if non_sparse_lsrs.size == 0:
+            # Create empty dataframes with expected columns
+            hail_data = pd.DataFrame(columns=['latitude', 'longitude'])
+            tornado_data = pd.DataFrame(columns=['latitude', 'longitude'])
+        else:
+            # Check if we have the expected structure (should have a dimension for indexing)
+            try:
+                hail_data = non_sparse_lsrs[non_sparse_lsrs == 2]
+                tornado_data = non_sparse_lsrs[non_sparse_lsrs == 3]
+                
+                # Convert to dataframe, handling empty results
+                if hail_data.size > 0:
+                    hail_data = hail_data.to_dataframe().reset_index()
+                else:
+                    hail_data = pd.DataFrame(columns=['latitude', 'longitude'])
+                
+                if tornado_data.size > 0:
+                    tornado_data = tornado_data.to_dataframe().reset_index()
+                else:
+                    tornado_data = pd.DataFrame(columns=['latitude', 'longitude'])
+            except (IndexError, ValueError, AttributeError) as e:
+                # Handle cases where the xarray structure is unexpected (e.g., single report)
+                print(f"Warning: Unexpected LSR structure, using empty dataframes. Error: {e}")
+                hail_data = pd.DataFrame(columns=['latitude', 'longitude'])
+                tornado_data = pd.DataFrame(columns=['latitude', 'longitude'])
+    except Exception as e:
+        # Fallback if stack_dataarray_from_dims fails
+        print(f"Warning: Failed to process LSRs, using empty dataframes. Error: {e}")
+        hail_data = pd.DataFrame(columns=['latitude', 'longitude'])
+        tornado_data = pd.DataFrame(columns=['latitude', 'longitude'])
 
     ax, mappable = severe_utils.plot_cbss_forecast_panel(
         cbss_data=cbss.craven_brooks_significant_severe.squeeze(),
@@ -157,16 +184,15 @@ if __name__ == "__main__":
     # load in the graphics objects
     print("Loading in the HRES graphics object")
     hres_graphics = pickle.load(open(basepath + "saved_data/hres_graphics.pkl", "rb"))
-    # print("Loading in the GraphCast graphics object")
-    # bb_graphcast_graphics = pickle.load(open(basepath + "saved_data/gc_bb_graphics.pkl", "rb"))
-    # print("Loading in the Pangu graphics object")
-    # bb_pangu_graphics = pickle.load(open(basepath + "saved_data/pang_bb_graphics.pkl", "rb"))
-    # print("Loading in the AIFS graphics object")
-    # bb_aifs_graphics = pickle.load(open(basepath + "saved_data/aifs_bb_graphics.pkl", "rb"))
+    print("Loading in the GraphCast graphics object")
+    bb_graphcast_graphics = pickle.load(open(basepath + "saved_data/gc_bb_graphics.pkl", "rb"))
+    print("Loading in the Pangu graphics object")
+    bb_pangu_graphics = pickle.load(open(basepath + "saved_data/pang_bb_graphics.pkl", "rb"))
+    print("Loading in the AIFS graphics object")
+    bb_aifs_graphics = pickle.load(open(basepath + "saved_data/aifs_bb_graphics.pkl", "rb"))
 
 
     # for debugging, downselect the cases
-    ewb_cases = ewb_cases.select_cases("case_id_number", [272, 273])
     print("Plotting the cases")
     for my_case in ewb_cases.cases:
         print(my_case.case_id_number)
@@ -195,54 +221,54 @@ if __name__ == "__main__":
             print(f"Skipping HRES for case {my_id}: missing cbss or pph data in graphics object")
         
 
-        # if (my_id, "cbss") in bb_graphcast_graphics and (my_id, "pph") in bb_graphcast_graphics:
-        #     cbss_gc, pph_gc = bb_graphcast_graphics[my_id, "cbss"], bb_graphcast_graphics[my_id, "pph"]
-        #     plot_cbss_pph_panel(cbss_gc, pph_gc, my_case, lsrs=my_lsr, ax=axs[0,1], title="GraphCast", lead_time_hours=48)
-        #     [tp, fn, csi, far, es] = get_stats(gc_severe_results, 
-        #         ps.gc_bb_ifs_settings['forecast_source'], my_case, lead_time_days=[2])
-        #     # print(f"GraphCast: {tp[0]:.2f}, {fn[0]:.2f}, {csi[0]:.2f}, {far[0]:.2f}, {es[0]:.2f}")
-        #     axs[1,1].text(0.5, 0.5, f"CSI: {csi[0]:.2f}\n"
-        #             f"FAR: {far[0]:.2f}\n"
-        #             f"ES: {es[0]:.2f}\n"
-        #             f"TP: {tp[0]:.2f}\n"
-        #             f"FN: {fn[0]:.2f}",
-        #             transform=axs[1,1].transAxes,
-        #             ha='center', va='center')
-        # else:
-        #     print(f"Skipping GraphCast for case {my_id}: missing cbss or pph data in graphics object")
+        if (my_id, "cbss") in bb_graphcast_graphics and (my_id, "pph") in bb_graphcast_graphics:
+            cbss_gc, pph_gc = bb_graphcast_graphics[my_id, "cbss"], bb_graphcast_graphics[my_id, "pph"]
+            plot_cbss_pph_panel(cbss_gc, pph_gc, my_case, lsrs=my_lsr, ax=axs[0,1], title="GraphCast", lead_time_hours=48)
+            [tp, fn, csi, far, es] = get_stats(gc_severe_results, 
+                ps.gc_bb_ifs_settings['forecast_source'], my_case, lead_time_days=[2])
+            # print(f"GraphCast: {tp[0]:.2f}, {fn[0]:.2f}, {csi[0]:.2f}, {far[0]:.2f}, {es[0]:.2f}")
+            axs[1,1].text(0.5, 0.5, f"CSI: {csi[0]:.2f}\n"
+                    f"FAR: {far[0]:.2f}\n"
+                    f"ES: {es[0]:.2f}\n"
+                    f"TP: {tp[0]:.2f}\n"
+                    f"FN: {fn[0]:.2f}",
+                    transform=axs[1,1].transAxes,
+                    ha='center', va='center')
+        else:
+            print(f"Skipping GraphCast for case {my_id}: missing cbss or pph data in graphics object")
 
 
-        # if (my_id, "cbss") in bb_pangu_graphics and (my_id, "pph") in bb_pangu_graphics:
-        #     cbss_pang, pph_pang = bb_pangu_graphics[my_id, "cbss"], bb_pangu_graphics[my_id, "pph"]
-        #     plot_cbss_pph_panel(cbss_pang, pph_pang, my_case, lsrs=my_lsr, ax=axs[0,2], title="Pangu", lead_time_hours=48)
-        #     [tp, fn, csi, far, es] = get_stats(pang_severe_results, 
-        #         ps.pangu_bb_ifs_settings['forecast_source'], my_case, lead_time_days=[2])
-        #     # print(f"Pangu: {tp[0]:.2f}, {fn[0]:.2f}, {csi[0]:.2f}, {far[0]:.2f}, {es[0]:.2f}")
-        #     axs[1,2].text(0.5, 0.5, f"CSI: {csi[0]:.2f}\n"
-        #             f"FAR: {far[0]:.2f}\n"
-        #             f"ES: {es[0]:.2f}\n"
-        #             f"TP: {tp[0]:.2f}\n"
-        #             f"FN: {fn[0]:.2f}",
-        #             transform=axs[1,2].transAxes,
-        #             ha='center', va='center')
-        # else:
-        #     print(f"Skipping Pangu for case {my_id}: missing cbss or pph data in graphics object")
+        if (my_id, "cbss") in bb_pangu_graphics and (my_id, "pph") in bb_pangu_graphics:
+            cbss_pang, pph_pang = bb_pangu_graphics[my_id, "cbss"], bb_pangu_graphics[my_id, "pph"]
+            plot_cbss_pph_panel(cbss_pang, pph_pang, my_case, lsrs=my_lsr, ax=axs[0,2], title="Pangu", lead_time_hours=48)
+            [tp, fn, csi, far, es] = get_stats(pang_severe_results, 
+                ps.pangu_bb_ifs_settings['forecast_source'], my_case, lead_time_days=[2])
+            # print(f"Pangu: {tp[0]:.2f}, {fn[0]:.2f}, {csi[0]:.2f}, {far[0]:.2f}, {es[0]:.2f}")
+            axs[1,2].text(0.5, 0.5, f"CSI: {csi[0]:.2f}\n"
+                    f"FAR: {far[0]:.2f}\n"
+                    f"ES: {es[0]:.2f}\n"
+                    f"TP: {tp[0]:.2f}\n"
+                    f"FN: {fn[0]:.2f}",
+                    transform=axs[1,2].transAxes,
+                    ha='center', va='center')
+        else:
+            print(f"Skipping Pangu for case {my_id}: missing cbss or pph data in graphics object")
 
-        # if (my_id, "cbss") in bb_aifs_graphics and (my_id, "pph") in bb_aifs_graphics:
-        #     cbss_aifs, pph_aifs = bb_aifs_graphics[my_id, "cbss"], bb_aifs_graphics[my_id, "pph"]
-        #     plot_cbss_pph_panel(cbss_aifs, pph_aifs, my_case, lsrs=my_lsr, ax=axs[0,3], title="AIFS", lead_time_hours=48)
-        #     [tp, fn, csi, far, es] = get_stats(aifs_severe_results, 
-        #         ps.aifs_bb_ifs_settings['forecast_source'], my_case, lead_time_days=[2])
-        #     # print(f"AIFS: {tp[0]:.2f}, {fn[0]:.2f}, {csi[0]:.2f}, {far[0]:.2f}, {es[0]:.2f}")
-        #     axs[1,3].text(0.5, 0.5, f"CSI: {csi[0]:.2f}\n"
-        #             f"FAR: {far[0]:.2f}\n"
-        #             f"ES: {es[0]:.2f}\n"
-        #             f"TP: {tp[0]:.2f}\n"
-        #             f"FN: {fn[0]:.2f}",
-        #             transform=axs[1,3].transAxes,
-        #             ha='center', va='center')
-        # else:
-        #     print(f"Skipping AIFS for case {my_id}: missing cbss or pph data in graphics object")
+        if (my_id, "cbss") in bb_aifs_graphics and (my_id, "pph") in bb_aifs_graphics:
+            cbss_aifs, pph_aifs = bb_aifs_graphics[my_id, "cbss"], bb_aifs_graphics[my_id, "pph"]
+            plot_cbss_pph_panel(cbss_aifs, pph_aifs, my_case, lsrs=my_lsr, ax=axs[0,3], title="AIFS", lead_time_hours=48)
+            [tp, fn, csi, far, es] = get_stats(aifs_severe_results, 
+                ps.aifs_ifs_settings['forecast_source'], my_case, lead_time_days=[2])
+            # print(f"AIFS: {tp[0]:.2f}, {fn[0]:.2f}, {csi[0]:.2f}, {far[0]:.2f}, {es[0]:.2f}")
+            axs[1,3].text(0.5, 0.5, f"CSI: {csi[0]:.2f}\n"
+                    f"FAR: {far[0]:.2f}\n"
+                    f"ES: {es[0]:.2f}\n"
+                    f"TP: {tp[0]:.2f}\n"
+                    f"FN: {fn[0]:.2f}",
+                    transform=axs[1,3].transAxes,
+                    ha='center', va='center')
+        else:
+            print(f"Skipping AIFS for case {my_id}: missing cbss or pph data in graphics object")
 
         # make the overall title and save it        
         fig.suptitle(f"Case {my_id}: {my_case.title} on {my_case.start_date}")

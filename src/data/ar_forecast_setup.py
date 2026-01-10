@@ -28,18 +28,19 @@ class AtmosphericRiverForecastSetup:
     def __init__(self):
         pass
 
-    def get_cira_forecast(self, model_name, init_type):
+    def get_cira_forecast(self, model_name, init_type, include_ivt=False):
         model_str = CIRA_MODEL_NAME_TO_SOURCE[model_name]
         source_str = f"gs://extremeweatherbench/{model_str}_{init_type}.parq"
         name_str = f"CIRA {model_name} {init_type}"
 
+        if include_ivt:
+            my_variables = [derived.AtmosphericRiverVariables()]
+        else:
+            my_variables = [derived.AtmosphericRiverVariables(output_variables=["atmospheric_river_land_intersection"])]
+
         cira_forecast = inputs.KerchunkForecast(
             source=source_str,
-            variables=[
-            derived.AtmosphericRiverVariables(
-                output_variables=["atmospheric_river_land_intersection"]
-            )
-            ],
+            variables=my_variables,
             variable_mapping=inputs.CIRA_metadata_variable_mapping,
             storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
             preprocess=defaults._preprocess_bb_ar_cira_forecast_dataset,
@@ -47,31 +48,42 @@ class AtmosphericRiverForecastSetup:
         )
         return cira_forecast
 
-    def get_hres_forecast(self):
+    def get_hres_forecast(self, include_ivt=False):
+        if include_ivt:
+            my_variables = [derived.AtmosphericRiverVariables()]
+        else:
+            my_variables = [derived.AtmosphericRiverVariables(output_variables=["atmospheric_river_land_intersection"])]
+
         hres_forecast = inputs.ZarrForecast(
             source="gs://weatherbench2/datasets/hres/2016-2022-0012-1440x721.zarr",
-            variables=[
-                derived.AtmosphericRiverVariables(
-                    output_variables=["atmospheric_river_land_intersection"]
-                )
-            ],
+            variables=my_variables,
             variable_mapping=inputs.HRES_metadata_variable_mapping,
             storage_options={"remote_options": {"anon": True}},
             name="ECMWF HRES",
         )
         return hres_forecast
 
-    def get_bb_hres_forecast(self):
+    def get_bb_hres_forecast(self, include_ivt=False):
+        if include_ivt:
+            my_variables = [derived.AtmosphericRiverVariables()]
+        else:
+            my_variables = [derived.AtmosphericRiverVariables(output_variables=["atmospheric_river_land_intersection"])]
+
         bb_hres_forecast = ArraylakeForecast(
             source="arraylake://brightband/ecmwf@main/forecast-archive/ewb-hres",
-            variables=[derived.AtmosphericRiverVariables(output_variables=["atmospheric_river_land_intersection"])],
+            variables=my_variables,
             storage_options={"remote_options": {"anon": True}},
             name="ECMWF HRES",
             variable_mapping=BB_metadata_variable_mapping,
         )
         return bb_hres_forecast
 
-    def get_bb_ar_forecast(self, model_name):
+    def get_bb_ar_forecast(self, model_name, include_ivt=False):
+        if include_ivt:
+            my_variables = [derived.AtmosphericRiverVariables()]
+        else:
+            my_variables = [derived.AtmosphericRiverVariables(output_variables=["atmospheric_river_land_intersection"])]
+
         bb_ar_ds = open_icechunk_dataset(
             bucket=DEFAULT_ICECHUNK_BUCKET,
             prefix=BB_MODEL_NAME_TO_PREFIX[model_name],
@@ -82,7 +94,7 @@ class AtmosphericRiverForecastSetup:
 
         bb_severe_convection_forecast = InMemoryForecast(
             ds=bb_ar_ds,
-            variables=[derived.AtmosphericRiverVariables(output_variables=["atmospheric_river_land_intersection"])],
+            variables=my_variables,
             variable_mapping=BB_MLWP_VARIABLE_MAPPING,
             name=f"BB {model_name}",
         )

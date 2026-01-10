@@ -111,9 +111,9 @@ if __name__ == "__main__":
         if args.run_hres:
             print("Computing IVT for HRES")
             if hres_ar_forecast is None:
-                hres_ar_forecast = atmospheric_river_forecast_setup.get_hres_forecast()
+                hres_ar_forecast = atmospheric_river_forecast_setup.get_hres_forecast(include_ivt=True)
             if bb_hres_ar_forecast is None:
-                bb_hres_ar_forecast = atmospheric_river_forecast_setup.get_bb_hres_forecast()
+                bb_hres_ar_forecast = atmospheric_river_forecast_setup.get_bb_hres_forecast(include_ivt=True)
             ivt = get_ivt(my_case, hres_ar_forecast)
             if len(ivt) == 0:
                 print("Computing IVT for BB HRES")
@@ -124,7 +124,7 @@ if __name__ == "__main__":
         if args.run_cira_fourv2:
             print("Computing IVT for FOURV2")
             if cira_fourv2_ar_forecast is None:
-                cira_fourv2_ar_ifs_forecast = atmospheric_river_forecast_setup.get_cira_ar_forecast("FOURv2", "IFS")
+                cira_fourv2_ar_ifs_forecast = atmospheric_river_forecast_setup.get_cira_ar_forecast("FOURv2", "IFS", include_ivt=True)
 
             ivt = get_ivt(my_case, cira_fourv2_ar_forecast)
             fourv2_graphics[my_id, "ivt"] = ivt
@@ -132,35 +132,35 @@ if __name__ == "__main__":
         if args.run_cira_gc:
             print("Computing IVT for GC")
             if gc_ar_forecast is None:  
-                gc_ar_forecast = atmospheric_river_forecast_setup.get_cira_gc_ar_forecast("Graphcast", "IFS")
+                gc_ar_forecast = atmospheric_river_forecast_setup.get_cira_gc_ar_forecast("Graphcast", "IFS", include_ivt=True)
             ivt = get_ivt(my_case, gc_ar_forecast)
             gc_graphics[my_id, "ivt"] = ivt
 
         if args.run_cira_pangu:
             print("Computing IVT for PANG")
             if pang_ar_forecast is None:
-                pang_ar_forecast = atmospheric_river_forecast_setup.get_cira_ar_forecast("Pangu", "IFS")
+                pang_ar_forecast = atmospheric_river_forecast_setup.get_cira_ar_forecast("Pangu", "IFS", include_ivt=True)
             ivt = get_ivt(my_case, pang_ar_forecast)
             pang_graphics[my_id, "ivt"] = ivt
 
         if args.run_bb_graphcast:
             print("Computing IVT for Graphcast")
             if bb_graphcast_ar_forecast is None:
-                bb_graphcast_ar_forecast = atmospheric_river_forecast_setup.get_bb_ar_forecast("Graphcast")
+                bb_graphcast_ar_forecast = atmospheric_river_forecast_setup.get_bb_ar_forecast("Graphcast", include_ivt=True)
             ivt = get_ivt(my_case, bb_graphcast_ar_forecast)
             gc_graphics[my_id, "ivt"] = ivt
 
         if args.run_bb_pangu:
             print("Computing IVT for Pangu")
             if bb_pangu_ar_forecast is None:
-                bb_pangu_ar_forecast = atmospheric_river_forecast_setup.get_bb_ar_forecast("Pangu")
+                bb_pangu_ar_forecast = atmospheric_river_forecast_setup.get_bb_ar_forecast("Pangu", include_ivt=True)
             ivt = get_ivt(my_case, bb_pangu_ar_forecast)
             pang_graphics[my_id, "ivt"] = ivt
 
         if args.run_bb_aifs:
             print("Computing IVT for AIFS")
             if bb_aifs_ar_forecast is None:
-                bb_aifs_ar_forecast = atmospheric_river_forecast_setup.get_bb_ar_forecast("AIFS")
+                bb_aifs_ar_forecast = atmospheric_river_forecast_setup.get_bb_ar_forecast("AIFS", include_ivt=True)
             ivt = get_ivt(my_case, bb_aifs_ar_forecast)
             aifs_graphics[my_id, "ivt"] = ivt
 
