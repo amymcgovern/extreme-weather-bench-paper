@@ -81,6 +81,7 @@ if __name__ == "__main__":
     # load in all of the events in the yaml file
     ewb_cases = cases.load_ewb_events_yaml_into_case_collection()
     ewb_cases = ewb_cases.select_cases("event_type", "severe_convection")
+    ewb_cases = ewb_cases.select_cases("case_id_number", [318, 269])
 
     # hres_graphics = dict()
     gc_graphics = dict()
@@ -173,29 +174,29 @@ if __name__ == "__main__":
     print("Saving the graphics objects")
     if args.run_hres:
         pickle.dump(
-            hres_graphics, open(basepath + "saved_data/hres_graphics.pkl", "wb")
+            hres_graphics, open(basepath + "saved_data/hres_graphics_paper.pkl", "wb")
         )
     if args.run_cira_fourv2:
         pickle.dump(
-            fourv2_graphics, open(basepath + "saved_data/fourv2_cira_graphics.pkl", "wb")
+            fourv2_graphics, open(basepath + "saved_data/fourv2_cira_graphics_paper.pkl", "wb")
         )
     if args.run_cira_gc:
         pickle.dump(
-            gc_graphics, open(basepath + "saved_data/gc_cira_graphics.pkl", "wb")
+            gc_graphics, open(basepath + "saved_data/gc_cira_graphics_paper.pkl", "wb")
         )
     if args.run_cira_pangu:
         pickle.dump(
-            pang_graphics, open(basepath + "saved_data/pang_cira_graphics.pkl", "wb")
+            pang_graphics, open(basepath + "saved_data/pang_cira_graphics_paper.pkl", "wb")
         )  
     if args.run_bb_graphcast:
         pickle.dump(
-            gc_graphics, open(basepath + "saved_data/gc_bb_graphics.pkl", "wb")
+            gc_graphics, open(basepath + "saved_data/gc_bb_graphics_paper.pkl", "wb")
         )
     if args.run_bb_pangu:
         pickle.dump(
-            pang_graphics, open(basepath + "saved_data/pang_bb_graphics.pkl", "wb")
+            pang_graphics, open(basepath + "saved_data/pang_bb_graphics_paper.pkl", "wb")
         )
     if args.run_bb_aifs:
         pickle.dump(
-            aifs_graphics, open(basepath + "saved_data/aifs_bb_graphics.pkl", "wb")
+            aifs_graphics, open(basepath + "saved_data/aifs_bb_graphics_paper.pkl", "wb")
         )
