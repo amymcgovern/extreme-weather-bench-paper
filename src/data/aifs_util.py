@@ -56,6 +56,7 @@ class InMemoryForecast(inputs.ForecastBase):
             name=name,
             variables=variables,
             variable_mapping=variable_mapping,
+            preprocess=preprocess,
             **kwargs,
         )
         self.ds = ds
