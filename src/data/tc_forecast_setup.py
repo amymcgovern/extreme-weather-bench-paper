@@ -1,6 +1,5 @@
-from pathlib import Path
 import xarray as xr
-from extremeweatherbench import defaults, inputs, metrics, derived
+from extremeweatherbench import calc, defaults, derived, inputs, metrics
 
 from src.data.aifs_util import (
     BB_MLWP_VARIABLE_MAPPING,
@@ -11,8 +10,7 @@ from src.data.aifs_util import (
 from src.data.arraylake_utils import (
     ArraylakeForecast,
     BB_metadata_variable_mapping,
-) # noqa: E402
-
+)  # noqa: E402
 from src.data.model_name_setup import (
     BB_MODEL_NAME_TO_CREDENTIALS_PREFIX,
     BB_MODEL_NAME_TO_PREFIX,
@@ -47,7 +45,9 @@ def preprocess_bb_hres_tc_dataset(ds: xr.Dataset) -> xr.Dataset:
     """
 
     # Calculate the geopotential thickness required for tropical cyclone tracks
-    ds["geopotential_thickness"] = ds["z"] / 9.81
+    ds["geopotential_thickness"] = calc.geopotential_thickness(
+        ds["z"], top_level_value=300, bottom_level_value=500
+    ) / 9.81
     return ds
 
 class TropicalCycloneForecastSetup:
