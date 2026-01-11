@@ -40,6 +40,16 @@ def preprocess_mlwp_tc_dataset(ds: xr.Dataset) -> xr.Dataset:
     ds["geopotential_thickness"] = ds["geopotential"] / 9.81
     return ds
 
+# Preprocessing function for MLWP data that includes geopotential thickness calculation
+# required for tropical cyclone tracks
+def preprocess_bb_hres_tc_dataset(ds: xr.Dataset) -> xr.Dataset:
+    """A function to process the MLWP dataset for tropical cyclone tracks.
+    """
+
+    # Calculate the geopotential thickness required for tropical cyclone tracks
+    ds["geopotential_thickness"] = ds["z"] / 9.81
+    return ds
+
 class TropicalCycloneForecastSetup:
     def __init__(self):
         pass
@@ -75,7 +85,7 @@ class TropicalCycloneForecastSetup:
         bb_hres_tc_forecast = ArraylakeForecast(
             source="arraylake://brightband/ecmwf@main/forecast-archive/ewb-hres",
             variables=[derived.TropicalCycloneTrackVariables()],
-            preprocess=defaults._preprocess_bb_hres_tc_forecast_dataset,
+            preprocess=preprocess_bb_hres_tc_dataset,
             variable_mapping=BB_metadata_variable_mapping,
             name="ECMWF HRES",
         )
