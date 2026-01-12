@@ -36,10 +36,10 @@ if __name__ == "__main__":
         help="Run CIRA FOURv2 evaluation (default: False)",
     )
     parser.add_argument(
-        "--run_cira_gc",
+        "--run_cira_graphcast",
         action="store_true",
         default=False,
-        help="Run CIRA GC evaluation (default: False)",
+        help="Run CIRA Graphcast evaluation (default: False)",
     )
     parser.add_argument(
         "--run_cira_pangu",
@@ -124,21 +124,21 @@ if __name__ == "__main__":
         cira_fourv2_results.to_pickle(basepath + "saved_data/cira_fourv2_ar_results.pkl")
         print("CIRA FOURv2 evaluation complete. Results saved to pickle.")
 
-    if args.run_cira_gc:
-        print("running CIRA GC evaluation")
+    if args.run_cira_graphcast:
+        print("running CIRA Graphcast evaluation")
 
-        cira_gc_ar_gfs_forecast = atmospheric_river_forecast_setup.get_cira_forecast("GC", "GFS")
-        cira_gc_ar_ifs_forecast = atmospheric_river_forecast_setup.get_cira_forecast("GC", "IFS")
-        cira_gc_ar_evaluation_objects = atmospheric_river_evaluation_setup.get_ar_evaluation_objects(
-            [cira_gc_ar_gfs_forecast, cira_gc_ar_ifs_forecast]
+        cira_graphcast_ar_gfs_forecast = atmospheric_river_forecast_setup.get_cira_forecast("Graphcast", "GFS")
+        cira_graphcast_ar_ifs_forecast = atmospheric_river_forecast_setup.get_cira_forecast("Graphcast", "IFS")
+        cira_graphcast_ar_evaluation_objects = atmospheric_river_evaluation_setup.get_ar_evaluation_objects(
+            [cira_graphcast_ar_gfs_forecast, cira_graphcast_ar_ifs_forecast]
         )
 
-        ewb_cira_gc = evaluate.ExtremeWeatherBench(ewb_cases, cira_gc_ar_evaluation_objects)
+        ewb_cira_graphcast = evaluate.ExtremeWeatherBench(ewb_cases, cira_graphcast_ar_evaluation_objects)
 
-        print("running CIRA GC")
-        cira_gc_results = ewb_cira_gc.run(parallel_config=parallel_config)
-        cira_gc_results.to_pickle(basepath + "saved_data/cira_gc_ar_results.pkl")
-        print("CIRA GC evaluation complete. Results saved to pickle.")
+        print("running CIRA Graphcast")
+        cira_graphcast_results = ewb_cira_graphcast.run(parallel_config=parallel_config)
+        cira_graphcast_results.to_pickle(basepath + "saved_data/cira_graphcast_ar_results.pkl")
+        print("CIRA Graphcast evaluation complete. Results saved to pickle.")
 
     if args.run_cira_pangu:
         print("running CIRA PANGU evaluation")

@@ -15,6 +15,7 @@ import matplotlib.colors as colors
 
 # setup all the imports
 import matplotlib.colors as mcolors
+import matplotlib.font_manager as fm
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
@@ -1545,14 +1546,13 @@ def plot_heatmap(
         label_fontsize = "xx-large"
         tick_fontsize = "xx-large"
         title_y = 1.05
+        annot_fontsize = 12
     else:
         title_fontsize = "xx-large"
         label_fontsize = "large"
         tick_fontsize = "large"
         title_y = 1.1
-
-    # Adjust annotation font size for subplots
-    annot_fontsize = 12 if is_subplot else None
+        annot_fontsize = "large"
 
     subplot_titles = settings["subplot_titles"]
     for i, my_title in enumerate(subplot_titles):
@@ -1563,7 +1563,7 @@ def plot_heatmap(
         ax = sns.heatmap(
             relative_error_array[metric],
             annot=error_array[metric],
-            fmt=".3g",
+            fmt=".2f",
             cmap=cmap,
             norm=norm,
             vmin=vmin,
@@ -1616,17 +1616,25 @@ def plot_heatmap(
         # Create the colorbar using the first subplot's collections
         cb = fig.colorbar(mappable=axs[0].collections[0], cax=cax, **cbar_kws)
         cb.ax.set_xticks(cb_levels)
-        cbar_fontsize = "xx-large" if is_subplot else "large"
+        # Scale up the label font size for the colorbar (1.2x larger)
+        base_size = plt.rcParams['font.size']
+        font_scalings = fm.font_scalings
+        label_size_numeric = base_size * font_scalings.get(label_fontsize, 1.0)
+        cbar_fontsize = label_size_numeric * 1.2
         cb.ax.set_xlabel(
             "Better ← % difference vs IFS HRES → Worse", fontsize=cbar_fontsize
         )
     elif show_colorbar:
-        # Original positioning for standalone figure
-        cax = fig.add_axes((0.25, -0.05, 0.5, 0.05))
-
+        # make the colorbar take up 90% of the width of the figure and center it on the bottom of the figure
+        cax = fig.add_axes((0, -0.05, 1, 0.05))
+        cax.set_position([0.1, -0.05, 0.8, 0.05])
         cb = fig.colorbar(mappable=ax.collections[0], cax=cax, **cbar_kws)
         cb.ax.set_xticks(cb_levels)
-        cbar_fontsize = "small" if is_subplot else "large"
+        # Scale up the label font size for the colorbar (1.2x larger)
+        base_size = plt.rcParams['font.size']
+        font_scalings = fm.font_scalings
+        label_size_numeric = base_size * font_scalings.get(label_fontsize, 1.0)
+        cbar_fontsize = label_size_numeric * 1.2
         cb.ax.set_xlabel(
             "Better ← % difference vs IFS HRES → Worse", fontsize=cbar_fontsize
         )
