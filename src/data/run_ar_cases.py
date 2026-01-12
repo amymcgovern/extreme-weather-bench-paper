@@ -111,8 +111,11 @@ if __name__ == "__main__":
     if args.run_cira_fourv2:
         print("running CIRA FOURv2 evaluation")
 
-        cira_fourv2_ar_forecast = atmospheric_river_forecast_setup.get_cira_forecast("FOURv2", "GFS")
-        cira_fourv2_ar_evaluation_objects = atmospheric_river_evaluation_setup.get_ar_evaluation_objects([cira_fourv2_ar_forecast])
+        cira_fourv2_ar_gfs_forecast = atmospheric_river_forecast_setup.get_cira_forecast("Fourv2", "GFS")
+        cira_fourv2_ar_ifs_forecast = atmospheric_river_forecast_setup.get_cira_forecast("Fourv2", "IFS")
+        cira_fourv2_ar_evaluation_objects = atmospheric_river_evaluation_setup.get_ar_evaluation_objects(
+            [cira_fourv2_ar_gfs_forecast, cira_fourv2_ar_ifs_forecast]
+        )
 
         ewb_fourv2 = evaluate.ExtremeWeatherBench(ewb_cases, cira_fourv2_ar_evaluation_objects)
 
@@ -124,8 +127,11 @@ if __name__ == "__main__":
     if args.run_cira_gc:
         print("running CIRA GC evaluation")
 
-        cira_gc_ar_forecast = atmospheric_river_forecast_setup.get_cira_forecast("GC", "GFS")
-        cira_gc_ar_evaluation_objects = atmospheric_river_evaluation_setup.get_ar_evaluation_objects([cira_gc_ar_forecast])
+        cira_gc_ar_gfs_forecast = atmospheric_river_forecast_setup.get_cira_forecast("GC", "GFS")
+        cira_gc_ar_ifs_forecast = atmospheric_river_forecast_setup.get_cira_forecast("GC", "IFS")
+        cira_gc_ar_evaluation_objects = atmospheric_river_evaluation_setup.get_ar_evaluation_objects(
+            [cira_gc_ar_gfs_forecast, cira_gc_ar_ifs_forecast]
+        )
 
         ewb_cira_gc = evaluate.ExtremeWeatherBench(ewb_cases, cira_gc_ar_evaluation_objects)
 
@@ -137,8 +143,11 @@ if __name__ == "__main__":
     if args.run_cira_pangu:
         print("running CIRA PANGU evaluation")
 
-        cira_pangu_ar_forecast = atmospheric_river_forecast_setup.get_cira_forecast("Pangu", "GFS")
-        cira_pangu_ar_evaluation_objects = atmospheric_river_evaluation_setup.get_ar_evaluation_objects([cira_pangu_ar_forecast])
+        cira_pangu_ar_gfs_forecast = atmospheric_river_forecast_setup.get_cira_forecast("Pangu", "GFS")
+        cira_pangu_ar_ifs_forecast = atmospheric_river_forecast_setup.get_cira_forecast("Pangu", "IFS")
+        cira_pangu_ar_evaluation_objects = atmospheric_river_evaluation_setup.get_ar_evaluation_objects(
+            [cira_pangu_ar_gfs_forecast, cira_pangu_ar_ifs_forecast]
+        )
 
         ewb_cira_pangu = evaluate.ExtremeWeatherBench(ewb_cases, cira_pangu_ar_evaluation_objects)
 

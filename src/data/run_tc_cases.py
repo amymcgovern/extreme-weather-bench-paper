@@ -111,8 +111,10 @@ if __name__ == "__main__":
     if args.run_cira_fourv2:
         print("running CIRA FOURv2 evaluation")
 
-        cira_fourv2_tc_forecast = tropical_cyclone_forecast_setup.get_cira_tc_forecast("FOURv2", "GFS")
-        cira_fourv2_tc_evaluation_objects = tropical_cyclone_evaluation_setup.get_tc_evaluation_objects([cira_fourv2_tc_forecast])
+        cira_fourv2_tc_forecast_gfs = tropical_cyclone_forecast_setup.get_cira_tc_forecast("Fourv2", "GFS")
+        cira_fourv2_tc_forecast_ifs = tropical_cyclone_forecast_setup.get_cira_tc_forecast("Fourv2", "IFS")
+        cira_fourv2_tc_evaluation_objects = tropical_cyclone_evaluation_setup.get_tc_evaluation_objects([
+            cira_fourv2_tc_forecast_gfs, cira_fourv2_tc_forecast_ifs])
 
         ewb_fourv2 = evaluate.ExtremeWeatherBench(ewb_cases, cira_fourv2_tc_evaluation_objects)
 
@@ -124,8 +126,10 @@ if __name__ == "__main__":
     if args.run_cira_gc:
         print("running CIRA GC evaluation")
 
-        cira_gc_tc_forecast = tropical_cyclone_forecast_setup.get_cira_tc_forecast("GC", "GFS")
-        cira_gc_tc_evaluation_objects = tropical_cyclone_evaluation_setup.get_tc_evaluation_objects([cira_gc_tc_forecast])
+        cira_gc_tc_forecast_gfs = tropical_cyclone_forecast_setup.get_cira_tc_forecast("GC", "GFS")
+        cira_gc_tc_forecast_ifs = tropical_cyclone_forecast_setup.get_cira_tc_forecast("GC", "IFS")
+        cira_gc_tc_evaluation_objects = tropical_cyclone_evaluation_setup.get_tc_evaluation_objects([
+            cira_gc_tc_forecast_gfs, cira_gc_tc_forecast_ifs])
 
         ewb_cira_gc = evaluate.ExtremeWeatherBench(ewb_cases, cira_gc_tc_evaluation_objects)
 
@@ -137,8 +141,10 @@ if __name__ == "__main__":
     if args.run_cira_pangu:
         print("running CIRA PANGU evaluation")
 
-        cira_pangu_tc_forecast = tropical_cyclone_forecast_setup.get_cira_tc_forecast("Pangu", "GFS")
-        cira_pangu_tc_evaluation_objects = tropical_cyclone_evaluation_setup.get_tc_evaluation_objects([cira_pangu_tc_forecast])
+        cira_pangu_tc_forecast_gfs = tropical_cyclone_forecast_setup.get_cira_tc_forecast("Pangu", "GFS")
+        cira_pangu_tc_forecast_ifs = tropical_cyclone_forecast_setup.get_cira_tc_forecast("Pangu", "IFS")
+        cira_pangu_tc_evaluation_objects = tropical_cyclone_evaluation_setup.get_tc_evaluation_objects([
+            cira_pangu_tc_forecast_gfs, cira_pangu_tc_forecast_ifs])
 
         ewb_cira_pangu = evaluate.ExtremeWeatherBench(ewb_cases, cira_pangu_tc_evaluation_objects)
 
