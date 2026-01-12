@@ -1559,11 +1559,28 @@ def plot_heatmap(
         ax = axs[i]
         # print(my_title)
         metric = settings["metric_str"][i]
+       
+        # Determine format based on the range of values being displayed
+        error_values = error_array[metric]
+        error_max = np.nanmax(np.abs(error_values))
+        error_min = np.nanmin(np.abs(error_values[error_values != 0])) if np.any(error_values != 0) else error_max
+        
+        # Choose format based on magnitude
+        if error_max >= 1000:
+            fmt = ".0f"  # No decimals for very large numbers
+        elif error_max >= 100:
+            fmt = ".1f"  # One decimal for large numbers
+        elif error_max >= 1:
+            fmt = ".2f"  # Two decimals for medium numbers
+        elif error_min < 0.01:
+            fmt = ".2g"  # General format (scientific notation) for very small numbers
+        else:
+            fmt = ".3f"  # Three decimals for small numbers
 
         ax = sns.heatmap(
             relative_error_array[metric],
             annot=error_array[metric],
-            fmt=".2f",
+            fmt=fmt,
             cmap=cmap,
             norm=norm,
             vmin=vmin,
@@ -1606,6 +1623,7 @@ def plot_heatmap(
         right = max(bbox.x1 for bbox in bboxes)
         bottom = min(bbox.y0 for bbox in bboxes)
         width = right - left
+        
         # Position colorbar below the subplots with proper spacing
         cbar_height = 0.03
         cbar_spacing = 0.02  # Space between subplots and colorbar
@@ -1613,9 +1631,11 @@ def plot_heatmap(
         cbar_left = left + width * 0.05  # Center 90% width colorbar
         cbar_bottom = bottom - cbar_height - cbar_spacing
         cax = fig.add_axes((cbar_left, cbar_bottom, cbar_width, cbar_height))
+        
         # Create the colorbar using the first subplot's collections
         cb = fig.colorbar(mappable=axs[0].collections[0], cax=cax, **cbar_kws)
         cb.ax.set_xticks(cb_levels)
+        
         # Scale up the label font size for the colorbar (1.2x larger)
         base_size = plt.rcParams['font.size']
         font_scalings = fm.font_scalings
@@ -1630,6 +1650,7 @@ def plot_heatmap(
         cax.set_position([0.1, -0.05, 0.8, 0.05])
         cb = fig.colorbar(mappable=ax.collections[0], cax=cax, **cbar_kws)
         cb.ax.set_xticks(cb_levels)
+        
         # Scale up the label font size for the colorbar (1.2x larger)
         base_size = plt.rcParams['font.size']
         font_scalings = fm.font_scalings
