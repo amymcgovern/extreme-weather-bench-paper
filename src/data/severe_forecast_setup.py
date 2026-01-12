@@ -62,6 +62,7 @@ class SevereForecastSetup:
             variable_mapping=inputs.CIRA_metadata_variable_mapping,
             storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
             name=name_str,
+            preprocess=defaults._preprocess_bb_severe_cira_forecast_dataset,
         )
         return cira_severe_convection_forecast
 

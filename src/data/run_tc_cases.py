@@ -99,7 +99,7 @@ if __name__ == "__main__":
         ewb_bb_hres = evaluate.ExtremeWeatherBench(later_cases, bb_hres_tc_evaluation_objects)
 
         print("running HRES")
-        # hres_results = ewb_hres.run(parallel_config=parallel_config)
+        hres_results = ewb_hres.run(parallel_config=parallel_config)
         print("running BB HRES")
         bb_hres_results = ewb_bb_hres.run(parallel_config=parallel_config)
         

@@ -34,10 +34,10 @@ if __name__ == "__main__":
         help="Run CIRA FOURv2 evaluation (default: False)",
     )
     parser.add_argument(
-        "--run_cira_gc",
+        "--run_cira_graphcast",
         action="store_true",
         default=False,
-        help="Run CIRA GC evaluation (default: False)",
+        help="Run CIRA Graphcast evaluation (default: False)",
     )
     parser.add_argument(
         "--run_cira_pangu",
@@ -113,10 +113,10 @@ if __name__ == "__main__":
         print("running FOURv2 evaluation")
 
         cira_fourv2_gfs_severe_forecast = (
-            severe_forecast_setup.get_cira_severe_convection_forecast("FOURv2", "GFS")
+            severe_forecast_setup.get_cira_severe_convection_forecast("Fourv2", "GFS")
         )
         cira_fourv2_ifs_severe_forecast = (
-            severe_forecast_setup.get_cira_severe_convection_forecast("FOURv2", "IFS")
+            severe_forecast_setup.get_cira_severe_convection_forecast("Fourv2", "IFS")
         )
         cira_fourv2_severe_evaluation_objects = (
             severe_evaluation_setup.get_severe_evaluation_objects(
@@ -130,8 +130,8 @@ if __name__ == "__main__":
         fourv2_results.to_pickle(basepath + "saved_data/cira_fourv2_severe_results.pkl")
         print("FOURv2 evaluation complete. Results saved to pickle.")
 
-    if args.run_cira_gc:
-        print("running GC evaluation")
+    if args.run_cira_graphcast:
+        print("running Graphcast evaluation")
 
         cira_gc_gfs_severe_forecast = (
             severe_forecast_setup.get_cira_severe_convection_forecast(
@@ -152,8 +152,8 @@ if __name__ == "__main__":
             ewb_cases, cira_gc_severe_evaluation_objects
         )
         gc_results = ewb_gc.run(parallel_config=parallel_config)
-        gc_results.to_pickle(basepath + "saved_data/cira_gc_severe_results.pkl")
-        print("GC evaluation complete. Results saved to pickle.")
+        gc_results.to_pickle(basepath + "saved_data/cira_graphcast_severe_results.pkl")
+        print("Graphcast evaluation complete. Results saved to pickle.")
 
     if args.run_cira_pangu:
         print("running PANGU evaluation")
