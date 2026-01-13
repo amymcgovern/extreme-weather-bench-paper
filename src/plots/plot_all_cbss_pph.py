@@ -151,7 +151,7 @@ if __name__ == "__main__":
     # load in all of the events in the yaml file
     ewb_cases = cases.load_ewb_events_yaml_into_case_collection()
     ewb_cases = ewb_cases.select_cases("event_type", "severe_convection")
-    # ewb_cases = ewb_cases.select_cases("case_id_number", [331, 269])
+    ewb_cases = ewb_cases.select_cases("case_id_number", [331, 269])
 
     # build out all of the expected data to evalate the case (we need this so we can plot
     # the LSR reports)
@@ -180,23 +180,16 @@ if __name__ == "__main__":
     # the memory as it shuts down the workers
     get_reusable_executor().shutdown(wait=True)
 
-    # print("Loading in the results")
-    # # load in the results
-    # hres_severe_results = pd.read_pickle(basepath + "saved_data/hres_severe_results.pkl")
-    # gc_severe_results = pd.read_pickle(basepath + "saved_data/bb_graphcast_severe_results.pkl")
-    # pang_severe_results = pd.read_pickle(basepath + "saved_data/bb_pangu_severe_results.pkl")
-    # aifs_severe_results = pd.read_pickle(basepath + "saved_data/bb_aifs_severe_results.pkl")
-
     print("Loading in the graphics objects")
     # load in the graphics objects
     print("Loading in the HRES graphics object")
-    hres_graphics = pickle.load(open(basepath + "saved_data/hres_graphics.pkl", "rb"))
+    hres_graphics = pickle.load(open(basepath + "saved_data/hres_graphics_paper.pkl", "rb"))
     print("Loading in the GraphCast graphics object")
-    bb_graphcast_graphics = pickle.load(open(basepath + "saved_data/gc_bb_graphics.pkl", "rb"))
+    bb_graphcast_graphics = pickle.load(open(basepath + "saved_data/gc_bb_graphics_paper.pkl", "rb"))
     print("Loading in the Pangu graphics object")
-    bb_pangu_graphics = pickle.load(open(basepath + "saved_data/pang_bb_graphics.pkl", "rb"))
+    bb_pangu_graphics = pickle.load(open(basepath + "saved_data/pang_bb_graphics_paper.pkl", "rb"))
     print("Loading in the AIFS graphics object")
-    bb_aifs_graphics = pickle.load(open(basepath + "saved_data/aifs_bb_graphics.pkl", "rb"))
+    bb_aifs_graphics = pickle.load(open(basepath + "saved_data/aifs_bb_graphics_paper.pkl", "rb"))
 
     lead_times_to_plot = [24, 3*24, 5*24, 7*24, 10*24]
 
@@ -208,7 +201,20 @@ if __name__ == "__main__":
         my_lsr = get_lsr_from_case_op(my_case, case_operators_with_targets_established)
 
         # make a subplot for each model and ensure it is a cartopy plot
-        fig, axs = plt.subplots(len(lead_times_to_plot), 4, figsize=(18, 4.2 * len(lead_times_to_plot)), subplot_kw={'projection': ccrs.PlateCarree()})
+        # Calculate figure size based on aspect ratio instead of hard-coding
+        # Define desired aspect ratio for each subplot (width/height)
+        subplot_aspect_ratio = 1.0  # Adjust this to change subplot shape (1.0 = square)
+        width_per_col = 3.75  # Base width per column
+        n_rows = len(lead_times_to_plot)
+        n_cols = 4
+        
+        # Calculate total figure size based on aspect ratio
+        total_width = width_per_col * n_cols
+        height_per_row = (width_per_col / subplot_aspect_ratio) + 0.1
+        total_height = height_per_row * n_rows
+        
+        fig, axs = plt.subplots(n_rows, n_cols, figsize=(total_width, total_height), 
+                                subplot_kw={'projection': ccrs.PlateCarree()})
 
         # Check if the graphics data exists for this case
         if (my_id, "cbss") in hres_graphics and (my_id, "pph") in hres_graphics:
@@ -221,19 +227,7 @@ if __name__ == "__main__":
                 plot_cbss_pph_panel(cbss_hres, pph_hres, my_case, lsrs=my_lsr, 
                     ax=axs[i, 0], title=title, lead_time_hours=lead_time_hours,
                     gridlines_kwargs={"show_left_labels": True, "show_bottom_labels": True})
-        #     [tp, fn, csi, far, es] = get_stats(hres_severe_results, 
-        #         ps.hres_ifs_settings['forecast_source'], my_case, lead_time_days=[int(lead_time_hours / 24)])
-        # # print(f"HRES: {tp[0]:.2f}, {fn[0]:.2f}, {csi[0]:.2f}, {far[0]:.2f}, {es[0]:.2f}")
-        #     if (len(csi) > 0 and len(far) > 0 and len(es) > 0 and len(tp) > 0 and len(fn) > 0):
-        #         axs[1,0].text(0.5, 0.5, f"CSI: {csi[0]:.2f}\n"
-        #                 f"FAR: {far[0]:.2f}\n"
-        #                 f"ES: {es[0]:.2f}\n"
-        #                 f"TP: {tp[0]:.2f}\n"
-        #                 f"FN: {fn[0]:.2f}",
-        #                 transform=axs[1,0].transAxes,
-        #                 ha='center', va='center')
-        #     else:
-        #         print(f"Skipping HRES for case {my_id}: missing stats data")
+        
         else:
             print(f"Skipping HRES for case {my_id}: missing cbss or pph data in graphics object")
         
@@ -248,20 +242,6 @@ if __name__ == "__main__":
                 plot_cbss_pph_panel(cbss_gc, pph_gc, my_case, lsrs=my_lsr, ax=axs[i, 1], 
                     title=title, lead_time_hours=lead_time_hours,
                     gridlines_kwargs={"show_left_labels": False, "show_bottom_labels": False})
-            
-            # [tp, fn, csi, far, es] = get_stats(gc_severe_results, 
-            #     ps.gc_bb_ifs_settings['forecast_source'], my_case, lead_time_days=[int(lead_time_hours / 24)])
-            # # print(f"GraphCast: {tp[0]:.2f}, {fn[0]:.2f}, {csi[0]:.2f}, {far[0]:.2f}, {es[0]:.2f}")
-            # if (len(csi) > 0 and len(far) > 0 and len(es) > 0 and len(tp) > 0 and len(fn) > 0):
-            #     axs[1,1].text(0.5, 0.5, f"CSI: {csi[0]:.2f}\n"
-            #                 f"FAR: {far[0]:.2f}\n"
-            #                 f"ES: {es[0]:.2f}\n"
-            #                 f"TP: {tp[0]:.2f}\n"
-            #                 f"FN: {fn[0]:.2f}",
-            #                 transform=axs[1,1].transAxes,
-            #                 ha='center', va='center')
-            # else:
-            #     print(f"Skipping GraphCast for case {my_id}: missing stats data")
         else:
             print(f"Skipping GraphCast for case {my_id}: missing cbss or pph data in graphics object")
 
@@ -276,19 +256,6 @@ if __name__ == "__main__":
                 plot_cbss_pph_panel(cbss_pang, pph_pang, my_case, lsrs=my_lsr, ax=axs[i, 2], 
                     title=title, lead_time_hours=lead_time_hours,
                     gridlines_kwargs={"show_left_labels": False, "show_bottom_labels": False})
-            # [tp, fn, csi, far, es] = get_stats(pang_severe_results, 
-            #     ps.pangu_bb_ifs_settings['forecast_source'], my_case, lead_time_days=[int(lead_time_hours / 24)])
-            # print(f"Pangu: {tp[0]:.2f}, {fn[0]:.2f}, {csi[0]:.2f}, {far[0]:.2f}, {es[0]:.2f}")
-            # if (len(csi) > 0 and len(far) > 0 and len(es) > 0 and len(tp) > 0 and len(fn) > 0):
-            #     axs[1,2].text(0.5, 0.5, f"CSI: {csi[0]:.2f}\n"
-            #             f"FAR: {far[0]:.2f}\n"
-            #             f"ES: {es[0]:.2f}\n"
-            #             f"TP: {tp[0]:.2f}\n"
-            #             f"FN: {fn[0]:.2f}",
-            #             transform=axs[1,2].transAxes,
-            #             ha='center', va='center')
-            # else:
-            #     print(f"Skipping Pangu for case {my_id}: missing stats data")
         else:
             print(f"Skipping Pangu for case {my_id}: missing cbss or pph data in graphics object")
 
@@ -302,21 +269,32 @@ if __name__ == "__main__":
                 plot_cbss_pph_panel(cbss_aifs, pph_aifs, my_case, lsrs=my_lsr, ax=axs[i, 3], 
                     title=title, lead_time_hours=lead_time_hours,
                     gridlines_kwargs={"show_left_labels": False, "show_bottom_labels": False})
-            # [tp, fn, csi, far, es] = get_stats(aifs_severe_results, 
-            #     ps.aifs_ifs_settings['forecast_source'], my_case, lead_time_days=[2])
-            # # print(f"AIFS: {tp[0]:.2f}, {fn[0]:.2f}, {csi[0]:.2f}, {far[0]:.2f}, {es[0]:.2f}")
-            # if (len(csi) > 0 and len(far) > 0 and len(es) > 0 and len(tp) > 0 and len(fn) > 0):
-            #     axs[1,3].text(0.5, 0.5, f"CSI: {csi[0]:.2f}\n"
-            #             f"FAR: {far[0]:.2f}\n"
-            #             f"ES: {es[0]:.2f}\n"
-            #             f"TP: {tp[0]:.2f}\n"
-            #             f"FN: {fn[0]:.2f}",
-            #             transform=axs[1,3].transAxes,
-            #             ha='center', va='center')
-            # else:
-            #     print(f"Skipping AIFS for case {my_id}: missing stats data")
         else:
             print(f"Skipping AIFS for case {my_id}: missing cbss or pph data in graphics object")
+
+        # plot the colorbar at the bottom of the figure
+        cmap, norm, levels = severe_utils.setup_cbss_colormap_and_levels()
+        # Get the bottom position of the lowest subplot
+        bottom_axes = [axs[len(lead_times_to_plot) - 1, j] for j in range(4)]
+        bottom_positions = [ax.get_position() for ax in bottom_axes]
+        bottom_y = min(bbox.y0 for bbox in bottom_positions)
+        left_x = min(bbox.x0 for bbox in bottom_positions)
+        right_x = max(bbox.x1 for bbox in bottom_positions)
+        width = right_x - left_x
+
+        # Position colorbar below the bottom row with proper spacing
+        cbar_height = 0.03
+        cbar_spacing = 0.05
+        cbar_width = width * 0.9
+        cbar_left = left_x + width * 0.05
+        cbar_bottom = bottom_y - cbar_height - cbar_spacing
+
+        cax = fig.add_axes([cbar_left, cbar_bottom, cbar_width, cbar_height])
+        # Get mappable from one of the bottom row subplots
+        cb = fig.colorbar(mappable=axs[len(lead_times_to_plot) - 1, 0].collections[0], cax=cax, orientation='horizontal')
+        cb.ax.set_xticks(levels)
+        cb.set_label("Craven-Brooks Significant Severe (m³/s³)", fontsize=18)
+
 
         # make the overall title and save it        
         fig.suptitle(f"Case {my_id}: {my_case.title} on {my_case.start_date}", fontsize=32)

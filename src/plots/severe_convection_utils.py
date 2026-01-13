@@ -16,6 +16,7 @@ import pandas as pd
 import xarray as xr
 
 import src.plots.plotting_utils as plotting
+import src.plots.atmospheric_river_utils as ar_utils
 
 logger = logging.getLogger(__name__)
 
@@ -227,11 +228,13 @@ def plot_cbss_forecast_panel(
 
     # Set extent
     lon_min, lon_max = plotting.convert_bbox_longitude(bbox)
+    
     ax.set_extent(
         [lon_min, lon_max, bbox["latitude_min"], bbox["latitude_max"]],
         crs=ccrs.PlateCarree(),
     )
-
+    
+    
     # Add gridlines
     plotting.setup_gridlines(ax, **gridlines_kwargs)
 
