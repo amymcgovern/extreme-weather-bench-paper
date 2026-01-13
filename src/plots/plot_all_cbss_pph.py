@@ -151,6 +151,8 @@ if __name__ == "__main__":
     # load in all of the events in the yaml file
     ewb_cases = cases.load_ewb_events_yaml_into_case_collection()
     ewb_cases = ewb_cases.select_cases("event_type", "severe_convection")
+    # ewb_cases = ewb_cases.select_cases("case_id_number", [331, 269])
+
     # build out all of the expected data to evalate the case (we need this so we can plot
     # the LSR reports)
     case_operators = cases.build_case_operators(
@@ -206,7 +208,7 @@ if __name__ == "__main__":
         my_lsr = get_lsr_from_case_op(my_case, case_operators_with_targets_established)
 
         # make a subplot for each model and ensure it is a cartopy plot
-        fig, axs = plt.subplots(len(lead_times_to_plot), 4, figsize=(20, 3 * len(lead_times_to_plot)), subplot_kw={'projection': ccrs.PlateCarree()})
+        fig, axs = plt.subplots(len(lead_times_to_plot), 4, figsize=(18, 4.2 * len(lead_times_to_plot)), subplot_kw={'projection': ccrs.PlateCarree()})
 
         # Check if the graphics data exists for this case
         if (my_id, "cbss") in hres_graphics and (my_id, "pph") in hres_graphics:
@@ -318,5 +320,5 @@ if __name__ == "__main__":
 
         # make the overall title and save it        
         fig.suptitle(f"Case {my_id}: {my_case.title} on {my_case.start_date}", fontsize=32)
-        fig.savefig(basepath + f"graphics/severe_convection/severe_case_{my_id}.png", dpi=300, bbox_inches="tight")
+        fig.savefig(basepath + f"graphics/severe/severe_case_{my_id}.png", dpi=300, bbox_inches="tight")
         plt.close(fig)
