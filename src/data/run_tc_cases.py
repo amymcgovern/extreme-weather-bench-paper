@@ -36,10 +36,10 @@ if __name__ == "__main__":
         help="Run CIRA FOURv2 evaluation (default: False)",
     )
     parser.add_argument(
-        "--run_cira_gc",
+        "--run_cira_graphcast",
         action="store_true",
         default=False,
-        help="Run CIRA GC evaluation (default: False)",
+        help="Run CIRA Graphcast evaluation (default: False)",
     )
     parser.add_argument(
         "--run_cira_pangu",
@@ -123,20 +123,20 @@ if __name__ == "__main__":
         cira_fourv2_results.to_pickle(basepath + "saved_data/cira_fourv2_tc_results.pkl")
         print("CIRA FOURv2 evaluation complete. Results saved to pickle.")
 
-    if args.run_cira_gc:
-        print("running CIRA GC evaluation")
+    if args.run_cira_graphcast:
+        print("running CIRA Graphcast evaluation")
 
-        cira_gc_tc_forecast_gfs = tropical_cyclone_forecast_setup.get_cira_tc_forecast("GC", "GFS")
-        cira_gc_tc_forecast_ifs = tropical_cyclone_forecast_setup.get_cira_tc_forecast("GC", "IFS")
+        cira_graphcast_tc_forecast_gfs = tropical_cyclone_forecast_setup.get_cira_tc_forecast("Graphcast", "GFS")
+        cira_graphcast_tc_forecast_ifs = tropical_cyclone_forecast_setup.get_cira_tc_forecast("Graphcast", "IFS")
         cira_gc_tc_evaluation_objects = tropical_cyclone_evaluation_setup.get_tc_evaluation_objects([
-            cira_gc_tc_forecast_gfs, cira_gc_tc_forecast_ifs])
+            cira_graphcast_tc_forecast_gfs, cira_graphcast_tc_forecast_ifs])
 
         ewb_cira_gc = evaluate.ExtremeWeatherBench(ewb_cases, cira_gc_tc_evaluation_objects)
 
-        print("running CIRA GC")
+        print("running CIRA Graphcast")
         cira_gc_results = ewb_cira_gc.run(parallel_config=parallel_config)
-        cira_gc_results.to_pickle(basepath + "saved_data/cira_gc_tc_results.pkl")
-        print("CIRA GC evaluation complete. Results saved to pickle.")
+        cira_gc_results.to_pickle(basepath + "saved_data/cira_graphcast_tc_results.pkl")
+        print("CIRA Graphcast evaluation complete. Results saved to pickle.")
 
     if args.run_cira_pangu:
         print("running CIRA PANGU evaluation")
