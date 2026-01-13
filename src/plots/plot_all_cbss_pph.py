@@ -151,7 +151,7 @@ if __name__ == "__main__":
     # load in all of the events in the yaml file
     ewb_cases = cases.load_ewb_events_yaml_into_case_collection()
     ewb_cases = ewb_cases.select_cases("event_type", "severe_convection")
-    ewb_cases = ewb_cases.select_cases("case_id_number", [331, 269])
+    # ewb_cases = ewb_cases.select_cases("case_id_number", [331, 269])
 
     # build out all of the expected data to evalate the case (we need this so we can plot
     # the LSR reports)
@@ -183,13 +183,13 @@ if __name__ == "__main__":
     print("Loading in the graphics objects")
     # load in the graphics objects
     print("Loading in the HRES graphics object")
-    hres_graphics = pickle.load(open(basepath + "saved_data/hres_graphics_paper.pkl", "rb"))
+    hres_graphics = pickle.load(open(basepath + "saved_data/hres_graphics.pkl", "rb"))
     print("Loading in the GraphCast graphics object")
-    bb_graphcast_graphics = pickle.load(open(basepath + "saved_data/gc_bb_graphics_paper.pkl", "rb"))
+    bb_graphcast_graphics = pickle.load(open(basepath + "saved_data/gc_bb_graphics.pkl", "rb"))
     print("Loading in the Pangu graphics object")
-    bb_pangu_graphics = pickle.load(open(basepath + "saved_data/pang_bb_graphics_paper.pkl", "rb"))
+    bb_pangu_graphics = pickle.load(open(basepath + "saved_data/pang_bb_graphics.pkl", "rb"))
     print("Loading in the AIFS graphics object")
-    bb_aifs_graphics = pickle.load(open(basepath + "saved_data/aifs_bb_graphics_paper.pkl", "rb"))
+    bb_aifs_graphics = pickle.load(open(basepath + "saved_data/aifs_bb_graphics.pkl", "rb"))
 
     lead_times_to_plot = [24, 3*24, 5*24, 7*24, 10*24]
 
