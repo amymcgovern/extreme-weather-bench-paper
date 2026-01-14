@@ -1,24 +1,22 @@
 # setup all the imports
 import argparse
 import pickle
+import sys
 from pathlib import Path
 
 import joblib
-from tqdm.dask import TqdmCallback
-
 from extremeweatherbench import cases, evaluate, inputs, utils
+from tqdm.dask import TqdmCallback
 
 from src.data.tc_forecast_setup import TropicalCycloneForecastSetup
 
+sys.path.append(str(Path.home() / "code" / "extreme-weather-bench-paper"))
 # make the basepath - change this to your local path
-basepath = Path.home() / "extreme-weather-bench-paper" / ""
+basepath = Path.home() / "code" /"extreme-weather-bench-paper" / ""
 basepath = str(basepath) + "/"
 
 # Define IBTrACS target
 ibtracs_target = inputs.IBTrACS()
-
-# Parallel configuration
-parallel_config = {"backend": "loky", "n_jobs": 20}
 
 
 def process_case(case, forecast, model_name):
@@ -47,7 +45,7 @@ def process_case(case, forecast, model_name):
     return case.case_id_number, model_name, target_data, forecast_data
 
 
-def run_model_evaluation(ewb_cases, forecast, model_name):
+def run_tc_tracker(ewb_cases, forecast, model_name, parallel_config):
     """Run parallel evaluation for all cases with a given forecast model.
 
     Args:
@@ -84,6 +82,9 @@ def update_tc_dict(tc_dict, results, model_name):
         if tc_dict[case_id]["target_data"] is None:
             tc_dict[case_id]["target_data"] = target_data
         tc_dict[case_id]["forecast_data"][model_name] = forecast_data
+
+    # Update the tc_tracks.pkl file   
+    pickle.dump(tc_dict, open(basepath + "saved_data/tc_tracks.pkl", "wb"))
     return tc_dict
 
 
@@ -133,7 +134,12 @@ if __name__ == "__main__":
         default=False,
         help="Run BB Pangu evaluation (default: False)",
     )
-
+    parser.add_argument(
+        "--n_jobs",
+        type=int,
+        default=20,
+        help="Number of jobs to run in parallel (default: 20)",
+    )
     args = parser.parse_args()
 
     # Load in all of the events in the yaml file and filter for tropical cyclones
@@ -156,11 +162,16 @@ if __name__ == "__main__":
     bb_graphcast_forecast = None
     bb_pangu_forecast = None
 
+    if args.n_jobs:
+        n_jobs = args.n_jobs
+    else:
+        n_jobs = 20
+    parallel_config = {"backend": "loky", "n_jobs": n_jobs}
     if args.run_hres:
         print("Running HRES TC track evaluation")
         if hres_forecast is None:
             hres_forecast = tc_forecast_setup.get_hres_forecast()
-        results = run_model_evaluation(ewb_cases, hres_forecast, "HRES")
+        results = run_tc_tracker(ewb_cases, hres_forecast, "HRES", parallel_config)
         # Check if any results are empty and fallback to BB HRES
         empty_cases = [r for r in results if len(r[3]) == 0]
         if empty_cases:
@@ -172,8 +183,8 @@ if __name__ == "__main__":
             empty_ewb_cases = ewb_cases.select_cases(
                 "case_id_number", empty_case_ids
             )
-            bb_results = run_model_evaluation(
-                empty_ewb_cases, bb_hres_forecast, "HRES"
+            bb_results = run_tc_tracker(
+                empty_ewb_cases, bb_hres_forecast, "HRES", parallel_config
             )
             # Merge results
             results = [r for r in results if len(r[3]) > 0] + bb_results
@@ -185,7 +196,7 @@ if __name__ == "__main__":
             cira_fourv2_forecast = tc_forecast_setup.get_cira_tc_forecast(
                 "Fourv2", "IFS"
             )
-        results = run_model_evaluation(ewb_cases, cira_fourv2_forecast, "CIRA_FOURv2")
+        results = run_tc_tracker(ewb_cases, cira_fourv2_forecast, "CIRA_FOURv2", parallel_config)
         tc_dict = update_tc_dict(tc_dict, results, "CIRA_FOURv2")
 
     if args.run_cira_gc:
@@ -194,35 +205,35 @@ if __name__ == "__main__":
             cira_gc_forecast = tc_forecast_setup.get_cira_tc_forecast(
                 "Graphcast", "GFS"
             )
-        results = run_model_evaluation(ewb_cases, cira_gc_forecast, "CIRA_Graphcast")
+        results = run_tc_tracker(ewb_cases, cira_gc_forecast, "CIRA_Graphcast", parallel_config)
         tc_dict = update_tc_dict(tc_dict, results, "CIRA_Graphcast")
 
     if args.run_cira_pangu:
         print("Running CIRA Pangu TC track evaluation")
         if cira_pangu_forecast is None:
             cira_pangu_forecast = tc_forecast_setup.get_cira_tc_forecast("Pangu", "IFS")
-        results = run_model_evaluation(ewb_cases, cira_pangu_forecast, "CIRA_Pangu")
+        results = run_tc_tracker(ewb_cases, cira_pangu_forecast, "CIRA_Pangu", parallel_config)
         tc_dict = update_tc_dict(tc_dict, results, "CIRA_Pangu")
 
     if args.run_bb_aifs:
         print("Running BB AIFS TC track evaluation")
         if bb_aifs_forecast is None:
             bb_aifs_forecast = tc_forecast_setup.get_bb_tc_forecast("AIFS")
-        results = run_model_evaluation(ewb_cases, bb_aifs_forecast, "BB_AIFS")
+        results = run_tc_tracker(ewb_cases, bb_aifs_forecast, "BB_AIFS", parallel_config)
         tc_dict = update_tc_dict(tc_dict, results, "BB_AIFS")
 
     if args.run_bb_graphcast:
         print("Running BB Graphcast TC track evaluation")
         if bb_graphcast_forecast is None:
             bb_graphcast_forecast = tc_forecast_setup.get_bb_tc_forecast("Graphcast")
-        results = run_model_evaluation(ewb_cases, bb_graphcast_forecast, "BB_Graphcast")
+        results = run_tc_tracker(ewb_cases, bb_graphcast_forecast, "BB_Graphcast", parallel_config)
         tc_dict = update_tc_dict(tc_dict, results, "BB_Graphcast")
 
     if args.run_bb_pangu:
         print("Running BB Pangu TC track evaluation")
         if bb_pangu_forecast is None:
             bb_pangu_forecast = tc_forecast_setup.get_bb_tc_forecast("Pangu")
-        results = run_model_evaluation(ewb_cases, bb_pangu_forecast, "BB_Pangu")
+        results = run_tc_tracker(ewb_cases, bb_pangu_forecast, "BB_Pangu", parallel_config)
         tc_dict = update_tc_dict(tc_dict, results, "BB_Pangu")
 
     # Save the results
