@@ -242,6 +242,34 @@ def add_horizontal_legend(
             fontsize=fontsize,
         )
 
+def setup_colormap_and_levels(bounds: np.ndarray):
+    """Setup colormap and normalization for AR plotting.
+
+    Args:
+        bounds: Array of bounds for the colormap.
+
+    Returns:
+        Tuple of (colormap, normalization) based on bounds.
+    """
+    # Create custom colormap from original code
+    cmap_colors = [
+        "#ffffff",
+        "#bde6fa",
+        "#7bbae7",
+        "#4892bd",
+        "#49ae62",
+        "#a7d051",
+        "#f9d251",
+        "#f7792f",
+        "#e43d28",
+        "#c11b24",
+        "#921318",
+    ]
+    cmap = mcolors.LinearSegmentedColormap.from_list("custom_cubehelix", cmap_colors)
+    norm = mcolors.BoundaryNorm(bounds, cmap.N)
+
+    return cmap, norm
+
 
 def add_horizontal_colorbar(
     fig: plt.Figure,
@@ -288,6 +316,93 @@ def set_axis_extent_from_bbox(
         crs=crs,
     )
 
+def build_mercator_bounds(min_lon, max_lon, min_lat, max_lat, zoom_val, aspect_ratio, out_crs=ccrs.Mercator()):
+    """Calculate the bounding box edges of a mercator projection for a given zoom level and aspect ratio.
+    
+    Args:
+        min_lon, max_lon, min_lat, max_lat: Bounding box edges
+        zoom_val: Zoom level
+        aspect_ratio: Aspect ratio x/y
+        out_crs: Out crs for extent values.
+
+    Returns:
+        tuple: (lon_min, lon_max, lat_min, lat_max)
+    """
+    mercator_crs = ccrs.Mercator()
+    center_lon = (min_lon + max_lon)/2
+    center_lat = (min_lat + max_lat)/2
+    # Define zoom scaling
+    zoom_coefficient = 2
+    # Calculate minimum longitude (min_lon) and maximum longitude (max_lon)
+    min_lon, max_lon = (
+        center_lon - (zoom_coefficient * zoom_val),
+        center_lon + (zoom_coefficient * zoom_val),
+    )
+            
+    # Transform map center to specified crs (default to Mercator)
+    c_mercator = mercator_crs.transform_point(center_lon, center_lat, src_crs=ccrs.Mercator())
+
+    # Transform minimum longitude and maximum longitude to specified crs (default to
+    # Mercator)
+    min_lon = mercator_crs.transform_point(
+        min_lon, center_lat, src_crs=ccrs.Mercator()
+    )[0]
+    max_lon = mercator_crs.transform_point(
+        max_lon, center_lat, src_crs=ccrs.Mercator()
+    )[0]
+
+    # Our goal is to calculate minimum latitude (min_lat) and maximum latitude (max_lat)
+    # using center point and distance between min_lon and max_lon
+    # To achieve this we will use formula [(lon_distance/lat_distance) =
+    # (aspect_ratio[0]/aspect_ratio[1])]
+    # Calculate distance between min_lon and max_lon
+    lon_distance = (max_lon) - (min_lon)
+
+    # To calculate lat_distance, we will proceed accordingly
+    lat_distance = lon_distance * aspect_ratio[1] / aspect_ratio[0]
+
+    # Now calculate max_lat and min_lon by adding/subtracting half of the distance from
+    # center latitude
+    max_lat = c_mercator[1] + lat_distance / 2
+    min_lat = c_mercator[1] - lat_distance / 2
+
+    # We can return our result in any format (eg. in Mercator coordinates or in degrees)
+    if out_crs != ccrs.Mercator():
+        min_lon, min_lat = out_crs.transform_point(min_lon, min_lat, src_crs=out_crs)
+        max_lon, max_lat = out_crs.transform_point(max_lon, max_lat, src_crs=out_crs)
+
+    return min_lon, max_lon, min_lat, max_lat
+
+def generate_plot_extent_bounds(min_lon, max_lon, min_lat, max_lat, zoom, aspect_ratio, out_crs=ccrs.Mercator()):
+    """
+    Generate extent from bounding box edges and optional zoom level.
+
+    Args:
+        min_lon, max_lon, min_lat, max_lat: Bounding box edges
+        zoom (float or 'auto'):  Zoom out level [0 to 10] or 'auto' to dynamically 
+            determine the zoom level
+        aspect_ratio (tuple): Aspect ratio x/y
+        out_crs (cartopy.crs, optional): Out crs for extent values.
+        
+    Returns:
+        tuple: (lon_min, lon_max, lat_min, lat_max)
+    """
+
+    init_lat_range = (max_lat - min_lat).copy()
+    init_lon_range = (max_lon - min_lon).copy()
+
+    if zoom == "auto":
+        zoom_val = 1
+    else:
+        zoom_val = zoom
+
+    # 
+    min_lon, max_lon, min_lat, max_lat = build_mercator_bounds(min_lon, max_lon, min_lat, max_lat, zoom_val, aspect_ratio, out_crs)
+    if zoom == 'auto':
+        while init_lat_range > (max_lat - min_lat) or init_lon_range > (max_lon - min_lon):
+            zoom_val += 1
+            min_lon, max_lon, min_lat, max_lat = build_mercator_bounds(min_lon, max_lon, min_lat, max_lat, zoom_val, aspect_ratio, out_crs)
+    return min_lon, max_lon, min_lat, max_lat
 
 def generate_extent(
     center_point: Tuple[float, float],
