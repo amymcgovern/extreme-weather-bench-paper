@@ -84,7 +84,7 @@ def update_tc_dict(tc_dict, results, model_name):
         tc_dict[case_id]["forecast_data"][model_name] = forecast_data
 
     # Update the tc_tracks.pkl file   
-    pickle.dump(tc_dict, open(basepath + "saved_data/tc_tracks.pkl", "wb"))
+    pickle.dump(tc_dict, open(basepath + "saved_data/temp_tc_tracks.pkl", "wb"))
     return tc_dict
 
 
@@ -238,4 +238,22 @@ if __name__ == "__main__":
 
     # Save the results
     print("Saving TC track results")
-    pickle.dump(tc_dict, open(basepath + "saved_data/tc_tracks.pkl", "wb"))
+    # Create filename based on which models were run
+    filename_parts = []
+    if args.run_hres:
+        filename_parts.append("hres")
+    if args.run_cira_fourv2:
+        filename_parts.append("cira_fourv2")
+    if args.run_cira_gc:
+        filename_parts.append("cira_gc")
+    if args.run_cira_pangu:
+        filename_parts.append("cira_pangu")
+    if args.run_bb_aifs:
+        filename_parts.append("bb_aifs")
+    if args.run_bb_graphcast:
+        filename_parts.append("bb_graphcast")
+    if args.run_bb_pangu:
+        filename_parts.append("bb_pangu")
+    
+    filename_suffix = "_".join(filename_parts) if filename_parts else "none"
+    pickle.dump(tc_dict, open(basepath + f"saved_data/tc_tracks_{filename_suffix}.pkl", "wb"))
