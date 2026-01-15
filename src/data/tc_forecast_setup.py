@@ -37,7 +37,7 @@ def preprocess_mlwp_tc_dataset(ds: xr.Dataset) -> xr.Dataset:
     # Calculate the geopotential thickness required for tropical cyclone tracks
     ds["geopotential_thickness"] = (
         calc.geopotential_thickness(
-            ds["geopotential"], top_level_value=300, bottom_level_value=500
+            ds["geopotential"], top_level=300, bottom_level=500
         ) / 9.81
     )
     return ds
@@ -50,7 +50,7 @@ def preprocess_bb_hres_tc_dataset(ds: xr.Dataset) -> xr.Dataset:
 
     # Calculate the geopotential thickness required for tropical cyclone tracks
     ds["geopotential_thickness"] = calc.geopotential_thickness(
-        ds["z"], top_level_value=300, bottom_level_value=500, pressure_dimension_str="isobaricInhPa"
+        ds["z"], top_level=300, bottom_level=500, pressure_dim="isobaricInhPa"
     ) / 9.81
     return ds
 
