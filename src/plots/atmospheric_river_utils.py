@@ -85,6 +85,7 @@ def plot_ar_mask_single_timestep(
     ax: Optional[plt.Axes] = None,
     colorbar: bool = True,
     show_axes: bool = False,
+    left_label=None,
 ) -> plt.Axes:
     """Plot the AR mask for a single timestep.
 
@@ -131,15 +132,18 @@ def plot_ar_mask_single_timestep(
     else:
         plotting.setup_gridlines(ax, show_top_labels=False, show_right_labels=False, show_left_labels=False, show_bottom_labels=False)
 
-    center_latitude = (ar_mask.latitude.min() + ar_mask.latitude.max()) / 2
-    center_longitude = (ar_mask.longitude.min() + ar_mask.longitude.max()) / 2
-    center_point = (
-        utils.convert_longitude_to_180(center_longitude.values),
-        center_latitude.values,
-    )
-    lon_min, lon_max, lat_min, lat_max = generate_extent(
-        center_point, zoom=8, aspect_ratio=(16, 9), out_crs=ccrs.PlateCarree()
-    )
+    # center_latitude = (ar_mask.latitude.min() + ar_mask.latitude.max()) / 2
+    # center_longitude = (ar_mask.longitude.min() + ar_mask.longitude.max()) / 2
+    # center_point = (
+    #     utils.convert_longitude_to_180(center_longitude.values),
+    #     center_latitude.values,
+    # )
+    # lon_min, lon_max, lat_min, lat_max = generate_extent(
+    #     center_point, zoom=8, aspect_ratio=(16, 9), out_crs=ccrs.PlateCarree()
+    # )
+    lon_min, lon_max, lat_min, lat_max = plotting.generate_plot_extent_bounds(ar_mask.longitude.min(), 
+        ar_mask.longitude.max(), ar_mask.latitude.min(), ar_mask.latitude.max(), 
+        zoom="auto", aspect_ratio=(9, 9), out_crs=ccrs.PlateCarree())
 
     # Create initial IVT plot
     im = ax.pcolormesh(
@@ -173,6 +177,14 @@ def plot_ar_mask_single_timestep(
         else:
             title_size = "large"
         _ = ax.set_title(title, loc="center", size=title_size)
+
+    if left_label is not None:
+        # Convert axes coordinates to figure coordinates for robust positioning
+        # Position text to the left of the axis in figure coordinates
+        ax_pos = ax.get_position(fig)
+        # Position text at the left edge of the figure, vertically centered on the axis
+        fig.text(ax_pos.x0 - 0.01, ax_pos.y0 + ax_pos.height * 0.5, left_label, 
+            fontsize="xx-large", ha='right', va='center')
 
     return ax
 
