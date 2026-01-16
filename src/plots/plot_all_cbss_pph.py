@@ -155,7 +155,7 @@ if __name__ == "__main__":
     ewb_cases = ewb_cases.select_cases("event_type", "severe_convection")
 
     # uncomment this for debugging and faster plotting
-    ewb_cases = ewb_cases.select_cases("case_id_number", [316, 269])
+    # ewb_cases = ewb_cases.select_cases("case_id_number", [316, 269])
 
     # build out all of the expected data to evalate the case (we need this so we can plot
     # the LSR reports)
@@ -187,13 +187,13 @@ if __name__ == "__main__":
     print("Loading in the graphics objects")
     # load in the graphics objects
     print("Loading in the HRES graphics object")
-    hres_graphics = pickle.load(open(basepath + "saved_data/hres_graphics_paper.pkl", "rb"))
+    hres_graphics = pickle.load(open(basepath + "saved_data/hres_graphics.pkl", "rb"))
     print("Loading in the GraphCast graphics object")
-    bb_graphcast_graphics = pickle.load(open(basepath + "saved_data/gc_bb_graphics_paper.pkl", "rb"))
+    bb_graphcast_graphics = pickle.load(open(basepath + "saved_data/gc_bb_graphics.pkl", "rb"))
     print("Loading in the Pangu graphics object")
-    bb_pangu_graphics = pickle.load(open(basepath + "saved_data/pang_bb_graphics_paper.pkl", "rb"))
+    bb_pangu_graphics = pickle.load(open(basepath + "saved_data/pang_bb_graphics.pkl", "rb"))
     print("Loading in the AIFS graphics object")
-    bb_aifs_graphics = pickle.load(open(basepath + "saved_data/aifs_bb_graphics_paper.pkl", "rb"))
+    bb_aifs_graphics = pickle.load(open(basepath + "saved_data/aifs_bb_graphics.pkl", "rb"))
 
     lead_times_to_plot = [10*24, 7*24, 5*24, 3*24, 24]
 
@@ -300,8 +300,8 @@ if __name__ == "__main__":
         # Add horizontal colorbar below bottom row
         cbar = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal')
         cbar.ax.set_xticks(levels)
-        cbar.ax.tick_params(labelsize=24)
-        cbar.set_label(r"Craven-Brooks Significant Severe (m$^{3}$/s$^{3}$)", fontsize=18)
+        cbar.ax.tick_params(labelsize=18)
+        cbar.set_label(r"Craven-Brooks Significant Severe (m$^{3}$/s$^{3}$)", fontsize=24)
 
 
         # make the overall title and save it        
