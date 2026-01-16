@@ -43,7 +43,7 @@ if __name__ == "__main__":
     ewb_cases = ewb_cases.select_cases("event_type", "atmospheric_river")
 
     # for debugging, only look at one case (that happens to be lovely)
-    ewb_cases = ewb_cases.select_cases("case_id_number", 95)
+    # ewb_cases = ewb_cases.select_cases("case_id_number", 95)
 
     # build out all of the expected data to evalate the case (we need this so we can plot
     # the LSR reports)
@@ -200,7 +200,7 @@ if __name__ == "__main__":
 
         # Add horizontal colorbar below bottom row
         cbar = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal')
-        cbar.set_label("Integrated Vapor Transport (kgm^-1s^-1)", size=32)
+        cbar.set_label(r"Integrated Vapor Transport (kg m$^{-1}$ s$^{-1}$)", size=32)
         cbar.ax.tick_params(labelsize=24)
 
         # make the overall title and save it        

@@ -151,6 +151,7 @@ def plot_cbss_forecast_panel(
     alpha: Optional[float] = 0.5,
     geographic_features_kwargs: Dict[str, Any] = {},
     gridlines_kwargs: Dict[str, Any] = {},
+    left_label: Optional[str] = None,
 ) -> Tuple[plt.Figure, plt.Axes, plt.cm.ScalarMappable]:
     """Plot a single CBSS forecast panel.
 
@@ -177,11 +178,11 @@ def plot_cbss_forecast_panel(
 
     # Create figure and axis if not provided
     if ax is None:
-        _, ax = plt.subplots(
+        fig, ax = plt.subplots(
             1, 1, figsize=(8, 6), subplot_kw={"projection": projection}
         )
     else:
-        _ = ax.figure
+        fig = ax.figure
 
     # Select data for this lead time
     lead_time_td = pd.Timedelta(hours=lead_time_hours)
@@ -254,6 +255,11 @@ def plot_cbss_forecast_panel(
         )
 
     ax.set_title(title_str, fontsize=18)
+
+    if left_label is not None:
+        ax_pos = ax.get_position(fig)
+        fig.text(ax_pos.x0 - 0.01, ax_pos.y0 + ax_pos.height * 0.5, left_label, 
+            fontsize="xx-large", ha='right', va='center')
 
     return ax, im
 

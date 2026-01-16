@@ -81,7 +81,7 @@ if __name__ == "__main__":
     # load in all of the events in the yaml file
     ewb_cases = cases.load_ewb_events_yaml_into_case_collection()
     ewb_cases = ewb_cases.select_cases("event_type", "severe_convection")
-    ewb_cases = ewb_cases.select_cases("case_id_number", [331, 269])
+    ewb_cases = ewb_cases.select_cases("case_id_number", [316, 269])
 
     # hres_graphics = dict()
     gc_graphics = dict()

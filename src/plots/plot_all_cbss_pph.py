@@ -34,7 +34,8 @@ def get_lsr_from_case_op(my_case, case_operators_with_targets_established):
             if case_info.attrs["source"] == "local_storm_reports":
                 return case_info
    
-def plot_cbss_pph_panel(cbss, pph, my_case, lsrs, ax=None, title=None, lead_time_hours=0, gridlines_kwargs={}, geographic_features_kwargs={}):
+def plot_cbss_pph_panel(cbss, pph, my_case, lsrs, ax=None, title=None, lead_time_hours=0, 
+    gridlines_kwargs={}, geographic_features_kwargs={}, left_label=None):
     my_bbox = dict()
     my_bbox["latitude_min"] = my_case.location.latitude_min
     my_bbox["latitude_max"] = my_case.location.latitude_max
@@ -94,7 +95,8 @@ def plot_cbss_pph_panel(cbss, pph, my_case, lsrs, ax=None, title=None, lead_time
                     alpha=0.6,
                     gridlines_kwargs=gridlines_kwargs,
                     geographic_features_kwargs=geographic_features_kwargs,
-                )
+                    left_label=left_label,
+                )            
             return ax, mappable                
     except Exception as e:
         # Fallback if stack_dataarray_from_dims fails
@@ -151,7 +153,9 @@ if __name__ == "__main__":
     # load in all of the events in the yaml file
     ewb_cases = cases.load_ewb_events_yaml_into_case_collection()
     ewb_cases = ewb_cases.select_cases("event_type", "severe_convection")
-    # ewb_cases = ewb_cases.select_cases("case_id_number", [331, 269])
+
+    # uncomment this for debugging and faster plotting
+    ewb_cases = ewb_cases.select_cases("case_id_number", [316, 269])
 
     # build out all of the expected data to evalate the case (we need this so we can plot
     # the LSR reports)
@@ -183,15 +187,15 @@ if __name__ == "__main__":
     print("Loading in the graphics objects")
     # load in the graphics objects
     print("Loading in the HRES graphics object")
-    hres_graphics = pickle.load(open(basepath + "saved_data/hres_graphics.pkl", "rb"))
+    hres_graphics = pickle.load(open(basepath + "saved_data/hres_graphics_paper.pkl", "rb"))
     print("Loading in the GraphCast graphics object")
-    bb_graphcast_graphics = pickle.load(open(basepath + "saved_data/gc_bb_graphics.pkl", "rb"))
+    bb_graphcast_graphics = pickle.load(open(basepath + "saved_data/gc_bb_graphics_paper.pkl", "rb"))
     print("Loading in the Pangu graphics object")
-    bb_pangu_graphics = pickle.load(open(basepath + "saved_data/pang_bb_graphics.pkl", "rb"))
+    bb_pangu_graphics = pickle.load(open(basepath + "saved_data/pang_bb_graphics_paper.pkl", "rb"))
     print("Loading in the AIFS graphics object")
-    bb_aifs_graphics = pickle.load(open(basepath + "saved_data/aifs_bb_graphics.pkl", "rb"))
+    bb_aifs_graphics = pickle.load(open(basepath + "saved_data/aifs_bb_graphics_paper.pkl", "rb"))
 
-    lead_times_to_plot = [24, 3*24, 5*24, 7*24, 10*24]
+    lead_times_to_plot = [10*24, 7*24, 5*24, 3*24, 24]
 
     # for debugging, downselect the cases
     print("Plotting the cases")
@@ -205,8 +209,8 @@ if __name__ == "__main__":
         # Define desired aspect ratio for each subplot (width/height)
         subplot_aspect_ratio = 1.0  # Adjust this to change subplot shape (1.0 = square)
         width_per_col = 3.75  # Base width per column
-        n_rows = len(lead_times_to_plot)
-        n_cols = 4
+        n_cols = len(lead_times_to_plot)
+        n_rows = 4
         
         # Calculate total figure size based on aspect ratio
         total_width = width_per_col * n_cols
@@ -220,13 +224,15 @@ if __name__ == "__main__":
         if (my_id, "cbss") in hres_graphics and (my_id, "pph") in hres_graphics:
             cbss_hres, pph_hres = hres_graphics[my_id, "cbss"], hres_graphics[my_id, "pph"]
             for i, lead_time_hours in enumerate(lead_times_to_plot):
+                title = f"{lead_time_hours} hours"
                 if (i == 0):
-                    title = f"HRES\n{lead_time_hours} hours"
+                    left_label = "HRES"
                 else:
-                    title = f"{lead_time_hours} hours"
+                    left_label = None
                 plot_cbss_pph_panel(cbss_hres, pph_hres, my_case, lsrs=my_lsr, 
-                    ax=axs[i, 0], title=title, lead_time_hours=lead_time_hours,
-                    gridlines_kwargs={"show_left_labels": True, "show_bottom_labels": True})
+                    ax=axs[0, i], title=title, lead_time_hours=lead_time_hours,
+                    gridlines_kwargs={"show_left_labels": False, "show_bottom_labels": False},
+                    left_label=left_label)
         
         else:
             print(f"Skipping HRES for case {my_id}: missing cbss or pph data in graphics object")
@@ -236,12 +242,14 @@ if __name__ == "__main__":
             cbss_gc, pph_gc = bb_graphcast_graphics[my_id, "cbss"], bb_graphcast_graphics[my_id, "pph"]
             for i, lead_time_hours in enumerate(lead_times_to_plot):
                 if (i == 0):
-                    title = f"GraphCast\n{lead_time_hours} hours"
+                    left_label = "GraphCast"
                 else:
-                    title = f"{lead_time_hours} hours"
-                plot_cbss_pph_panel(cbss_gc, pph_gc, my_case, lsrs=my_lsr, ax=axs[i, 1], 
+                    left_label = None
+
+                plot_cbss_pph_panel(cbss_gc, pph_gc, my_case, lsrs=my_lsr, ax=axs[1, i], 
                     title=title, lead_time_hours=lead_time_hours,
-                    gridlines_kwargs={"show_left_labels": False, "show_bottom_labels": False})
+                    gridlines_kwargs={"show_left_labels": False, "show_bottom_labels": False},
+                    left_label=left_label)
         else:
             print(f"Skipping GraphCast for case {my_id}: missing cbss or pph data in graphics object")
 
@@ -250,12 +258,13 @@ if __name__ == "__main__":
             cbss_pang, pph_pang = bb_pangu_graphics[my_id, "cbss"], bb_pangu_graphics[my_id, "pph"]
             for i, lead_time_hours in enumerate(lead_times_to_plot):
                 if (i == 0):
-                    title = f"Pangu\n{lead_time_hours} hours"
+                    left_label = "Pangu"
                 else:
-                    title = f"{lead_time_hours} hours"
-                plot_cbss_pph_panel(cbss_pang, pph_pang, my_case, lsrs=my_lsr, ax=axs[i, 2], 
+                    left_label = None
+                plot_cbss_pph_panel(cbss_pang, pph_pang, my_case, lsrs=my_lsr, ax=axs[2, i], 
                     title=title, lead_time_hours=lead_time_hours,
-                    gridlines_kwargs={"show_left_labels": False, "show_bottom_labels": False})
+                    gridlines_kwargs={"show_left_labels": False, "show_bottom_labels": False},
+                    left_label=left_label)
         else:
             print(f"Skipping Pangu for case {my_id}: missing cbss or pph data in graphics object")
 
@@ -263,37 +272,36 @@ if __name__ == "__main__":
             cbss_aifs, pph_aifs = bb_aifs_graphics[my_id, "cbss"], bb_aifs_graphics[my_id, "pph"]
             for i, lead_time_hours in enumerate(lead_times_to_plot):
                 if (i == 0):
-                    title = f"AIFS\n{lead_time_hours} hours"
+                    left_label = "AIFS"
                 else:
-                    title = f"{lead_time_hours} hours"
-                plot_cbss_pph_panel(cbss_aifs, pph_aifs, my_case, lsrs=my_lsr, ax=axs[i, 3], 
+                    left_label = None
+                plot_cbss_pph_panel(cbss_aifs, pph_aifs, my_case, lsrs=my_lsr, ax=axs[3, i], 
                     title=title, lead_time_hours=lead_time_hours,
-                    gridlines_kwargs={"show_left_labels": False, "show_bottom_labels": False})
+                    gridlines_kwargs={"show_left_labels": False, "show_bottom_labels": False},
+                    left_label=left_label)
         else:
             print(f"Skipping AIFS for case {my_id}: missing cbss or pph data in graphics object")
 
         # plot the colorbar at the bottom of the figure
         cmap, norm, levels = severe_utils.setup_cbss_colormap_and_levels()
+        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+        sm.set_array([])  # Empty array, we just need the colormap/norm
+
         # Get the bottom position of the lowest subplot
-        bottom_axes = [axs[len(lead_times_to_plot) - 1, j] for j in range(4)]
-        bottom_positions = [ax.get_position() for ax in bottom_axes]
-        bottom_y = min(bbox.y0 for bbox in bottom_positions)
-        left_x = min(bbox.x0 for bbox in bottom_positions)
-        right_x = max(bbox.x1 for bbox in bottom_positions)
-        width = right_x - left_x
+        # Get the position from bottom row subplots to position colorbar below them
+        pos0 = axs[n_rows - 1, 0].get_position(fig)
+        pos3 = axs[n_rows - 1, (len(lead_times_to_plot) - 1)].get_position(fig)
+        # Create axes below row 5 that spans all 4 columns
+        # Position it just below row 5, using a small height
+        cbar_y = pos0.y0 - pos0.height * 0.3  # Position below bottom row
+        cbar_height = pos0.height * 0.15  # Height for colorbar
+        cbar_ax = fig.add_axes([pos0.x0, cbar_y, pos3.x1 - pos0.x0, cbar_height])
 
-        # Position colorbar below the bottom row with proper spacing
-        cbar_height = 0.03
-        cbar_spacing = 0.05
-        cbar_width = width * 0.9
-        cbar_left = left_x + width * 0.05
-        cbar_bottom = bottom_y - cbar_height - cbar_spacing
-
-        cax = fig.add_axes([cbar_left, cbar_bottom, cbar_width, cbar_height])
-        # Get mappable from one of the bottom row subplots
-        cb = fig.colorbar(mappable=axs[len(lead_times_to_plot) - 1, 0].collections[0], cax=cax, orientation='horizontal')
-        cb.ax.set_xticks(levels)
-        cb.set_label("Craven-Brooks Significant Severe (m³/s³)", fontsize=18)
+        # Add horizontal colorbar below bottom row
+        cbar = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal')
+        cbar.ax.set_xticks(levels)
+        cbar.ax.tick_params(labelsize=24)
+        cbar.set_label(r"Craven-Brooks Significant Severe (m$^{3}$/s$^{3}$)", fontsize=18)
 
 
         # make the overall title and save it        
