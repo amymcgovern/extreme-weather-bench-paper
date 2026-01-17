@@ -208,13 +208,13 @@ if __name__ == "__main__":
         # Calculate figure size based on aspect ratio instead of hard-coding
         # Define desired aspect ratio for each subplot (width/height)
         subplot_aspect_ratio = 1.0  # Adjust this to change subplot shape (1.0 = square)
-        width_per_col = 3.75  # Base width per column
+        width_per_col = 3  # Base width per column
         n_cols = len(lead_times_to_plot)
         n_rows = 4
         
         # Calculate total figure size based on aspect ratio
         total_width = width_per_col * n_cols
-        height_per_row = (width_per_col / subplot_aspect_ratio) + 0.1
+        height_per_row = (width_per_col / subplot_aspect_ratio)
         total_height = height_per_row * n_rows
         
         fig, axs = plt.subplots(n_rows, n_cols, figsize=(total_width, total_height), 
@@ -245,6 +245,7 @@ if __name__ == "__main__":
                     left_label = "GraphCast"
                 else:
                     left_label = None
+                title = ""
 
                 plot_cbss_pph_panel(cbss_gc, pph_gc, my_case, lsrs=my_lsr, ax=axs[1, i], 
                     title=title, lead_time_hours=lead_time_hours,
@@ -261,6 +262,7 @@ if __name__ == "__main__":
                     left_label = "Pangu"
                 else:
                     left_label = None
+                title = ""
                 plot_cbss_pph_panel(cbss_pang, pph_pang, my_case, lsrs=my_lsr, ax=axs[2, i], 
                     title=title, lead_time_hours=lead_time_hours,
                     gridlines_kwargs={"show_left_labels": False, "show_bottom_labels": False},
@@ -275,6 +277,7 @@ if __name__ == "__main__":
                     left_label = "AIFS"
                 else:
                     left_label = None
+                title = ""
                 plot_cbss_pph_panel(cbss_aifs, pph_aifs, my_case, lsrs=my_lsr, ax=axs[3, i], 
                     title=title, lead_time_hours=lead_time_hours,
                     gridlines_kwargs={"show_left_labels": False, "show_bottom_labels": False},

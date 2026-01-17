@@ -1684,13 +1684,13 @@ def plot_heatmap(
         if error_max >= 1000:
             fmt = ".0f"  # No decimals for very large numbers
         elif error_max >= 100:
-            fmt = ".1f"  # One decimal for large numbers
+            fmt = ".0f"  # One decimal for large numbers
         elif error_max >= 1:
             fmt = ".2f"  # Two decimals for medium numbers
         elif error_min < 0.01:
             fmt = ".2g"  # General format (scientific notation) for very small numbers
         else:
-            fmt = ".3f"  # Three decimals for small numbers
+            fmt = ".2f"  # Three decimals for small numbers
 
         ax = sns.heatmap(
             relative_error_array[metric],
