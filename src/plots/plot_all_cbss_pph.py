@@ -4,8 +4,10 @@ import pickle
 from pathlib import Path
 from joblib import Parallel, delayed  # noqa: E402
 from joblib.externals.loky import get_reusable_executor  # noqa: E402
-import pandas as pd    
+import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import cartopy.crs as ccrs  # noqa: E402
 
 from extremeweatherbench import (
@@ -155,8 +157,22 @@ if __name__ == "__main__":
     ewb_cases = ewb_cases.select_cases("event_type", "severe_convection")
 
     # uncomment this for debugging and faster plotting
-    # ewb_cases = ewb_cases.select_cases("case_id_number", [316, 269])
+    parser = argparse.ArgumentParser(
+            description="Plot all CBSS and PPH cases."
+    )
+    parser.add_argument(
+        "--paper",
+        action="store_true",
+        default=False,
+        help="Plot for paper (default: False)",
+    )
 
+    args = parser.parse_args()
+    paper = args.paper
+
+    if paper:
+        ewb_cases = ewb_cases.select_cases("case_id_number", [316, 269])
+    
     # build out all of the expected data to evalate the case (we need this so we can plot
     # the LSR reports)
     case_operators = cases.build_case_operators(
@@ -187,13 +203,20 @@ if __name__ == "__main__":
     print("Loading in the graphics objects")
     # load in the graphics objects
     print("Loading in the HRES graphics object")
-    hres_graphics = pickle.load(open(basepath + "saved_data/hres_graphics.pkl", "rb"))
-    print("Loading in the GraphCast graphics object")
-    bb_graphcast_graphics = pickle.load(open(basepath + "saved_data/gc_bb_graphics.pkl", "rb"))
-    print("Loading in the Pangu graphics object")
-    bb_pangu_graphics = pickle.load(open(basepath + "saved_data/pang_bb_graphics.pkl", "rb"))
-    print("Loading in the AIFS graphics object")
-    bb_aifs_graphics = pickle.load(open(basepath + "saved_data/aifs_bb_graphics.pkl", "rb"))
+    if paper:
+        hres_graphics = pickle.load(open(basepath + "saved_data/hres_graphics_paper.pkl", "rb"))
+        bb_graphcast_graphics = pickle.load(open(basepath + "saved_data/gc_bb_graphics_paper.pkl", "rb"))
+        bb_pangu_graphics = pickle.load(open(basepath + "saved_data/pang_bb_graphics_paper.pkl", "rb"))
+        bb_aifs_graphics = pickle.load(open(basepath + "saved_data/aifs_bb_graphics_paper.pkl", "rb"))
+
+    else:
+        hres_graphics = pickle.load(open(basepath + "saved_data/hres_graphics.pkl", "rb"))
+        print("Loading in the GraphCast graphics object")
+        bb_graphcast_graphics = pickle.load(open(basepath + "saved_data/gc_bb_graphics.pkl", "rb"))
+        print("Loading in the Pangu graphics object")
+        bb_pangu_graphics = pickle.load(open(basepath + "saved_data/pang_bb_graphics.pkl", "rb"))
+        print("Loading in the AIFS graphics object")
+        bb_aifs_graphics = pickle.load(open(basepath + "saved_data/aifs_bb_graphics.pkl", "rb"))
 
     lead_times_to_plot = [10*24, 7*24, 5*24, 3*24, 24]
 
@@ -205,20 +228,29 @@ if __name__ == "__main__":
         my_lsr = get_lsr_from_case_op(my_case, case_operators_with_targets_established)
 
         # make a subplot for each model and ensure it is a cartopy plot
-        # Calculate figure size based on aspect ratio instead of hard-coding
-        # Define desired aspect ratio for each subplot (width/height)
-        subplot_aspect_ratio = 1.0  # Adjust this to change subplot shape (1.0 = square)
-        width_per_col = 3  # Base width per column
+        # Use gridspec for better control over spacing
         n_cols = len(lead_times_to_plot)
         n_rows = 4
         
-        # Calculate total figure size based on aspect ratio
+        # Define figure size (can be adjusted independently of subplot spacing)
+        width_per_col = 3
+        height_per_row = 3
         total_width = width_per_col * n_cols
-        height_per_row = (width_per_col / subplot_aspect_ratio)
         total_height = height_per_row * n_rows
         
-        fig, axs = plt.subplots(n_rows, n_cols, figsize=(total_width, total_height), 
-                                subplot_kw={'projection': ccrs.PlateCarree()})
+        fig = plt.figure(figsize=(total_width, total_height))
+        
+        # Create gridspec with adjustable spacing
+        # wspace: width space between subplots (as fraction of subplot width)
+        # hspace: height space between subplots (as fraction of subplot height)
+        gs = gridspec.GridSpec(n_rows, n_cols, figure=fig, 
+                               wspace=0.1, hspace=0.1,
+                               left=0.05, right=0.95, top=0.90, bottom=0.1)
+        
+        # Create axes with cartopy projection
+        axs = [[fig.add_subplot(gs[i, j], projection=ccrs.PlateCarree()) 
+                for j in range(n_cols)] for i in range(n_rows)]
+        axs = np.array(axs)  # Convert to numpy array for easier indexing
 
         # Check if the graphics data exists for this case
         if (my_id, "cbss") in hres_graphics and (my_id, "pph") in hres_graphics:
@@ -308,6 +340,6 @@ if __name__ == "__main__":
 
 
         # make the overall title and save it        
-        fig.suptitle(f"Case {my_id}: {my_case.title} on {my_case.start_date}", fontsize=32)
+        fig.suptitle(f"Case {my_id}: {my_case.title} on {my_case.start_date}", fontsize=32, y=0.98)
         fig.savefig(basepath + f"graphics/severe/severe_case_{my_id}.png", dpi=300, bbox_inches="tight")
         plt.close(fig)
