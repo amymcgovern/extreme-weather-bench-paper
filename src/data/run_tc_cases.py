@@ -14,7 +14,6 @@ from src.data.tc_forecast_setup import (
     TropicalCycloneForecastSetup,
 )
 
-
 if __name__ == "__main__":
     # make the basepath - change this to your local path
     basepath = Path.home() / "extreme-weather-bench-paper" / ""
@@ -69,8 +68,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # load in all of the events in the yaml file
-    ewb_cases = cases.load_ewb_events_yaml_into_case_collection()
-    ewb_cases = ewb_cases.select_cases("event_type", "tropical_cyclone")
+    ewb_cases = cases.load_ewb_events_yaml_into_case_list()
+    ewb_cases = [n for n in ewb_cases if n.event_type == "tropical_cyclone"]
 
     parallel_config = {"backend": "loky", "n_jobs": 24}
 
@@ -88,12 +87,8 @@ if __name__ == "__main__":
         bb_hres_tc_evaluation_objects = tropical_cyclone_evaluation_setup.get_tc_evaluation_objects([bb_hres_tc_forecast])
         print(bb_hres_tc_evaluation_objects)
 
-        early_cases = cases.IndividualCaseCollection(
-            [i for i in ewb_cases.cases if i.end_date < pd.Timestamp("2023-01-01")]
-        )
-        later_cases = cases.IndividualCaseCollection(
-            [i for i in ewb_cases.cases if i.start_date > pd.Timestamp("2023-01-01")]
-        )
+        early_cases = [i for i in ewb_cases if i.end_date < pd.Timestamp("2023-01-01")]
+        later_cases = [i for i in ewb_cases if i.start_date > pd.Timestamp("2023-01-01")]
 
         ewb_hres = evaluate.ExtremeWeatherBench(early_cases, hres_tc_evaluation_objects)
         ewb_bb_hres = evaluate.ExtremeWeatherBench(later_cases, bb_hres_tc_evaluation_objects)

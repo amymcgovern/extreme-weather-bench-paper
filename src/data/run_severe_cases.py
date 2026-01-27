@@ -67,8 +67,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # load in all of the events in the yaml file
-    ewb_cases = cases.load_ewb_events_yaml_into_case_collection()
-    ewb_cases = ewb_cases.select_cases("event_type", "severe_convection")
+    ewb_cases = cases.load_ewb_events_yaml_into_case_list()
+    ewb_cases = [n for n in ewb_cases if n.event_type == "severe_convection"]
 
     parallel_config = {"backend": "loky", "n_jobs": 24}
 

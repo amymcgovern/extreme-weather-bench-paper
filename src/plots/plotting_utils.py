@@ -719,15 +719,15 @@ def plot_all_cases(
         "severe_convection": 0.02,
     }
 
-    # Handle both IndividualCaseCollection and IndividualCase
-    if isinstance(ewb_cases, cases.IndividualCaseCollection):
-        cases_to_plot = ewb_cases.cases
-    elif isinstance(ewb_cases, cases.IndividualCase):
+    # Handle both IndividualCase and list of IndividualCases
+    if isinstance(ewb_cases, cases.IndividualCase):
         cases_to_plot = [ewb_cases]
+    elif isinstance(ewb_cases, list):
+        cases_to_plot = ewb_cases
     else:
         raise TypeError(
             f"ewb_cases must be IndividualCase or "
-            f"IndividualCaseCollection, got {type(ewb_cases)}"
+            f"list of IndividualCases, got {type(ewb_cases)}"
         )
 
     # Plot boxes for each case
@@ -966,15 +966,15 @@ def plot_all_cases_and_obs(
         "severe_convection": 1,
     }
 
-    # Handle both IndividualCaseCollection and IndividualCase
-    if isinstance(ewb_cases, cases.IndividualCaseCollection):
-        cases_to_plot = ewb_cases.cases
-    elif isinstance(ewb_cases, cases.IndividualCase):
+    # Handle both IndividualCase and list of IndividualCases
+    if isinstance(ewb_cases, cases.IndividualCase):
         cases_to_plot = [ewb_cases]
+    elif isinstance(ewb_cases, list):
+        cases_to_plot = ewb_cases
     else:
         raise TypeError(
             f"ewb_cases must be IndividualCase or "
-            f"IndividualCaseCollection, got {type(ewb_cases)}"
+            f"list of IndividualCases, got {type(ewb_cases)}"
         )
 
     # Plot boxes for each case

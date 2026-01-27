@@ -73,8 +73,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # load in all of the events in the yaml file
-    ewb_cases = cases.load_ewb_events_yaml_into_case_collection()
-    ewb_cases = ewb_cases.select_cases("event_type", "freeze")
+    ewb_cases = cases.load_ewb_events_yaml_into_case_list()
+    ewb_cases = [n for n in ewb_cases if n.event_type == "freeze"]
 
     heat_freeze_forecast_setup = HeatFreezeForecastSetup()
     heat_freeze_evaluation_setup = HeatFreezeEvaluationSetup()
@@ -86,12 +86,8 @@ if __name__ == "__main__":
 
     if args.run_hres:
         print("running HRES evaluation")
-        early_cases = cases.IndividualCaseCollection(
-            [i for i in ewb_cases.cases if i.end_date < pd.Timestamp("2023-01-01")]
-        )
-        later_cases = cases.IndividualCaseCollection(
-            [i for i in ewb_cases.cases if i.start_date > pd.Timestamp("2023-01-01")]
-        )
+        early_cases = [i for i in ewb_cases if i.end_date < pd.Timestamp("2023-01-01")]
+        later_cases = [i for i in ewb_cases if i.start_date > pd.Timestamp("2023-01-01")]
 
         hres_freeze_forecast = (
             heat_freeze_forecast_setup.get_hres_heat_freeze_forecast()

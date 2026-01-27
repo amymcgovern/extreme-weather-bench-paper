@@ -2,24 +2,16 @@
 import argparse
 import pickle
 from pathlib import Path
-from joblib import Parallel, delayed  # noqa: E402
-from joblib.externals.loky import get_reusable_executor  # noqa: E402
-import pandas as pd    
-import matplotlib.pyplot as plt
-import cartopy.crs as ccrs  # noqa: E402
-from matplotlib.cm import ScalarMappable  # noqa: E402
-import xarray as xr
 
+import cartopy.crs as ccrs  # noqa: E402
+import matplotlib.pyplot as plt
+import pandas as pd
 from extremeweatherbench import (
     cases,
-    evaluate,
-    inputs,defaults,utils,
+    defaults,
 )
+from matplotlib.cm import ScalarMappable  # noqa: E402
 
-import src.plots.plotting_utils as plot_utils  # noqa: E402
-import src.plots.results_utils as results_utils  # noqa: E402
-import src.plots.severe_convection_utils as severe_utils
-import src.plots.plotting_styles as ps
 import src.plots.atmospheric_river_utils as ar_plot_utils
 
 if __name__ == "__main__":
@@ -39,11 +31,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # load in all of the events in the yaml file
-    ewb_cases = cases.load_ewb_events_yaml_into_case_collection()
-    ewb_cases = ewb_cases.select_cases("event_type", "atmospheric_river")
+    ewb_cases = cases.load_ewb_events_yaml_into_case_list()
+    ewb_cases = [n for n in ewb_cases if n.event_type == "atmospheric_river"]
 
     # for debugging, only look at one case (that happens to be lovely)
-    # ewb_cases = ewb_cases.select_cases("case_id_number", 95)
+    # ewb_cases = [n for n in ewb_cases if n.case_id_number == 95]
 
     # build out all of the expected data to evalate the case (we need this so we can plot
     # the LSR reports)
@@ -74,14 +66,14 @@ if __name__ == "__main__":
     lead_times_to_plot = [10*24, 7*24, 5*24, 3*24, 24]
     
 
-    # ewb_cases = ewb_cases.select_cases("case_id_number", 95)
+    # ewb_cases = [n for n in ewb_cases if n.case_id_number == 95]
     # for debugging, downselect the cases
     print("Plotting the cases")
 
     if args.plot_era_separately:
         fig = plt.figure(figsize=(5,5), projection=ccrs.PlateCarree())
 
-        for my_case in ewb_cases.cases:
+        for my_case in ewb_cases:
             print(my_case.case_id_number)
             my_id = my_case.case_id_number
 
@@ -94,7 +86,7 @@ if __name__ == "__main__":
             plt.close(fig)
             
     
-    for my_case in ewb_cases.cases:
+    for my_case in ewb_cases:
         print(my_case.case_id_number)
         my_id = my_case.case_id_number
         if args.plot_era_separately:

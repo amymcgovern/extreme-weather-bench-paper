@@ -57,9 +57,9 @@ def run_tc_tracker(ewb_cases, forecast, model_name, parallel_config):
         List of results from process_case.
     """
     with joblib.parallel_config(**parallel_config):
-        results = utils.ParallelTqdm(total_tasks=len(ewb_cases.cases))(
+        results = utils.ParallelTqdm(total_tasks=len(ewb_cases))(
             joblib.delayed(process_case)(case, forecast, model_name)
-            for case in ewb_cases.cases
+            for case in ewb_cases
         )
     return results
 
@@ -143,8 +143,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Load in all of the events in the yaml file and filter for tropical cyclones
-    ewb_cases = cases.load_ewb_events_yaml_into_case_collection()
-    ewb_cases = ewb_cases.select_cases("event_type", "tropical_cyclone")
+    ewb_cases = cases.load_ewb_events_yaml_into_case_list()
+    ewb_cases = [n for n in ewb_cases if n.event_type == "tropical_cyclone"]
 
     # Initialize the TC forecast setup class
     tc_forecast_setup = TropicalCycloneForecastSetup()
@@ -180,9 +180,7 @@ if __name__ == "__main__":
                 bb_hres_forecast = tc_forecast_setup.get_bb_hres_forecast()
             # Re-run only for empty cases
             empty_case_ids = [r[0] for r in empty_cases]
-            empty_ewb_cases = ewb_cases.select_cases(
-                "case_id_number", empty_case_ids
-            )
+            empty_ewb_cases = [n for n in ewb_cases if n.case_id_number in empty_case_ids]
             bb_results = run_tc_tracker(
                 empty_ewb_cases, bb_hres_forecast, "HRES", parallel_config
             )
