@@ -6,13 +6,13 @@ from pathlib import Path
 from extremeweatherbench import (
     cases,
     evaluate,
-    inputs,
 )
 
 from src.data.ar_forecast_setup import (
     AtmosphericRiverEvaluationSetup,
     AtmosphericRiverForecastSetup,
 )
+
 
 # to plot the targets, we need to run the pipeline for each case and target
 def get_ivt(ewb_case, forecast_source):
@@ -86,8 +86,8 @@ if __name__ == "__main__":
     atmospheric_river_evaluation_setup = AtmosphericRiverEvaluationSetup()
 
     # load in all of the events in the yaml file
-    ewb_cases = cases.load_ewb_events_yaml_into_case_collection()
-    ewb_cases = ewb_cases.select_cases("event_type", "atmospheric_river")
+    ewb_cases = cases.load_ewb_events_yaml_into_case_list()
+    ewb_cases = [n for n in ewb_cases if n.event_type == "atmospheric_river"]
 
     hres_graphics = dict()
     gc_graphics = dict()
@@ -111,12 +111,12 @@ if __name__ == "__main__":
     bb_aifs_ar_forecast = None
     era5 = None
 
-    #ewb_cases = ewb_cases.select_cases("case_id_number", 95)
-    for my_case in ewb_cases.cases:
+    #ewb_cases = [n for n in ewb_cases if n.case_id_number == 95]
+    for my_case in ewb_cases:
         # compute IVT for all the AI models and HRES for the case we chose
         print(my_case.case_id_number)
         my_id = my_case.case_id_number
-        # my_case = ewb_cases.select_cases("case_id_number", my_id).cases[0]
+        # my_case = [n for n in ewb_cases if n.case_id_number == my_id][0]
 
         if args.run_hres:
             print("Computing IVT for HRES")

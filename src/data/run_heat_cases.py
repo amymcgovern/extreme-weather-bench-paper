@@ -72,9 +72,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # load in the events
-    ewb_cases = cases.load_ewb_events_yaml_into_case_collection().select_cases(
-        "event_type", "heat_wave"
-    )
+    ewb_cases = cases.load_ewb_events_yaml_into_case_list()
+    ewb_cases = [n for n in ewb_cases if n.event_type == "heat_wave"]
 
     parallel_config = {"backend": "loky", "n_jobs": 32}
 
@@ -101,12 +100,8 @@ if __name__ == "__main__":
 
         ewb_hres = evaluate.ExtremeWeatherBench(ewb_cases, hres_heat_evaluation_objects)
         # split the cases into early and later for HRES (just for ease of evaluation)
-        early_cases = cases.IndividualCaseCollection(
-            [i for i in ewb_cases.cases if i.end_date < pd.Timestamp("2023-01-01")]
-        )
-        later_cases = cases.IndividualCaseCollection(
-            [i for i in ewb_cases.cases if i.start_date > pd.Timestamp("2023-01-01")]
-        )
+        early_cases = [i for i in ewb_cases if i.end_date < pd.Timestamp("2023-01-01")]
+        later_cases = [i for i in ewb_cases if i.start_date > pd.Timestamp("2023-01-01")]
 
         ewb_hres_early = evaluate.ExtremeWeatherBench(
             early_cases, hres_heat_evaluation_objects

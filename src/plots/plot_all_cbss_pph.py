@@ -2,24 +2,24 @@
 import argparse
 import pickle
 from pathlib import Path
-from joblib import Parallel, delayed  # noqa: E402
-from joblib.externals.loky import get_reusable_executor  # noqa: E402
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-import cartopy.crs as ccrs  # noqa: E402
 
+import cartopy.crs as ccrs  # noqa: E402
+import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from extremeweatherbench import (
     cases,
+    defaults,
     evaluate,
-    inputs,defaults,utils,
+    inputs,
+    utils,
 )
+from joblib import Parallel, delayed  # noqa: E402
+from joblib.externals.loky import get_reusable_executor  # noqa: E402
 
-import src.plots.plotting_utils as plot_utils  # noqa: E402
 import src.plots.results_utils as results_utils  # noqa: E402
 import src.plots.severe_convection_utils as severe_utils
-import src.plots.plotting_styles as ps
 
 # to plot the targets, we need to run the pipeline for each case and target
 
@@ -153,8 +153,8 @@ if __name__ == "__main__":
     basepath = str(basepath) + "/"
 
     # load in all of the events in the yaml file
-    ewb_cases = cases.load_ewb_events_yaml_into_case_collection()
-    ewb_cases = ewb_cases.select_cases("event_type", "severe_convection")
+    ewb_cases = cases.load_ewb_events_yaml_into_case_list()
+    ewb_cases = [n for n in ewb_cases if n.event_type == "severe_convection"]
 
     # uncomment this for debugging and faster plotting
     parser = argparse.ArgumentParser(
@@ -171,7 +171,7 @@ if __name__ == "__main__":
     paper = args.paper
 
     if paper:
-        ewb_cases = ewb_cases.select_cases("case_id_number", [316, 269])
+        ewb_cases = [n for n in ewb_cases if n.case_id_number in [316, 269]]
     
     # build out all of the expected data to evalate the case (we need this so we can plot
     # the LSR reports)
@@ -222,7 +222,7 @@ if __name__ == "__main__":
 
     # for debugging, downselect the cases
     print("Plotting the cases")
-    for my_case in ewb_cases.cases:
+    for my_case in ewb_cases:
         print(my_case.case_id_number)
         my_id = my_case.case_id_number
         my_lsr = get_lsr_from_case_op(my_case, case_operators_with_targets_established)
