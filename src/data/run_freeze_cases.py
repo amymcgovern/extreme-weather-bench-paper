@@ -183,7 +183,7 @@ if __name__ == "__main__":
         print("running AIFS evaluation")
 
         aifs_freeze_forecast = heat_freeze_forecast_setup.get_bb_heat_freeze_forecast(
-            "AIFS"
+            "aifs-single"
         )
         aifs_freeze_evaluation_objects = (
             heat_freeze_evaluation_setup.get_freeze_evaluation_objects(
@@ -201,7 +201,7 @@ if __name__ == "__main__":
         print("running Graphcast evaluation")
 
         graphcast_freeze_forecast = (
-            heat_freeze_forecast_setup.get_bb_heat_freeze_forecast("Graphcast")
+            heat_freeze_forecast_setup.get_bb_heat_freeze_forecast("graphcast")
         )
         graphcast_freeze_evaluation_objects = (
             heat_freeze_evaluation_setup.get_freeze_evaluation_objects(
@@ -221,7 +221,7 @@ if __name__ == "__main__":
         print("running Pangu evaluation")
 
         pang_freeze_forecast = heat_freeze_forecast_setup.get_bb_heat_freeze_forecast(
-            "Pangu"
+            "panguweather"
         )
         pang_freeze_evaluation_objects = (
             heat_freeze_evaluation_setup.get_freeze_evaluation_objects(

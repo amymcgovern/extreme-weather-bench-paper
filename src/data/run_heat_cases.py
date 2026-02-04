@@ -10,6 +10,13 @@ from src.data.heat_freeze_forecast_setup import (
     HeatFreezeForecastSetup,
 )
 
+import warnings
+warnings.filterwarnings(
+  "ignore",
+  message="Numcodecs codecs are not in the Zarr version 3 specification*",
+  category=UserWarning
+)
+
 if __name__ == "__main__":
     # make the basepath for saving the results - change this to your local path
     basepath = Path.home() / "extreme-weather-bench-paper" / ""
@@ -179,7 +186,7 @@ if __name__ == "__main__":
     if args.run_bb_aifs:
         print("running BB AIFS evaluation")
         bb_aifs_heat_forecast = heat_freeze_forecast_setup.get_bb_heat_freeze_forecast(
-            "AIFS"
+            "aifs-single"
         )
         bb_aifs_heat_evaluation_objects = (
             heat_freeze_evaluation_setup.get_heat_evaluation_objects(
@@ -195,7 +202,7 @@ if __name__ == "__main__":
 
     if args.run_bb_graphcast:
         bb_graphcast_heat_forecast = (
-            heat_freeze_forecast_setup.get_bb_heat_freeze_forecast("Graphcast")
+            heat_freeze_forecast_setup.get_bb_heat_freeze_forecast("graphcast")
         )
         bb_graphcast_heat_evaluation_objects = (
             heat_freeze_evaluation_setup.get_heat_evaluation_objects(
@@ -215,7 +222,7 @@ if __name__ == "__main__":
     if args.run_bb_pangu:
         print("running BB Pangu evaluation")
         bb_pangu_heat_forecast = heat_freeze_forecast_setup.get_bb_heat_freeze_forecast(
-            "Pangu"
+            "panguweather"
         )
         bb_pangu_heat_evaluation_objects = (
             heat_freeze_evaluation_setup.get_heat_evaluation_objects(

@@ -113,57 +113,57 @@ REF_INTERVAL = DateInterval(
 )
 
 
-def open_icechunk_dataset(
-    bucket: str = DEFAULT_ICECHUNK_BUCKET,
-    prefix: str = AIFS_ICECHUNK_PREFIX,
-    variable_mapping: dict[str, str] | None = None,
-    chunks: str | dict | None = "auto",
-    source_credentials_prefix: str = AIFS_SOURCE_CREDENTIALS_PREFIX,
-) -> xr.Dataset:
-    """Open a dataset from an Icechunk repository with preprocessing.
+# def open_icechunk_dataset(
+#     bucket: str = DEFAULT_ICECHUNK_BUCKET,
+#     prefix: str = AIFS_ICECHUNK_PREFIX,
+#     variable_mapping: dict[str, str] | None = None,
+#     chunks: str | dict | None = "auto",
+#     source_credentials_prefix: str = AIFS_SOURCE_CREDENTIALS_PREFIX,
+# ) -> xr.Dataset:
+#     """Open a dataset from an Icechunk repository with preprocessing.
 
-    The repository config already knows where the virtual chunks are located.
-    We just need to provide credentials broad enough to cover that location.
+#     The repository config already knows where the virtual chunks are located.
+#     We just need to provide credentials broad enough to cover that location.
 
-    Args:
-        bucket: GCS bucket containing the Icechunk repository.
-        prefix: Prefix within the bucket for the repository.
-        variable_mapping: Dictionary mapping source variable names to target names.
-        chunks: Chunk specification for xarray (default: "auto").
-        source_credentials_prefix: GCS prefix for virtual chunk credentials.
-            Should be broad enough to cover wherever the source data lives.
+#     Args:
+#         bucket: GCS bucket containing the Icechunk repository.
+#         prefix: Prefix within the bucket for the repository.
+#         variable_mapping: Dictionary mapping source variable names to target names.
+#         chunks: Chunk specification for xarray (default: "auto").
+#         source_credentials_prefix: GCS prefix for virtual chunk credentials.
+#             Should be broad enough to cover wherever the source data lives.
 
-    Returns:
-        Preprocessed xarray Dataset ready for evaluation.
-    """
-    print(f"Opening Icechunk repository at gs://{bucket}/{prefix}")
+#     Returns:
+#         Preprocessed xarray Dataset ready for evaluation.
+#     """
+#     print(f"Opening Icechunk repository at gs://{bucket}/{prefix}")
 
-    # Set up storage
-    storage = icechunk.gcs_storage(bucket=bucket, prefix=prefix)
+#     # Set up storage
+#     storage = icechunk.gcs_storage(bucket=bucket, prefix=prefix)
 
-    # Set up credentials for virtual chunks.
-    # The repo config knows the exact location; we just provide credentials
-    # broad enough to cover it.
-    gcs_credentials = icechunk.gcs_from_env_credentials()
-    virtual_credentials = icechunk.containers_credentials(
-        {source_credentials_prefix: gcs_credentials}
-    )
+#     # Set up credentials for virtual chunks.
+#     # The repo config knows the exact location; we just provide credentials
+#     # broad enough to cover it.
+#     gcs_credentials = icechunk.gcs_from_env_credentials()
+#     virtual_credentials = icechunk.containers_credentials(
+#         {source_credentials_prefix: gcs_credentials}
+#     )
 
-    # Open repository
-    repo = icechunk.Repository.open(
-        storage, authorize_virtual_chunk_access=virtual_credentials
-    )
-    session = repo.readonly_session("main")
+#     # Open repository
+#     repo = icechunk.Repository.open(
+#         storage, authorize_virtual_chunk_access=virtual_credentials
+#     )
+#     session = repo.readonly_session("main")
 
-    # Open dataset
-    ds = xr.open_dataset(session.store, engine="zarr", chunks=chunks)
-    print(f"Opened dataset with variables: {list(ds.data_vars)}")
+#     # Open dataset
+#     ds = xr.open_dataset(session.store, engine="zarr", chunks=chunks)
+#     print(f"Opened dataset with variables: {list(ds.data_vars)}")
 
-    # Apply variable renaming if specified
-    if variable_mapping:
-        rename_dict = {k: v for k, v in variable_mapping.items() if k in ds.data_vars}
-        if rename_dict:
-            print(f"Renaming variables: {rename_dict}")
-            ds = ds.rename(rename_dict)
+#     # Apply variable renaming if specified
+#     if variable_mapping:
+#         rename_dict = {k: v for k, v in variable_mapping.items() if k in ds.data_vars}
+#         if rename_dict:
+#             print(f"Renaming variables: {rename_dict}")
+#             ds = ds.rename(rename_dict)
 
-    return ds
+#     return ds
