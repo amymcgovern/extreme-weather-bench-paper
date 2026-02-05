@@ -3,10 +3,7 @@ import argparse  # noqa: E402
 from pathlib import Path  # noqa: E402
 
 import pandas as pd  # noqa: E402
-from extremeweatherbench import (  # noqa: E402
-    cases,
-    evaluate,
-)
+import extremeweatherbench as ewb
 
 from src.data.severe_forecast_setup import (
     SevereEvaluationSetup,
@@ -67,10 +64,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # load in all of the events in the yaml file
-    ewb_cases = cases.load_ewb_events_yaml_into_case_list()
+    ewb_cases = ewb.cases.load_ewb_events_yaml_into_case_list()
     ewb_cases = [n for n in ewb_cases if n.event_type == "severe_convection"]
 
-    parallel_config = {"backend": "loky", "n_jobs": 24}
+    parallel_config = {"backend": "loky", "n_jobs": 12}
 
     severe_forecast_setup = SevereForecastSetup()
     severe_evaluation_setup = SevereEvaluationSetup()
@@ -94,10 +91,10 @@ if __name__ == "__main__":
                 [bb_hres_severe_forecast]
             )
         )
-        ewb_hres = evaluate.ExtremeWeatherBench(
+        ewb_hres = ewb.evaluate.ExtremeWeatherBench(
             ewb_cases, hres_severe_evaluation_objects
         )
-        ewb_hres_bb = evaluate.ExtremeWeatherBench(
+        ewb_hres_bb = ewb.evaluate.ExtremeWeatherBench(
             ewb_cases, bb_hres_severe_evaluation_objects
         )
 
@@ -123,7 +120,7 @@ if __name__ == "__main__":
                 [cira_fourv2_ifs_severe_forecast, cira_fourv2_gfs_severe_forecast]
             )
         )
-        ewb_fourv2 = evaluate.ExtremeWeatherBench(
+        ewb_fourv2 = ewb.evaluate.ExtremeWeatherBench(
             ewb_cases, cira_fourv2_severe_evaluation_objects
         )
         fourv2_results = ewb_fourv2.run(parallel_config=parallel_config)
@@ -148,7 +145,7 @@ if __name__ == "__main__":
                 [cira_gc_ifs_severe_forecast, cira_gc_gfs_severe_forecast]
             )
         )
-        ewb_gc = evaluate.ExtremeWeatherBench(
+        ewb_gc = ewb.evaluate.ExtremeWeatherBench(
             ewb_cases, cira_gc_severe_evaluation_objects
         )
         gc_results = ewb_gc.run(parallel_config=parallel_config)
@@ -169,7 +166,7 @@ if __name__ == "__main__":
                 [cira_pangu_ifs_severe_forecast, cira_pangu_gfs_severe_forecast]
             )
         )
-        ewb_pang = evaluate.ExtremeWeatherBench(
+        ewb_pang = ewb.evaluate.ExtremeWeatherBench(
             ewb_cases, cira_pangu_severe_evaluation_objects
         )
         pang_results = ewb_pang.run(parallel_config=parallel_config)
@@ -180,14 +177,14 @@ if __name__ == "__main__":
         print("running AIFS evaluation")
 
         bb_aifs_severe_forecast = (
-            severe_forecast_setup.get_bb_severe_convection_forecast("AIFS")
+            severe_forecast_setup.get_bb_severe_convection_forecast("aifs-single")
         )
         bb_aifs_severe_evaluation_objects = (
             severe_evaluation_setup.get_severe_evaluation_objects(
                 [bb_aifs_severe_forecast]
             )
         )
-        ewb_aifs = evaluate.ExtremeWeatherBench(
+        ewb_aifs = ewb.evaluate.ExtremeWeatherBench(
             ewb_cases, bb_aifs_severe_evaluation_objects
         )
         aifs_results = ewb_aifs.run(parallel_config=parallel_config)
@@ -198,14 +195,14 @@ if __name__ == "__main__":
         print("running Graphcast evaluation")
 
         bb_graphcast_severe_forecast = (
-            severe_forecast_setup.get_bb_severe_convection_forecast("Graphcast")
+            severe_forecast_setup.get_bb_severe_convection_forecast("graphcast")
         )
         bb_graphcast_severe_evaluation_objects = (
             severe_evaluation_setup.get_severe_evaluation_objects(
                 [bb_graphcast_severe_forecast]
             )
         )
-        ewb_graphcast = evaluate.ExtremeWeatherBench(
+        ewb_graphcast = ewb.evaluate.ExtremeWeatherBench(
             ewb_cases, bb_graphcast_severe_evaluation_objects
         )
         graphcast_results = ewb_graphcast.run(parallel_config=parallel_config)
@@ -218,14 +215,14 @@ if __name__ == "__main__":
         print("running Pangu evaluation")
 
         bb_pangu_severe_forecast = (
-            severe_forecast_setup.get_bb_severe_convection_forecast("Pangu")
+            severe_forecast_setup.get_bb_severe_convection_forecast("panguweather")
         )
         bb_pangu_severe_evaluation_objects = (
             severe_evaluation_setup.get_severe_evaluation_objects(
                 [bb_pangu_severe_forecast]
             )
         )
-        ewb_pangu = evaluate.ExtremeWeatherBench(
+        ewb_pangu = ewb.evaluate.ExtremeWeatherBench(
             ewb_cases, bb_pangu_severe_evaluation_objects
         )
         pangu_results = ewb_pangu.run(parallel_config=parallel_config)

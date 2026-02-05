@@ -18,7 +18,7 @@ accessible_colors = [
 
 # defaults for plotting
 fourv2_style = {"color": accessible_colors[0]}
-gc_style = {"color": accessible_colors[2]}
+graphcast_style = {"color": accessible_colors[2]}
 pangu_style = {"color": accessible_colors[3]}
 hres_style = {"color": "black"}
 aifs_style = {"color": accessible_colors[5]}
@@ -37,42 +37,40 @@ global_group_style = {"linestyle": "--", "marker": "*", "group": "Global"}
 hres_group_style = {"linestyle": "-", "marker": ".", "group": "HRES"}
 
 # settings for the different models
-fourv2_ifs_cira_settings = {
+cira_fourv2_ifs_settings = {
     "forecast_source": "CIRA FOURv2 IFS",
     "label_str": "ForecastNet V2",
 }
-fourv2_gfs_cira_settings = {
+cira_fourv2_gfs_settings = {
     "forecast_source": "CIRA FOURv2 GFS",
     "label_str": "ForecastNet V2",
 }
-gc_ifs_cira_settings = {"forecast_source": "CIRA GC IFS", "label_str": "GraphCast"}
-gc_gfs_cira_settings = {"forecast_source": "CIRA GC GFS", "label_str": "GraphCast"}
-pangu_ifs_cira_settings = {
+cira_graphcast_ifs_settings = {"forecast_source": "CIRA GC IFS", "label_str": "GraphCast"}
+cira_graphcast_gfs_settings = {"forecast_source": "CIRA GC GFS", "label_str": "GraphCast"}
+cira_pangu_ifs_settings = {
     "forecast_source": "CIRA PANG IFS",
     "label_str": "Pangu Weather",
 }
-pangu_gfs_cira_settings = {
+cira_pangu_gfs_settings = {
     "forecast_source": "CIRA PANG GFS",
     "label_str": "Pangu Weather",
 }
-pangu_bb_settings = {"forecast_source": "BB Pangu", "label_str": "Pangu Weather"}
-gc_bb_settings = {"forecast_source": "BB Graphcast", "label_str": "GraphCast"}
-aifs_bb_settings = {"forecast_source": "BB AIFS", "label_str": "AIFS"}
-hres_ifs_settings = {"forecast_source": "ECMWF HRES", "label_str": "HRES"} 
+bb_pangu_settings = {"forecast_source": "BB panguweather", "label_str": "Pangu Weather"}
+bb_graphcast_settings = {"forecast_source": "BB graphcast", "label_str": "GraphCast"}
+bb_aifs_settings = {"forecast_source": "BB aifs-single", "label_str": "AIFS"}
+hres_settings = {"forecast_source": "ECMWF HRES", "label_str": "HRES"} 
 
-fourv2_ifs_settings = fourv2_ifs_cira_settings | fourv2_style | ifs_group_style
-gc_ifs_settings = gc_ifs_cira_settings | gc_style | ifs_group_style
-pangu_ifs_settings = pangu_ifs_cira_settings | pangu_style | ifs_group_style
-hres_settings = hres_ifs_settings | hres_style | hres_group_style
-aifs_ifs_settings = aifs_bb_settings | aifs_style | ifs_group_style
-pangu_bb_ifs_settings = pangu_bb_settings | pangu_style | ifs_group_style
-gc_bb_ifs_settings = gc_bb_settings | gc_style | ifs_group_style
-
-
-fourv2_gfs_settings = fourv2_gfs_cira_settings | fourv2_style | gfs_group_style
-gc_gfs_settings = gc_gfs_cira_settings | gc_style | gfs_group_style
-pangu_gfs_settings = pangu_gfs_cira_settings | pangu_style | gfs_group_style
-
+# combine the settings for the different models
+cira_fourv2_ifs_settings = cira_fourv2_ifs_settings | fourv2_style | ifs_group_style
+cira_fourv2_gfs_settings = cira_fourv2_gfs_settings | fourv2_style | gfs_group_style
+cira_graphcast_ifs_settings = cira_graphcast_ifs_settings | graphcast_style | ifs_group_style
+cira_graphcast_gfs_settings = cira_graphcast_gfs_settings | graphcast_style | gfs_group_style
+cira_pangu_ifs_settings = cira_pangu_ifs_settings | pangu_style | ifs_group_style
+cira_pangu_gfs_settings = cira_pangu_gfs_settings | pangu_style | gfs_group_style
+bb_pangu_settings = bb_pangu_settings | pangu_style | global_group_style
+bb_graphcast_settings = bb_graphcast_settings | graphcast_style | global_group_style
+bb_aifs_settings = bb_aifs_settings | aifs_style | global_group_style
+hres_ifs_settings = hres_settings | hres_style | ifs_group_style
 
 severe_tp_settings = {"linestyle": "-", "marker": "o", "group": "True Positives"}
 severe_fn_settings = {"linestyle": "--", "marker": "x", "group": "False Negatives"}

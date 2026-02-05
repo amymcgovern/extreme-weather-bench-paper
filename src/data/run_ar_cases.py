@@ -4,10 +4,7 @@ import argparse  # noqa: E402
 from pathlib import Path  # noqa: E402
 
 import pandas as pd  # noqa: E402
-from extremeweatherbench import (  # noqa: E402
-    cases,
-    evaluate,
-)
+import extremeweatherbench as ewb
 
 from src.data.ar_forecast_setup import (
     AtmosphericRiverEvaluationSetup,
@@ -68,7 +65,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # load in all of the events in the yaml file
-    ewb_cases = cases.load_ewb_events_yaml_into_case_list()
+    ewb_cases = ewb.cases.load_ewb_events_yaml_into_case_list()
     ewb_cases = [n for n in ewb_cases if n.event_type == "atmospheric_river"]
 
     parallel_config = {"backend": "loky", "n_jobs": 24}
@@ -92,8 +89,8 @@ if __name__ == "__main__":
         later_cases = [i for i in ewb_cases if i.start_date > pd.Timestamp("2023-01-01")]
         
 
-        ewb_hres = evaluate.ExtremeWeatherBench(early_cases, hres_ar_evaluation_objects)
-        ewb_bb_hres = evaluate.ExtremeWeatherBench(later_cases, bb_hres_ar_evaluation_objects)
+        ewb_hres = ewb.evaluate.ExtremeWeatherBench(early_cases, hres_ar_evaluation_objects)
+        ewb_bb_hres = ewb.evaluate.ExtremeWeatherBench(later_cases, bb_hres_ar_evaluation_objects)
 
         print("running HRES")
         hres_results = ewb_hres.run(parallel_config=parallel_config)
@@ -114,7 +111,7 @@ if __name__ == "__main__":
             [cira_fourv2_ar_gfs_forecast, cira_fourv2_ar_ifs_forecast]
         )
 
-        ewb_fourv2 = evaluate.ExtremeWeatherBench(ewb_cases, cira_fourv2_ar_evaluation_objects)
+        ewb_fourv2 = ewb.evaluate.ExtremeWeatherBench(ewb_cases, cira_fourv2_ar_evaluation_objects)
 
         print("running CIRA FOURv2")
         cira_fourv2_results = ewb_fourv2.run(parallel_config=parallel_config)
@@ -130,7 +127,7 @@ if __name__ == "__main__":
             [cira_graphcast_ar_gfs_forecast, cira_graphcast_ar_ifs_forecast]
         )
 
-        ewb_cira_graphcast = evaluate.ExtremeWeatherBench(ewb_cases, cira_graphcast_ar_evaluation_objects)
+        ewb_cira_graphcast = ewb.evaluate.ExtremeWeatherBench(ewb_cases, cira_graphcast_ar_evaluation_objects)
 
         print("running CIRA Graphcast")
         cira_graphcast_results = ewb_cira_graphcast.run(parallel_config=parallel_config)
@@ -146,7 +143,7 @@ if __name__ == "__main__":
             [cira_pangu_ar_gfs_forecast, cira_pangu_ar_ifs_forecast]
         )
 
-        ewb_cira_pangu = evaluate.ExtremeWeatherBench(ewb_cases, cira_pangu_ar_evaluation_objects)
+        ewb_cira_pangu = ewb.evaluate.ExtremeWeatherBench(ewb_cases, cira_pangu_ar_evaluation_objects)
 
         print("running CIRA PANGU")
         cira_pangu_results = ewb_cira_pangu.run(parallel_config=parallel_config)
@@ -156,10 +153,10 @@ if __name__ == "__main__":
     if args.run_bb_aifs:
         print("running BB AIFS evaluation")
 
-        bb_aifs_ar_forecast = atmospheric_river_forecast_setup.get_bb_ar_forecast("AIFS")
+        bb_aifs_ar_forecast = atmospheric_river_forecast_setup.get_bb_ar_forecast("aifs-single")
         bb_aifs_ar_evaluation_objects = atmospheric_river_evaluation_setup.get_ar_evaluation_objects([bb_aifs_ar_forecast])
 
-        ewb_bb_aifs = evaluate.ExtremeWeatherBench(ewb_cases, bb_aifs_ar_evaluation_objects)
+        ewb_bb_aifs = ewb.evaluate.ExtremeWeatherBench(ewb_cases, bb_aifs_ar_evaluation_objects)
 
         print("running BB AIFS")
         bb_aifs_results = ewb_bb_aifs.run(parallel_config=parallel_config)
@@ -169,10 +166,10 @@ if __name__ == "__main__":
     if args.run_bb_graphcast:
         print("running BB Graphcast evaluation")
 
-        bb_graphcast_ar_forecast = atmospheric_river_forecast_setup.get_bb_ar_forecast("Graphcast")
+        bb_graphcast_ar_forecast = atmospheric_river_forecast_setup.get_bb_ar_forecast("graphcast")
         bb_graphcast_ar_evaluation_objects = atmospheric_river_evaluation_setup.get_ar_evaluation_objects([bb_graphcast_ar_forecast])
 
-        ewb_bb_graphcast = evaluate.ExtremeWeatherBench(ewb_cases, bb_graphcast_ar_evaluation_objects)
+        ewb_bb_graphcast = ewb.evaluate.ExtremeWeatherBench(ewb_cases, bb_graphcast_ar_evaluation_objects)
 
         print("running BB Graphcast")
         bb_graphcast_results = ewb_bb_graphcast.run(parallel_config=parallel_config)
@@ -182,10 +179,10 @@ if __name__ == "__main__":
     if args.run_bb_pangu:
         print("running BB PANGU evaluation")
 
-        bb_pangu_ar_forecast = atmospheric_river_forecast_setup.get_bb_ar_forecast("Pangu")
+        bb_pangu_ar_forecast = atmospheric_river_forecast_setup.get_bb_ar_forecast("panguweather")
         bb_pangu_ar_evaluation_objects = atmospheric_river_evaluation_setup.get_ar_evaluation_objects([bb_pangu_ar_forecast])
 
-        ewb_bb_pangu = evaluate.ExtremeWeatherBench(ewb_cases, bb_pangu_ar_evaluation_objects)
+        ewb_bb_pangu = ewb.evaluate.ExtremeWeatherBench(ewb_cases, bb_pangu_ar_evaluation_objects)
 
         print("running BB PANGU")
         bb_pangu_results = ewb_bb_pangu.run(parallel_config=parallel_config)

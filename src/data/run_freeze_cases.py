@@ -3,7 +3,7 @@ import argparse  # noqa: E402
 from pathlib import Path  # noqa: E402
 
 import pandas as pd  # noqa: E402
-from extremeweatherbench import cases, evaluate
+import extremeweatherbench as ewb
 
 from src.data.heat_freeze_forecast_setup import (
     HeatFreezeEvaluationSetup,
@@ -73,7 +73,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # load in all of the events in the yaml file
-    ewb_cases = cases.load_ewb_events_yaml_into_case_list()
+    ewb_cases = ewb.cases.load_ewb_events_yaml_into_case_list()
     ewb_cases = [n for n in ewb_cases if n.event_type == "freeze"]
 
     heat_freeze_forecast_setup = HeatFreezeForecastSetup()
@@ -107,10 +107,10 @@ if __name__ == "__main__":
             )
         )
 
-        ewb_hres_early = evaluate.ExtremeWeatherBench(
+        ewb_hres_early = ewb.evaluate.ExtremeWeatherBench(
             early_cases, hres_freeze_evaluation_objects
         )
-        ewb_hres_later = evaluate.ExtremeWeatherBench(
+        ewb_hres_later = ewb.evaluate.ExtremeWeatherBench(
             later_cases, bb_hres_freeze_evaluation_objects
         )
         hres_results_early = ewb_hres_early.run(parallel_config=parallel_config)
@@ -133,7 +133,7 @@ if __name__ == "__main__":
                 [pang_freeze_ifs_forecast, pang_freeze_gfs_forecast]
             )
         )
-        ewb_pang = evaluate.ExtremeWeatherBench(
+        ewb_pang = ewb.evaluate.ExtremeWeatherBench(
             ewb_cases, pang_freeze_evaluation_objects
         )
         pang_results = ewb_pang.run(parallel_config=parallel_config)
@@ -153,7 +153,7 @@ if __name__ == "__main__":
                 [fourv2_freeze_ifs_forecast, fourv2_freeze_gfs_forecast]
             )
         )
-        ewb_fourv2 = evaluate.ExtremeWeatherBench(
+        ewb_fourv2 = ewb.evaluate.ExtremeWeatherBench(
             ewb_cases, fourv2_freeze_evaluation_objects
         )
         fourv2_results = ewb_fourv2.run(parallel_config=parallel_config)
@@ -174,9 +174,9 @@ if __name__ == "__main__":
                 [gc_freeze_ifs_forecast, gc_freeze_gfs_forecast]
             )
         )
-        ewb_gc = evaluate.ExtremeWeatherBench(ewb_cases, gc_freeze_evaluation_objects)
+        ewb_gc = ewb.evaluate.ExtremeWeatherBench(ewb_cases, gc_freeze_evaluation_objects)
         gc_results = ewb_gc.run(parallel_config=parallel_config)
-        gc_results.to_pickle(basepath + "saved_data/cira_gc_freeze_results.pkl")
+        gc_results.to_pickle(basepath + "saved_data/cira_graphcast_freeze_results.pkl")
         print("Graphcast evaluation complete. Results saved to pickle.")
 
     if args.run_bb_aifs:
@@ -190,7 +190,7 @@ if __name__ == "__main__":
                 [aifs_freeze_forecast]
             )
         )
-        ewb_aifs = evaluate.ExtremeWeatherBench(
+        ewb_aifs = ewb.evaluate.ExtremeWeatherBench(
             ewb_cases, aifs_freeze_evaluation_objects
         )
         aifs_results = ewb_aifs.run(parallel_config=parallel_config)
@@ -208,7 +208,7 @@ if __name__ == "__main__":
                 [graphcast_freeze_forecast]
             )
         )
-        ewb_graphcast = evaluate.ExtremeWeatherBench(
+        ewb_graphcast = ewb.evaluate.ExtremeWeatherBench(
             ewb_cases, graphcast_freeze_evaluation_objects
         )
         graphcast_results = ewb_graphcast.run(parallel_config=parallel_config)
@@ -228,7 +228,7 @@ if __name__ == "__main__":
                 [pang_freeze_forecast]
             )
         )
-        ewb_pang = evaluate.ExtremeWeatherBench(
+        ewb_pang = ewb.evaluate.ExtremeWeatherBench(
             ewb_cases, pang_freeze_evaluation_objects
         )
         pang_results = ewb_pang.run(parallel_config=parallel_config)

@@ -3,7 +3,7 @@ import argparse
 from pathlib import Path
 
 import pandas as pd  # noqa: E402
-from extremeweatherbench import cases, evaluate
+import extremeweatherbench as ewb
 
 from src.data.heat_freeze_forecast_setup import (
     HeatFreezeEvaluationSetup,
@@ -79,7 +79,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # load in the events
-    ewb_cases = cases.load_ewb_events_yaml_into_case_list()
+    ewb_cases = ewb.cases.load_ewb_events_yaml_into_case_list()
     ewb_cases = [n for n in ewb_cases if n.event_type == "heat_wave"]
 
     parallel_config = {"backend": "loky", "n_jobs": 32}
@@ -105,15 +105,15 @@ if __name__ == "__main__":
             )
         )
 
-        ewb_hres = evaluate.ExtremeWeatherBench(ewb_cases, hres_heat_evaluation_objects)
+        ewb_hres = ewb.evaluate.ExtremeWeatherBench(ewb_cases, hres_heat_evaluation_objects)
         # split the cases into early and later for HRES (just for ease of evaluation)
         early_cases = [i for i in ewb_cases if i.end_date < pd.Timestamp("2023-01-01")]
         later_cases = [i for i in ewb_cases if i.start_date > pd.Timestamp("2023-01-01")]
 
-        ewb_hres_early = evaluate.ExtremeWeatherBench(
+        ewb_hres_early = ewb.evaluate.ExtremeWeatherBench(
             early_cases, hres_heat_evaluation_objects
         )
-        ewb_hres_later = evaluate.ExtremeWeatherBench(
+        ewb_hres_later = ewb.evaluate.ExtremeWeatherBench(
             later_cases, bb_hres_heat_evaluation_objects
         )
 
@@ -140,7 +140,7 @@ if __name__ == "__main__":
                 [fourv2_heat_ifs_forecast, fourv2_heat_gfs_forecast]
             )
         )
-        ewb_fourv2 = evaluate.ExtremeWeatherBench(
+        ewb_fourv2 = ewb.evaluate.ExtremeWeatherBench(
             ewb_cases, fourv2_heat_evaluation_objects
         )
         fourv2_results = ewb_fourv2.run(parallel_config=parallel_config)
@@ -160,7 +160,7 @@ if __name__ == "__main__":
                 [gc_heat_ifs_forecast, gc_heat_gfs_forecast]
             )
         )
-        ewb_gc = evaluate.ExtremeWeatherBench(ewb_cases, gc_heat_evaluation_objects)
+        ewb_gc = ewb.evaluate.ExtremeWeatherBench(ewb_cases, gc_heat_evaluation_objects)
         gc_results = ewb_gc.run(parallel_config=parallel_config)
         gc_results.to_pickle(basepath + "saved_data/cira_graphcast_heat_results.pkl")
         print("Graphcast evaluation complete. Results saved to pickle.")
@@ -178,9 +178,9 @@ if __name__ == "__main__":
                 [pang_heat_ifs_forecast, pang_heat_gfs_forecast]
             )
         )
-        ewb_pang = evaluate.ExtremeWeatherBench(ewb_cases, pang_heat_evaluation_objects)
+        ewb_pang = ewb.evaluate.ExtremeWeatherBench(ewb_cases, pang_heat_evaluation_objects)
         pang_results = ewb_pang.run(parallel_config=parallel_config)
-        pang_results.to_pickle(basepath + "saved_data/cira_pang_heat_results.pkl")
+        pang_results.to_pickle(basepath + "saved_data/cira_pangu_heat_results.pkl")
         print("Pangu evaluation complete. Results saved to pickle.")
 
     if args.run_bb_aifs:
@@ -193,7 +193,7 @@ if __name__ == "__main__":
                 [bb_aifs_heat_forecast]
             )
         )
-        ewb_bb_aifs = evaluate.ExtremeWeatherBench(
+        ewb_bb_aifs = ewb.evaluate.ExtremeWeatherBench(
             ewb_cases, bb_aifs_heat_evaluation_objects
         )
         bb_aifs_results = ewb_bb_aifs.run(parallel_config=parallel_config)
@@ -210,7 +210,7 @@ if __name__ == "__main__":
             )
         )
         print("running BB Graphcast evaluation")
-        ewb_bb_graphcast = evaluate.ExtremeWeatherBench(
+        ewb_bb_graphcast = ewb.evaluate.ExtremeWeatherBench(
             ewb_cases, bb_graphcast_heat_evaluation_objects
         )
         bb_graphcast_results = ewb_bb_graphcast.run(parallel_config=parallel_config)
@@ -229,7 +229,7 @@ if __name__ == "__main__":
                 [bb_pangu_heat_forecast]
             )
         )
-        ewb_bb_pangu = evaluate.ExtremeWeatherBench(
+        ewb_bb_pangu = ewb.evaluate.ExtremeWeatherBench(
             ewb_cases, bb_pangu_heat_evaluation_objects
         )
         bb_pangu_results = ewb_bb_pangu.run(parallel_config=parallel_config)
