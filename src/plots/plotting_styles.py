@@ -38,21 +38,21 @@ hres_group_style = {"linestyle": "-", "marker": ".", "group": "HRES"}
 
 # settings for the different models
 cira_fourv2_ifs_settings = {
-    "forecast_source": "CIRA FOURv2 IFS",
+    "forecast_source": "CIRA Fourv2 IFS",
     "label_str": "ForecastNet V2",
 }
 cira_fourv2_gfs_settings = {
-    "forecast_source": "CIRA FOURv2 GFS",
+    "forecast_source": "CIRA Fourv2 GFS",
     "label_str": "ForecastNet V2",
 }
-cira_graphcast_ifs_settings = {"forecast_source": "CIRA GC IFS", "label_str": "GraphCast"}
-cira_graphcast_gfs_settings = {"forecast_source": "CIRA GC GFS", "label_str": "GraphCast"}
+cira_graphcast_ifs_settings = {"forecast_source": "CIRA Graphcast IFS", "label_str": "GraphCast"}
+cira_graphcast_gfs_settings = {"forecast_source": "CIRA Graphcast GFS", "label_str": "GraphCast"}
 cira_pangu_ifs_settings = {
-    "forecast_source": "CIRA PANG IFS",
+    "forecast_source": "CIRA Pangu IFS",
     "label_str": "Pangu Weather",
 }
 cira_pangu_gfs_settings = {
-    "forecast_source": "CIRA PANG GFS",
+    "forecast_source": "CIRA Pangu GFS",
     "label_str": "Pangu Weather",
 }
 bb_pangu_settings = {"forecast_source": "BB panguweather", "label_str": "Pangu Weather"}

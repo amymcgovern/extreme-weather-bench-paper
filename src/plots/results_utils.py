@@ -101,30 +101,26 @@ def subset_results_to_xarray_by_init_time(
     # compute the lead times in time deltas so we can do math on it later
     lead_times = [
         np.timedelta64(lead_time_days[i], "D") for i in range(len(lead_time_days))
-    ]
-    print(lead_times)
-    
+    ]    
     lead_times_arr = np.array(lead_times)
 
-    # map case_id_number -> start_date so we can compute lead time per row
-    start_date_by_case = {case.case_id_number: case.start_date for case in ewb_cases}
-    print(start_date_by_case)
-    # add lead_time column: for each row, start_date - init_time (on the main subset)
+    # map case_id_number -> end_date so we can compute lead time per row
+    end_date_by_case = {case.case_id_number: case.end_date for case in ewb_cases}
+
+    # add lead_time column: for each row, end_date - init_time (on the main subset)
     subset2 = subset.copy()
-    subset2["lead_time"] = subset["case_id_number"].map(start_date_by_case) - subset["init_time"]
+    subset2["lead_time"] = subset["case_id_number"].map(end_date_by_case) - subset["init_time"]
     # keep only rows whose computed lead time is in the requested lead_times
     subset2 = subset2.loc[np.isin(subset2["lead_time"].values, lead_times_arr)]
 
-    # prepare for xarray conversion
-    subset2.set_index(["lead_time", "case_id_number"])
-    subset2.sort_index()
+    # prepare for xarray conversion (set_index/sort_index return new DataFrame)
+    subset2 = subset2.set_index(["lead_time", "case_id_number"]).sort_index()
     subset_xa = subset2.to_xarray()
 
     return subset_xa
 
-
-
 def compute_mean_by_lead_time(
+    ewb_cases,
     results_df,
     forecast_source,
     target_source,
@@ -144,19 +140,32 @@ def compute_mean_by_lead_time(
         my_mean: numpy array containing the mean of the results by lead time
     """
 
-    subset = subset_results_to_xarray(
-        results_df=results_df,
-        forecast_source=forecast_source,
-        target_source=target_source,
-        metric=metric,
-        lead_time_days=lead_time_days,
-        case_id_list=case_ids,
-    )
+
+    if 'DurationMeanError' in metric:
+        subset = subset_results_to_xarray_by_init_time(
+            ewb_cases,
+            results_df,
+            forecast_source,
+            target_source,
+            metric,
+            lead_time_days,
+            case_id_list=case_ids,
+        )
+    else:   
+        subset = subset_results_to_xarray(
+            results_df=results_df,
+            forecast_source=forecast_source,
+            target_source=target_source,
+            metric=metric,
+            lead_time_days=lead_time_days,
+            case_id_list=case_ids,
+        )
     my_mean = subset["value"].mean("case_id_number")
     return my_mean
 
 
 def compute_relative_error(
+    ewb_cases,
     results_df,
     forecast_source,
     comparison_results_df,
@@ -192,7 +201,8 @@ def compute_relative_error(
             the results by lead time
     """
 
-    my_mean = compute_mean_by_lead_time(
+    my_mean = compute_mean_by_lead_time(    
+        ewb_cases,
         results_df,
         forecast_source,
         target_source,
@@ -201,6 +211,7 @@ def compute_relative_error(
         case_ids,
     )
     comparison_mean = compute_mean_by_lead_time(
+        ewb_cases,
         comparison_results_df,
         comparison_forecast_source,
         target_source,
