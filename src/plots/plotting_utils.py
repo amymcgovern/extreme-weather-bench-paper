@@ -671,15 +671,15 @@ def plot_all_cases(
     ax.add_feature(cfeature.OCEAN, edgecolor="black", facecolor="white", zorder=10)
 
     # Add gridlines
-    gl = ax.gridlines(
-        draw_labels=True, linewidth=0.5, color="gray", alpha=0.5, linestyle="--"
-    )
-    gl.top_labels = False
-    gl.right_labels = False
-    gl.xformatter = LongitudeFormatter()
-    gl.yformatter = LatitudeFormatter()
-    gl.xlabel_style = {"size": 14}
-    gl.ylabel_style = {"size": 14}
+    # gl = ax.gridlines(
+    #     draw_labels=True, linewidth=0.5, color="gray", alpha=0.5, linestyle="--"
+    # )
+    # gl.top_labels = False
+    # gl.right_labels = False
+    # gl.xformatter = LongitudeFormatter()
+    # gl.yformatter = LatitudeFormatter()
+    # gl.xlabel_style = {"size": 14}
+    # gl.ylabel_style = {"size": 14}
 
     # Define colors for each event type
     # use seaborn color palette for colorblind friendly colors
@@ -903,14 +903,14 @@ def plot_all_cases_and_obs(
     ax.add_feature(cfeature.RIVERS, edgecolor="black")
     ax.add_feature(cfeature.OCEAN, edgecolor="black", facecolor="white", zorder=10)
 
-    # Add gridlines
-    gl = ax.gridlines(
-        draw_labels=True, linewidth=0.5, color="gray", alpha=0.5, linestyle="--"
-    )
-    gl.top_labels = False
-    gl.right_labels = False
-    gl.xformatter = LongitudeFormatter()
-    gl.yformatter = LatitudeFormatter()
+    # # Add gridlines
+    # gl = ax.gridlines(
+    #     draw_labels=True, linewidth=0.5, color="gray", alpha=0.5, linestyle="--"
+    # )
+    # gl.top_labels = False
+    # gl.right_labels = False
+    # gl.xformatter = LongitudeFormatter()
+    # gl.yformatter = LatitudeFormatter()
 
     # Define colors for each event type
     # use seaborn color palette for colorblind friendly colors
@@ -1375,10 +1375,11 @@ def plot_results_by_metric(
         ax.plot(
             my_mean,
             color=my_settings["color"],
-            linewidth=4,
+            linewidth=2,
             label=my_label,
             linestyle=my_settings["linestyle"],
             marker=my_settings["marker"],
+            alpha=my_settings["alpha"] if "alpha" in my_settings else 1,
             markersize=10,
         )
 
@@ -1402,7 +1403,7 @@ def plot_results_by_metric(
     ax.set_xticks(labels=xtick_str, ticks=np.arange(0, len(model["lead_time"]), 1))
 
     ax.set_ylabel(y_label, fontsize=20)
-    ax.set_xlabel("Lead Time (days)", fontsize=20)
+    ax.set_xlabel("Lead Time (days)", fontsize=14)
     ax.set_title(title, fontsize=20)
 
     # Add a blank line to your legend_elements list
