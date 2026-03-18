@@ -628,6 +628,7 @@ def plot_all_cases(
     bounding_box=None,
     fill_boxes=False,
     ax=None,
+    title=None,
 ):
     """A function to plot all cases
     Args:
@@ -833,12 +834,13 @@ def plot_all_cases(
     )
     legend.set_zorder(10)
 
-    if event_type is None:
-        title = "ExtremeWeatherBench Cases (n = %d)" % sum(counts_by_type.values())
-    else:
-        title = (
-            f"{event_type.replace('_', ' ').title()} (n = {counts_by_type[event_type]})"
-        )
+    if title is None:
+        if event_type is None:
+            title = "ExtremeWeatherBench Cases (n = %d)" % sum(counts_by_type.values())
+        else:
+            title = (
+                f"{event_type.replace('_', ' ').title()} (n = {counts_by_type[event_type]})"
+            )
 
     ax.set_title(title, loc="center", fontsize=20)
 
@@ -859,6 +861,7 @@ def plot_all_cases_and_obs(
     case_id=None,
     ax=None,
     show_legend=True,
+    title=None,
 ):
     """Plot all cases (outlined) and observations (filled) on map.
     Args:
@@ -1253,13 +1256,14 @@ def plot_all_cases_and_obs(
         )
         legend.set_zorder(10)
 
-    if event_type is None:
-        title = "ExtremeWeatherBench Cases (n = %d)" % sum(counts_by_type.values())
-    else:
-        title = (
-            f"{event_type.replace('_', ' ').title()} (n = %d)"
-            % counts_by_type[event_type]
-        )
+    if title is None:
+        if event_type is None:
+            title = "ExtremeWeatherBench Cases (n = %d)" % sum(counts_by_type.values())
+        else:
+            title = (
+                f"{event_type.replace('_', ' ').title()} (n = %d)"
+                % counts_by_type[event_type]
+            )
 
     ax.set_title(title, fontsize=20)
 
@@ -1741,7 +1745,7 @@ def plot_heatmap(
         
         # Position colorbar below the subplots with proper spacing
         cbar_height = 0.03
-        cbar_spacing = 0.02  # Space between subplots and colorbar
+        cbar_spacing = 0.05  # Space between subplots and colorbar
         cbar_width = width * 0.9
         cbar_left = left + width * 0.05  # Center 90% width colorbar
         cbar_bottom = bottom - cbar_height - cbar_spacing
@@ -1756,6 +1760,7 @@ def plot_heatmap(
         font_scalings = fm.font_scalings
         label_size_numeric = base_size * font_scalings.get(label_fontsize, 1.0)
         cbar_fontsize = label_size_numeric * 1.2
+        cb.ax.tick_params(labelsize=cbar_fontsize)
         cb.ax.set_xlabel(
             "Better ← % difference vs IFS HRES → Worse", fontsize=cbar_fontsize
         )
