@@ -1691,9 +1691,9 @@ def plot_heatmap(
         elif error_max >= 100:
             fmt = ".0f"  # One decimal for large numbers
         elif error_max >= 1:
-            fmt = ".2f"  # Two decimals for medium numbers
+            fmt = ".1f"  # Two decimals for medium numbers
         elif error_min < 0.01:
-            fmt = ".2g"  # General format (scientific notation) for very small numbers
+            fmt = ".1g"  # General format (scientific notation) for very small numbers
         else:
             fmt = ".2f"  # Three decimals for small numbers
 

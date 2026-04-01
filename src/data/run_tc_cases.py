@@ -94,9 +94,9 @@ if __name__ == "__main__":
         ewb_bb_hres = evaluate.ExtremeWeatherBench(later_cases, bb_hres_tc_evaluation_objects)
 
         print("running HRES")
-        hres_results = ewb_hres.run(parallel_config=parallel_config)
+        hres_results = ewb_hres.run_evaluation(parallel_config=parallel_config)
         print("running BB HRES")
-        bb_hres_results = ewb_bb_hres.run(parallel_config=parallel_config)
+        bb_hres_results = ewb_bb_hres.run_evaluation(parallel_config=parallel_config)
         
         print("concatenating the results")
         hres_combined_results = pd.concat([hres_results, bb_hres_results])
@@ -114,7 +114,7 @@ if __name__ == "__main__":
         ewb_fourv2 = evaluate.ExtremeWeatherBench(ewb_cases, cira_fourv2_tc_evaluation_objects)
 
         print("running CIRA FOURv2")
-        cira_fourv2_results = ewb_fourv2.run(parallel_config=parallel_config)
+        cira_fourv2_results = ewb_fourv2.run_evaluation(parallel_config=parallel_config)
         cira_fourv2_results.to_pickle(basepath + "saved_data/cira_fourv2_tc_results.pkl")
         print("CIRA FOURv2 evaluation complete. Results saved to pickle.")
 
@@ -129,7 +129,7 @@ if __name__ == "__main__":
         ewb_cira_gc = evaluate.ExtremeWeatherBench(ewb_cases, cira_gc_tc_evaluation_objects)
 
         print("running CIRA Graphcast")
-        cira_gc_results = ewb_cira_gc.run(parallel_config=parallel_config)
+        cira_gc_results = ewb_cira_gc.run_evaluation(parallel_config=parallel_config)
         cira_gc_results.to_pickle(basepath + "saved_data/cira_graphcast_tc_results.pkl")
         print("CIRA Graphcast evaluation complete. Results saved to pickle.")
 
@@ -144,45 +144,45 @@ if __name__ == "__main__":
         ewb_cira_pangu = evaluate.ExtremeWeatherBench(ewb_cases, cira_pangu_tc_evaluation_objects)
 
         print("running CIRA PANGU")
-        cira_pangu_results = ewb_cira_pangu.run(parallel_config=parallel_config)
+        cira_pangu_results = ewb_cira_pangu.run_evaluation(parallel_config=parallel_config)
         cira_pangu_results.to_pickle(basepath + "saved_data/cira_pangu_tc_results.pkl")
         print("CARA PANGU evaluation complete. Results saved to pickle.")
 
     if args.run_bb_aifs:
         print("running BB AIFS evaluation")
 
-        bb_aifs_tc_forecast = tropical_cyclone_forecast_setup.get_bb_tc_forecast("AIFS")
+        bb_aifs_tc_forecast = tropical_cyclone_forecast_setup.get_bb_tc_forecast("aifs-single")
         bb_aifs_tc_evaluation_objects = tropical_cyclone_evaluation_setup.get_tc_evaluation_objects([bb_aifs_tc_forecast])
 
         ewb_bb_aifs = evaluate.ExtremeWeatherBench(ewb_cases, bb_aifs_tc_evaluation_objects)
 
         print("running BB AIFS")
-        bb_aifs_results = ewb_bb_aifs.run(parallel_config=parallel_config)
+        bb_aifs_results = ewb_bb_aifs.run_evaluation(parallel_config=parallel_config)
         bb_aifs_results.to_pickle(basepath + "saved_data/bb_aifs_tc_results.pkl")
         print("BB AIFS evaluation complete. Results saved to pickle.")
 
     if args.run_bb_graphcast:
         print("running BB Graphcast evaluation")
 
-        bb_graphcast_tc_forecast = tropical_cyclone_forecast_setup.get_bb_tc_forecast("Graphcast")
+        bb_graphcast_tc_forecast = tropical_cyclone_forecast_setup.get_bb_tc_forecast("graphcast")
         bb_graphcast_tc_evaluation_objects = tropical_cyclone_evaluation_setup.get_tc_evaluation_objects([bb_graphcast_tc_forecast])
 
         ewb_bb_graphcast = evaluate.ExtremeWeatherBench(ewb_cases, bb_graphcast_tc_evaluation_objects)
 
         print("running BB Graphcast")
-        bb_graphcast_results = ewb_bb_graphcast.run(parallel_config=parallel_config)
+        bb_graphcast_results = ewb_bb_graphcast.run_evaluation(parallel_config=parallel_config)
         bb_graphcast_results.to_pickle(basepath + "saved_data/bb_graphcast_tc_results.pkl")
         print("BB Graphcast evaluation complete. Results saved to pickle.")
 
     if args.run_bb_pangu:
         print("running BB PANGU evaluation")
 
-        bb_pangu_tc_forecast = tropical_cyclone_forecast_setup.get_bb_tc_forecast("Pangu")
+        bb_pangu_tc_forecast = tropical_cyclone_forecast_setup.get_bb_tc_forecast("panguweather")
         bb_pangu_tc_evaluation_objects = tropical_cyclone_evaluation_setup.get_tc_evaluation_objects([bb_pangu_tc_forecast])
 
         ewb_bb_pangu = evaluate.ExtremeWeatherBench(ewb_cases, bb_pangu_tc_evaluation_objects)
 
         print("running BB PANGU")
-        bb_pangu_results = ewb_bb_pangu.run(parallel_config=parallel_config)
+        bb_pangu_results = ewb_bb_pangu.run_evaluation(parallel_config=parallel_config)
         bb_pangu_results.to_pickle(basepath + "saved_data/bb_pangu_tc_results.pkl")
         print("BB PANGU evaluation complete. Results saved to pickle.")

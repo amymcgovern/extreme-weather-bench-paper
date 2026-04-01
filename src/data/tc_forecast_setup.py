@@ -1,16 +1,18 @@
+from pathlib import Path
 import xarray as xr
-from extremeweatherbench import calc, defaults, derived, inputs, metrics
+
+import extremeweatherbench as ewb
 
 from src.data.aifs_util import (
     BB_MLWP_VARIABLE_MAPPING,
     DEFAULT_ICECHUNK_BUCKET,
     InMemoryForecast,
-    open_icechunk_dataset,
 )  # noqa: E402
 from src.data.arraylake_utils import (
-    ArraylakeForecast,
-    BB_metadata_variable_mapping,
-)  # noqa: E402
+    ArraylakeForecast, BB_metadata_variable_mapping,
+) # noqa: E402
+from check_icechunk import open_mlwp_archive_icechunk_dataset
+
 from src.data.model_name_setup import (
     BB_MODEL_NAME_TO_CREDENTIALS_PREFIX,
     BB_MODEL_NAME_TO_PREFIX,
@@ -18,13 +20,13 @@ from src.data.model_name_setup import (
 )
 
 composite_landfall_metrics = [
-    metrics.LandfallMetric(
+    ewb.metrics.LandfallMetric(
         metrics=[
-            metrics.LandfallIntensityMeanAbsoluteError,
-            metrics.LandfallTimeMeanError,
-            metrics.LandfallDisplacement,
+            ewb.metrics.LandfallIntensityMeanAbsoluteError(),
+            ewb.metrics.LandfallTimeMeanError(),
+            ewb.metrics.LandfallDisplacement(),
         ],
-        approach="next",
+        approach="first",
     )
 ]
 
@@ -36,7 +38,7 @@ def preprocess_mlwp_tc_dataset(ds: xr.Dataset) -> xr.Dataset:
 
     # Calculate the geopotential thickness required for tropical cyclone tracks
     ds["geopotential_thickness"] = (
-        calc.geopotential_thickness(
+        ewb.calc.geopotential_thickness(
             ds["geopotential"], top_level=300, bottom_level=500
         ) / 9.81
     )
@@ -49,7 +51,7 @@ def preprocess_bb_hres_tc_dataset(ds: xr.Dataset) -> xr.Dataset:
     """
 
     # Calculate the geopotential thickness required for tropical cyclone tracks
-    ds["geopotential_thickness"] = calc.geopotential_thickness(
+    ds["geopotential_thickness"] = ewb.calc.geopotential_thickness(
         ds["z"], top_level=300, bottom_level=500, pressure_dim="isobaricInhPa"
     ) / 9.81
     return ds
@@ -63,22 +65,22 @@ class TropicalCycloneForecastSetup:
         source_str = f"gs://extremeweatherbench/{model_str}_{init_type}.parq"
         name_str = f"CIRA {model_name} {init_type}"
 
-        cira_tc_forecast = inputs.KerchunkForecast(
+        cira_tc_forecast = ewb.inputs.KerchunkForecast(
             source=source_str,
-            variables=[derived.TropicalCycloneTrackVariables()],            
-            variable_mapping=inputs.CIRA_metadata_variable_mapping,
+            variables=[ewb.derived.TropicalCycloneTrackVariables()],            
+            variable_mapping=ewb.inputs.CIRA_metadata_variable_mapping,
             storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
-            preprocess=defaults._preprocess_bb_cira_tc_forecast_dataset,
+            preprocess=ewb.defaults.preprocess_cira_kerchunk_tc_forecast_dataset,
             name=name_str,
         )
         return cira_tc_forecast
 
     def get_hres_forecast(self):
-        hres_tc_forecast = inputs.ZarrForecast(
+        hres_tc_forecast = ewb.inputs.ZarrForecast(
             source="gs://weatherbench2/datasets/hres/2016-2022-0012-1440x721.zarr",
-            variables=[derived.TropicalCycloneTrackVariables()],            
-            preprocess=defaults._preprocess_bb_hres_tc_forecast_dataset,
-            variable_mapping=inputs.HRES_metadata_variable_mapping,
+            variables=[ewb.derived.TropicalCycloneTrackVariables()],            
+            preprocess=ewb.defaults.preprocess_hres_tc_forecast_dataset,
+            variable_mapping=ewb.inputs.HRES_metadata_variable_mapping,
             storage_options={"remote_options": {"anon": True}},
             name="ECMWF HRES",
         )
@@ -88,29 +90,28 @@ class TropicalCycloneForecastSetup:
     def get_bb_hres_forecast(self):
         bb_hres_tc_forecast = ArraylakeForecast(
             source="arraylake://brightband/ecmwf@main/forecast-archive/ewb-hres",
-            variables=[derived.TropicalCycloneTrackVariables()],
+            variables=[ewb.derived.TropicalCycloneTrackVariables()],
             preprocess=preprocess_bb_hres_tc_dataset,
+            storage_options={"remote_options": {"anon": True}},
             variable_mapping=BB_metadata_variable_mapping,
             name="ECMWF HRES",
         )
         return bb_hres_tc_forecast
 
     def get_bb_tc_forecast(self, model_name):
-        bb_tc_ds = open_icechunk_dataset(
-            bucket=DEFAULT_ICECHUNK_BUCKET,
-            prefix=BB_MODEL_NAME_TO_PREFIX[model_name],
-            variable_mapping=BB_MLWP_VARIABLE_MAPPING,
-            chunks="auto",
-            source_credentials_prefix=BB_MODEL_NAME_TO_CREDENTIALS_PREFIX[model_name],
+        bb_tc_ds = open_mlwp_archive_icechunk_dataset(
+            model=model_name,
         )
+
         bb_tc_forecast = InMemoryForecast(
             bb_tc_ds,
             name=f"BB {model_name}",
-            variables=[derived.TropicalCycloneTrackVariables()],
+            variables=[ewb.derived.TropicalCycloneTrackVariables()],
             preprocess=preprocess_mlwp_tc_dataset,
             variable_mapping=BB_MLWP_VARIABLE_MAPPING,
         )
         return bb_tc_forecast
+
 
 
 class TropicalCycloneEvaluationSetup:
@@ -121,10 +122,10 @@ class TropicalCycloneEvaluationSetup:
         evaluation_objects = []
         for forecast in forecasts:
             evaluation_objects.append(
-                inputs.EvaluationObject(
+                ewb.inputs.EvaluationObject(
                             event_type="tropical_cyclone",
                             metric_list=composite_landfall_metrics,
-                            target=defaults.ibtracs_target,
+                            target=ewb.defaults.ibtracs_target,
                             forecast=forecast,
                         )
                     )
