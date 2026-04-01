@@ -77,11 +77,13 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+    args.run_bb_aifs = True
+    args.run_bb_graphcast = True
 
     # load in all of the events in the yaml file
     ewb_cases = cases.load_ewb_events_yaml_into_case_list()
     ewb_cases = [n for n in ewb_cases if n.event_type == "severe_convection"]
-    ewb_cases = [n for n in ewb_cases if n.case_id_number in [316, 269]]
+    ewb_cases = [n for n in ewb_cases if n.case_id_number in [331, 269]]
 
     # hres_graphics = dict()
     gc_graphics = dict()
@@ -150,7 +152,7 @@ if __name__ == "__main__":
         if args.run_bb_graphcast:
             print("Computing CBSS and PPH for Graphcast")
             if bb_graphcast_severe_forecast is None:
-                bb_graphcast_severe_forecast = severe_forecast_setup.get_bb_severe_convection_forecast("Graphcast")
+                bb_graphcast_severe_forecast = severe_forecast_setup.get_bb_severe_convection_forecast("graphcast")
             [cbss, pph] = get_cbss_and_pph_outputs(my_case, bb_graphcast_severe_forecast)
             gc_graphics[my_id, "cbss"] = cbss
             gc_graphics[my_id, "pph"] = pph
@@ -158,7 +160,7 @@ if __name__ == "__main__":
         if args.run_bb_pangu:
             print("Computing CBSS and PPH for Pangu")
             if bb_pangu_severe_forecast is None:
-                bb_pangu_severe_forecast = severe_forecast_setup.get_bb_severe_convection_forecast("Pangu")
+                bb_pangu_severe_forecast = severe_forecast_setup.get_bb_severe_convection_forecast("panguweather")
             [cbss, pph] = get_cbss_and_pph_outputs(my_case, bb_pangu_severe_forecast)
             pang_graphics[my_id, "cbss"] = cbss
             pang_graphics[my_id, "pph"] = pph
@@ -166,7 +168,7 @@ if __name__ == "__main__":
         if args.run_bb_aifs:
             print("Computing CBSS and PPH for AIFS")
             if bb_aifs_severe_forecast is None:
-                bb_aifs_severe_forecast = severe_forecast_setup.get_bb_severe_convection_forecast("AIFS")
+                bb_aifs_severe_forecast = severe_forecast_setup.get_bb_severe_convection_forecast("aifs-single")
             [cbss, pph] = get_cbss_and_pph_outputs(my_case, bb_aifs_severe_forecast)
             aifs_graphics[my_id, "cbss"] = cbss
             aifs_graphics[my_id, "pph"] = pph

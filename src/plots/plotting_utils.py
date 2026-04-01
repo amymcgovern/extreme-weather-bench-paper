@@ -6,7 +6,7 @@ convection, tropical cyclones, etc.
 """
 
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
@@ -862,12 +862,13 @@ def plot_all_cases_and_obs(
     ax=None,
     show_legend=True,
     title=None,
+    map_gridlines: Optional[Union[bool, Dict[str, Any]]] = None,
 ):
     """Plot all cases (outlined) and observations (filled) on map.
     Args:
         ewb_cases (list): A list of cases to plot.
         event_type (str): The type of event to plot. If None, all
-        events will be plotted).
+            events will be plotted).
         filename (str): The name of the file to save the plot. If
             None, the plot will not be saved.
         bounding_box (tuple): A tuple of the form (min_lon, min_lat,
@@ -879,6 +880,9 @@ def plot_all_cases_and_obs(
         case_id (str): The ID of the case to plot. If None, all cases will be plotted.
         ax (matplotlib.axes.Axes): The axis to plot the cases on. If None, a new axis
             will be created using plt.axes(projection=ccrs.PlateCarree()).
+        map_gridlines: If None (default), do not add gridlines. If True, call
+            setup_gridlines with defaults. If a dict, keyword arguments for
+            setup_gridlines (e.g. show_left_labels=False for unlabeled grid).
     """
     # plot all cases on one giant world map
     if ax is None:
@@ -1255,6 +1259,11 @@ def plot_all_cases_and_obs(
             handlelength=2.5,
         )
         legend.set_zorder(10)
+
+    if map_gridlines is True:
+        setup_gridlines(ax)
+    elif isinstance(map_gridlines, dict):
+        setup_gridlines(ax, **map_gridlines)
 
     if title is None:
         if event_type is None:

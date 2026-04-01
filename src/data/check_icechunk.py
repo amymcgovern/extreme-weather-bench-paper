@@ -58,6 +58,12 @@ def open_mlwp_archive_icechunk_dataset(
             logger.info(f"Renaming variables: {rename_dict}")
             ds = ds.rename(rename_dict)
 
+    # debug fix for GC which has a broken valid_time dimension
+    if "valid_time" in ds.coords:
+        # remove the valid_time dimension
+        ds = ds.drop_vars("valid_time")
+        # ds = ds.assign_coords({'valid_time': ds['init_time'] + ds['lead_time']})
+
     return ds
 
 
