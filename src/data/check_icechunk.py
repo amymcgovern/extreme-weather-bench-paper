@@ -25,7 +25,7 @@ def open_mlwp_archive_icechunk_dataset(
     model: str,
     src: str = "hres",
     variable_mapping: dict[str, str] | None = None,
-    chunks: str | dict | None = "auto",
+    chunks: str | dict | None = {},
 ) -> xr.Dataset:
     bucket = "brightband-public-mlwp-forecast-archive"
     icechunk_prefix = f"{model}.{src}.icechunk"
