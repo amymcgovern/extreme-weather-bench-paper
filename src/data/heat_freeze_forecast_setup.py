@@ -1,7 +1,7 @@
 from pathlib import Path
 import extremeweatherbench as ewb
 import operator
-
+import xarray as xr
 from src.data.aifs_util import (
     BB_MLWP_VARIABLE_MAPPING,
     DEFAULT_ICECHUNK_BUCKET,
@@ -38,6 +38,10 @@ freeze_metrics = [
         op_func=operator.le),
 ]
 
+def my_preprocess_heat_freeze_cira_forecast_dataset(ds: xr.Dataset) -> xr.Dataset:
+    ds = ewb.defaults.preprocess_cira_kerchunk_forecast_dataset(ds)
+    ds = ewb.defaults.preprocess_heatwave_forecast_dataset(ds)
+    return ds
 
 class HeatFreezeForecastSetup:
     def __init__(self):
@@ -53,7 +57,7 @@ class HeatFreezeForecastSetup:
             variables=["surface_air_temperature"],
             variable_mapping={"t2": "surface_air_temperature"},
             storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
-            preprocess=ewb.defaults._preprocess_cira_forecast_dataset,
+            preprocess=my_preprocess_heat_freeze_cira_forecast_dataset,
             name=name_str,
         )
         return cira_heat_freeze_forecast

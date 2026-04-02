@@ -6,7 +6,7 @@ convection, tropical cyclones, etc.
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
@@ -28,6 +28,9 @@ from matplotlib.patches import Patch
 from shapely.geometry import Polygon
 
 logger = logging.getLogger(__name__)
+
+# Boundary levels for scorecard heatmaps and matching colorbars (see plot_heatmap)
+SCORECARD_CB_LEVELS = [-50, -20, -10, -5, -2, -1, 1, 2, 5, 10, 20, 50]
 
 
 lsr_colors = {
@@ -1585,6 +1588,72 @@ def plot_two_results_by_metric(
         plt.savefig(filename, bbox_inches="tight", dpi=300)
 
 
+def add_scorecard_colorbar_right(
+    fig: plt.Figure,
+    mappable,
+    spanning_axes: Sequence[Any],
+    *,
+    n_subplots: Optional[int] = None,
+    pad: float = 0.015,
+    width: float = 0.025,
+    cb_levels: Optional[Sequence[float]] = None,
+    label: Optional[str] = None,
+    label_fontsize: Optional[float] = None,
+):
+    """Add a vertical scorecard colorbar along the right edge of a subplot span.
+
+    ``spanning_axes`` should be the parent grid axes passed as ``ax=`` to
+    ``plot_heatmap`` (one per row/cell). The colorbar spans the union of their
+    positions in figure coordinates.
+
+    Args:
+        fig: Figure containing the heatmaps.
+        mappable: ScalarMappable (e.g. first heatmap's QuadMesh) with matching norm/cmap.
+        spanning_axes: Non-empty sequence of Axes; ``len`` is the number of subplots spanned.
+        n_subplots: If set, must equal ``len(spanning_axes)``.
+        pad: Horizontal gap (figure coords) between heatmap block and colorbar.
+        width: Colorbar thickness in figure coordinates.
+        cb_levels: Tick values; defaults to :data:`SCORECARD_CB_LEVELS`.
+        label: Colorbar label; defaults to the standard scorecard caption.
+        label_fontsize: If None, derived from rcParams similarly to ``plot_heatmap``.
+    """
+    axes_list = list(spanning_axes)
+    if not axes_list:
+        raise ValueError("spanning_axes must be non-empty")
+    if n_subplots is not None and len(axes_list) != n_subplots:
+        raise ValueError(
+            f"n_subplots={n_subplots} but len(spanning_axes)={len(axes_list)}"
+        )
+
+    levels = list(cb_levels) if cb_levels is not None else list(SCORECARD_CB_LEVELS)
+    label_text = (
+        label
+        if label is not None
+        else "Better ← % difference vs IFS HRES → Worse"
+    )
+
+    boxes = [ax.get_position() for ax in axes_list]
+    x1 = max(b.x1 for b in boxes)
+    y0 = min(b.y0 for b in boxes)
+    y1 = max(b.y1 for b in boxes)
+
+    cbar_left = x1 + pad
+    cbar_bottom = y0
+    cbar_height = y1 - y0
+    cax = fig.add_axes([cbar_left, cbar_bottom, width, cbar_height])
+
+    cb = fig.colorbar(mappable, cax=cax, orientation="vertical", extend="both")
+    cb.set_ticks(levels)
+
+    base_size = plt.rcParams["font.size"]
+    font_scalings = fm.font_scalings
+    if label_fontsize is None:
+        label_fontsize = base_size * font_scalings.get("large", 1.0) * 1.2
+    cb.ax.tick_params(axis="y", labelsize=label_fontsize)
+    cb.ax.set_ylabel(label_text, rotation=-90, labelpad=12, fontsize=label_fontsize)
+    return cb
+
+
 def plot_heatmap(
     relative_error_array,
     error_array,
@@ -1593,6 +1662,7 @@ def plot_heatmap(
     filename=None,
     ax=None,
     show_colorbar=False,
+    return_mappable: bool = False,
 ):
     """
     Plots a heatmap of the relative error of the models versus the IFS HRES
@@ -1608,6 +1678,9 @@ def plot_heatmap(
             will create 3 subplots within this axis, effectively subdividing it.
             The parent axis will be hidden and used as a container.
         show_colorbar: boolean, if True, the colorbar will be shown
+        return_mappable: if True, return the mappable from the first heatmap panel
+            (for use with :func:`add_scorecard_colorbar_right`). Typically use
+            ``show_colorbar=False`` on multi-panel figures.
     """
     n_rows = 1
     n_cols = len(settings["metric_str"])
@@ -1623,7 +1696,7 @@ def plot_heatmap(
     cmap = mcolors.ListedColormap(
         blues + [(0.95, 0.95, 0.95)] + reds, name="wb_scorecard"
     )
-    cb_levels = [-50, -20, -10, -5, -2, -1, 1, 2, 5, 10, 20, 50]
+    cb_levels = list(SCORECARD_CB_LEVELS)
     vmin = cb_levels[0]
     vmax = cb_levels[-1]
     norm = mcolors.BoundaryNorm(cb_levels, cmap.N, extend="both")
@@ -1671,9 +1744,9 @@ def plot_heatmap(
 
     # Adjust font sizes based on whether we're a subplot
     if is_subplot:
-        title_fontsize = "xx-large"
-        label_fontsize = "xx-large"
-        tick_fontsize = "xx-large"
+        title_fontsize = "large"
+        label_fontsize = "large"
+        tick_fontsize = "large"
         title_y = 1.05
         annot_fontsize = 12
     else:
@@ -1796,3 +1869,11 @@ def plot_heatmap(
 
     if filename is not None:
         plt.savefig(filename, bbox_inches="tight", dpi=300)
+
+    if return_mappable:
+        if not axs[0].collections:
+            raise RuntimeError(
+                "plot_heatmap: no collections on first heatmap axis; cannot return mappable"
+            )
+        return axs[0].collections[0]
+    return None

@@ -88,6 +88,8 @@ if __name__ == "__main__":
     # load in all of the events in the yaml file
     ewb_cases = cases.load_ewb_events_yaml_into_case_list()
     ewb_cases = [n for n in ewb_cases if n.event_type == "atmospheric_river"]
+    ewb_cases = [n for n in ewb_cases if n.case_id_number == 113 or n.case_id_number == 116]
+
 
     hres_graphics = dict()
     gc_graphics = dict()
@@ -111,7 +113,6 @@ if __name__ == "__main__":
     bb_aifs_ar_forecast = None
     era5 = None
 
-    #ewb_cases = [n for n in ewb_cases if n.case_id_number == 95]
     for my_case in ewb_cases:
         # compute IVT for all the AI models and HRES for the case we chose
         print(my_case.case_id_number)
@@ -156,21 +157,21 @@ if __name__ == "__main__":
         if args.run_bb_graphcast:
             print("Computing IVT for Graphcast")
             if bb_graphcast_ar_forecast is None:
-                bb_graphcast_ar_forecast = atmospheric_river_forecast_setup.get_bb_ar_forecast("Graphcast", include_ivt=True)
+                bb_graphcast_ar_forecast = atmospheric_river_forecast_setup.get_bb_ar_forecast("graphcast", include_ivt=True)
             ivt = get_ivt(my_case, bb_graphcast_ar_forecast)
             gc_graphics[my_id, "ivt"] = ivt
 
         if args.run_bb_pangu:
             print("Computing IVT for Pangu")
             if bb_pangu_ar_forecast is None:
-                bb_pangu_ar_forecast = atmospheric_river_forecast_setup.get_bb_ar_forecast("Pangu", include_ivt=True)
+                bb_pangu_ar_forecast = atmospheric_river_forecast_setup.get_bb_ar_forecast("panguweather", include_ivt=True)
             ivt = get_ivt(my_case, bb_pangu_ar_forecast)
             pang_graphics[my_id, "ivt"] = ivt
 
         if args.run_bb_aifs:
             print("Computing IVT for AIFS")
             if bb_aifs_ar_forecast is None:
-                bb_aifs_ar_forecast = atmospheric_river_forecast_setup.get_bb_ar_forecast("AIFS", include_ivt=True)
+                bb_aifs_ar_forecast = atmospheric_river_forecast_setup.get_bb_ar_forecast("aifs-single", include_ivt=True)
             ivt = get_ivt(my_case, bb_aifs_ar_forecast)
             aifs_graphics[my_id, "ivt"] = ivt
 

@@ -224,4 +224,8 @@ def compute_relative_error(
     else:
         my_relative_error = (my_mean - comparison_mean) / comparison_mean * 100
 
+    # replace nan with 0
+    my_relative_error = np.nan_to_num(my_relative_error)
+    my_mean = np.nan_to_num(my_mean)
+
     return (my_mean, my_relative_error)

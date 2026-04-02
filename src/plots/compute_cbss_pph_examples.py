@@ -77,8 +77,6 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    args.run_bb_aifs = True
-    args.run_bb_graphcast = True
 
     # load in all of the events in the yaml file
     ewb_cases = cases.load_ewb_events_yaml_into_case_list()

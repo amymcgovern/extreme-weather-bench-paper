@@ -10,7 +10,7 @@ from src.data.aifs_util import (
 from src.data.arraylake_utils import (
     ArraylakeForecast, BB_metadata_variable_mapping,
 ) # noqa: E402
-from check_icechunk import open_mlwp_archive_icechunk_dataset
+from src.data.check_icechunk import open_mlwp_archive_icechunk_dataset
 
 from src.data.model_name_setup import (
     BB_MODEL_NAME_TO_CREDENTIALS_PREFIX,
