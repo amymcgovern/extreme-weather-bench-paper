@@ -21,7 +21,11 @@ from src.data.model_name_setup import (
 ar_metrics = [
     ewb.metrics.CriticalSuccessIndex(),
     ewb.metrics.SpatialDisplacement(),
-    ewb.metrics.EarlySignal(spatial_aggregation='half'),
+    ewb.metrics.EarlySignal(
+        comparison_operator=">=",
+        forecast_threshold=0.5,
+        overlap_target_threshold=0.5
+        )
 ]
 
 class AtmosphericRiverForecastSetup:  

@@ -26,7 +26,11 @@ pph_metrics = [
         forecast_threshold=15000,
         target_threshold=0.01,
     ),
-    ewb.metrics.EarlySignal(threshold=15000, spatial_aggregation='half'),
+    ewb.metrics.EarlySignal(
+        comparison_operator=">=",
+        forecast_threshold=15000,
+        overlap_target_threshold=0.01
+        )
 ]
 
 # Define LSR metrics
@@ -57,7 +61,7 @@ class SevereForecastSetup:
             variable_mapping=ewb.inputs.CIRA_metadata_variable_mapping,
             storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
             name=name_str,
-            preprocess=ewb.defaults._preprocess_severe_cira_forecast_dataset,
+            preprocess=ewb.defaults.preprocess_cira_kerchunk_severe_forecast_dataset,
         )
         return cira_severe_convection_forecast
 

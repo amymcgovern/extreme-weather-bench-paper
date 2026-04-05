@@ -1654,6 +1654,86 @@ def add_scorecard_colorbar_right(
     return cb
 
 
+def add_horizontal_colorbar_below(
+    fig: plt.Figure,
+    mappable,
+    spanning_axes: Sequence[Any],
+    *,
+    n_subplots: Optional[int] = None,
+    pad: Optional[float] = None,
+    height: Optional[float] = None,
+    extend: str = "neither",
+    label: Optional[str] = None,
+    levels: Optional[Sequence[float]] = None,
+    label_fontsize: Optional[float] = None,
+    tick_labelsize: Optional[float] = None,
+):
+    """Add a horizontal colorbar below the bottom edge of a subplot span.
+
+    Horizontal extent and vertical placement use the union of ``get_position()``
+    boxes for ``spanning_axes`` (figure coordinates), analogous to
+    :func:`add_scorecard_colorbar_right`. Default ``pad`` and ``height`` follow
+    the layout used in ``plot_all_cbss_pph`` (fractions of the shortest axis
+    height in the span). For GridSpec-based layouts with a dedicated colorbar
+    row, see :func:`add_horizontal_colorbar`.
+
+    Args:
+        fig: Figure containing the axes.
+        mappable: ScalarMappable (cmap/norm) for the colorbar.
+        spanning_axes: Non-empty sequence of axes whose bbox union defines span.
+        n_subplots: If set, must equal ``len(spanning_axes)``.
+        pad: Figure-coordinate gap from the lowest ``y0`` in the span to the
+            top of the colorbar. If ``None``, ``0.15 * min_axis_height``.
+        height: Colorbar axis height in figure coordinates. If ``None``,
+            ``0.15 * min_axis_height``.
+        extend: Passed through to ``Figure.colorbar``.
+        label: Optional colorbar label.
+        levels: If set, passed to ``colorbar.set_ticks``.
+        label_fontsize: Label font size; if ``None``, derived from rcParams
+            like :func:`add_scorecard_colorbar_right`.
+        tick_labelsize: Tick label font size; if ``None``, matches
+            ``label_fontsize`` when that is set, else same rcParams-derived base
+            as the label.
+    """
+    axes_list = list(spanning_axes)
+    if not axes_list:
+        raise ValueError("spanning_axes must be non-empty")
+    if n_subplots is not None and len(axes_list) != n_subplots:
+        raise ValueError(
+            f"n_subplots={n_subplots} but len(spanning_axes)={len(axes_list)}"
+        )
+
+    boxes = [ax.get_position() for ax in axes_list]
+    x0 = min(b.x0 for b in boxes)
+    x1 = max(b.x1 for b in boxes)
+    y0_min = min(b.y0 for b in boxes)
+    min_axis_height = min(b.y1 - b.y0 for b in boxes)
+
+    if pad is None:
+        pad = 0.15 * min_axis_height
+    if height is None:
+        height = 0.15 * min_axis_height
+
+    cbar_bottom = y0_min - pad - height
+    cax = fig.add_axes([x0, cbar_bottom, x1 - x0, height])
+
+    cb = fig.colorbar(mappable, cax=cax, orientation="horizontal", extend=extend)
+    if levels is not None:
+        cb.set_ticks(list(levels))
+
+    base_size = plt.rcParams["font.size"]
+    font_scalings = fm.font_scalings
+    if label_fontsize is None:
+        label_fontsize = base_size * font_scalings.get("large", 1.0) * 1.2
+    if tick_labelsize is None:
+        tick_labelsize = label_fontsize
+
+    cb.ax.tick_params(axis="x", labelsize=tick_labelsize)
+    if label is not None:
+        cb.set_label(label, fontsize=label_fontsize)
+    return cb
+
+
 def plot_heatmap(
     relative_error_array,
     error_array,

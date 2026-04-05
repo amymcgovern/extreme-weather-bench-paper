@@ -18,6 +18,7 @@ from extremeweatherbench import (
 from joblib import Parallel, delayed  # noqa: E402
 from joblib.externals.loky import get_reusable_executor  # noqa: E402
 
+import src.plots.plotting_utils as plot_utils  # noqa: E402
 import src.plots.results_utils as results_utils  # noqa: E402
 import src.plots.severe_convection_utils as severe_utils
 
@@ -322,21 +323,16 @@ if __name__ == "__main__":
         sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
         sm.set_array([])  # Empty array, we just need the colormap/norm
 
-        # Get the bottom position of the lowest subplot
-        # Get the position from bottom row subplots to position colorbar below them
-        pos0 = axs[n_rows - 1, 0].get_position(fig)
-        pos3 = axs[n_rows - 1, (len(lead_times_to_plot) - 1)].get_position(fig)
-        # Create axes below row 5 that spans all 4 columns
-        # Position it just below row 5, using a small height
-        cbar_y = pos0.y0 - pos0.height * 0.3  # Position below bottom row
-        cbar_height = pos0.height * 0.15  # Height for colorbar
-        cbar_ax = fig.add_axes([pos0.x0, cbar_y, pos3.x1 - pos0.x0, cbar_height])
-
-        # Add horizontal colorbar below bottom row
-        cbar = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal')
-        cbar.ax.set_xticks(levels)
-        cbar.ax.tick_params(labelsize=18)
-        cbar.set_label(r"Craven-Brooks Significant Severe (m$^{3}$/s$^{3}$)", fontsize=24)
+        plot_utils.add_horizontal_colorbar_below(
+            fig,
+            sm,
+            [axs[n_rows - 1, j] for j in range(n_cols)],
+            n_subplots=n_cols,
+            levels=levels,
+            label=r"Craven-Brooks Significant Severe (m$^{3}$/s$^{3}$)",
+            label_fontsize=24,
+            tick_labelsize=18,
+        )
 
 
         # make the overall title and save it        
