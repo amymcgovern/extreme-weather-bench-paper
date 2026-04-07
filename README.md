@@ -33,7 +33,7 @@ from src.plots.plotting_utils import convert_longitude_for_plotting
 ```
 cd path/to/your/main-repo
 mkdir -p external
-git clone -b feature/new-event-types https://github.com/brightbandtech/ExtremeWeatherBench.git external/ExtremeWeatherBench
+git clone -b develop https://github.com/brightbandtech/ExtremeWeatherBench.git external/ExtremeWeatherBench
 ```
 ## then you need to add it to your uv
 ```
