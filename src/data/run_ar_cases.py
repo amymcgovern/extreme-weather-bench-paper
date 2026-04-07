@@ -85,9 +85,7 @@ if __name__ == "__main__":
         print(bb_hres_ar_evaluation_objects)
 
         early_cases = [i for i in ewb_cases if i.end_date < pd.Timestamp("2023-01-01")]
-        
         later_cases = [i for i in ewb_cases if i.start_date > pd.Timestamp("2023-01-01")]
-        
 
         ewb_hres = ewb.evaluate.ExtremeWeatherBench(early_cases, hres_ar_evaluation_objects)
         ewb_bb_hres = ewb.evaluate.ExtremeWeatherBench(later_cases, bb_hres_ar_evaluation_objects)

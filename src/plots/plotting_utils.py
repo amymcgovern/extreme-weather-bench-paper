@@ -1046,6 +1046,7 @@ def plot_all_cases_and_obs(
             # grab the target data for this case; targets is a list of tuples of
             # (case_id, target dataset)
             # print(targets)
+            print(f"indiv_event_type: {indiv_event_type} and case id: {indiv_case.case_id_number}")
             if indiv_event_type == "severe_convection":
                 my_target_info = [
                     n[1]
@@ -1060,6 +1061,7 @@ def plot_all_cases_and_obs(
                     if n[0] == indiv_case.case_id_number
                     and n[1].attrs["source"] != "ERA5"
                 ]
+            print("made it here for case id: ", indiv_case.case_id_number)
             # print(my_target_info)
 
             # make a scatter plot of the target points (for hot/cold/tc events)

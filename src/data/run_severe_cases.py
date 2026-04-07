@@ -91,18 +91,22 @@ if __name__ == "__main__":
                 [bb_hres_severe_forecast]
             )
         )
-        ewb_hres = ewb.evaluate.ExtremeWeatherBench(
-            ewb_cases, hres_severe_evaluation_objects
+
+        early_cases = [i for i in ewb_cases if i.end_date < pd.Timestamp("2023-01-01")]
+        later_cases = [i for i in ewb_cases if i.start_date > pd.Timestamp("2023-01-01")]
+
+        ewb_hres_early = ewb.evaluate.ExtremeWeatherBench(
+            early_cases, hres_severe_evaluation_objects
         )
-        ewb_hres_bb = ewb.evaluate.ExtremeWeatherBench(
-            ewb_cases, bb_hres_severe_evaluation_objects
+        ewb_hres_later = ewb.evaluate.ExtremeWeatherBench(
+            later_cases, bb_hres_severe_evaluation_objects
         )
 
-        hres_results1 = ewb_hres.run(parallel_config=parallel_config)
+        hres_results_early = ewb_hres_early.run(parallel_config=parallel_config)
         print("running HRES part 2")
-        hres_results2 = ewb_hres_bb.run(parallel_config=parallel_config)
+        hres_results_later = ewb_hres_later.run(parallel_config=parallel_config)
         print("concatenating the results")
-        hres_results = pd.concat([hres_results1, hres_results2])
+        hres_results = pd.concat([hres_results_early, hres_results_later])
         hres_results.to_pickle(basepath + "saved_data/hres_severe_results.pkl")
         print("HRES evaluation complete. Results saved to pickle.")
 
