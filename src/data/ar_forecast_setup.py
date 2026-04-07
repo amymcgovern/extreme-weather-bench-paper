@@ -47,7 +47,7 @@ class AtmosphericRiverForecastSetup:
             variables=my_variables,
             variable_mapping=ewb.inputs.CIRA_metadata_variable_mapping,
             storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
-            preprocess=ewb.defaults._preprocess_cira_ar_forecast_dataset,
+            preprocess=ewb.defaults.preprocess_cira_kerchunk_tc_forecast_dataset,
             name=name_str,
         )
         return cira_forecast
