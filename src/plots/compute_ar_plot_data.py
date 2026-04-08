@@ -135,7 +135,7 @@ if __name__ == "__main__":
         if args.run_cira_fourv2:
             print("Computing IVT for FOURV2")
             if cira_fourv2_ar_forecast is None:
-                cira_fourv2_ar_ifs_forecast = atmospheric_river_forecast_setup.get_cira_ar_forecast("Fourv2", "IFS", include_ivt=True)
+                 cira_fourv2_ar_ifs_forecast = atmospheric_river_forecast_setup.get_cira_forecast("Fourv2", "IFS", include_ivt=True)
 
             ivt = get_ivt(my_case, cira_fourv2_ar_forecast)
             fourv2_graphics[my_id, "ivt"] = ivt
@@ -143,14 +143,14 @@ if __name__ == "__main__":
         if args.run_cira_gc:
             print("Computing IVT for GC")
             if gc_ar_forecast is None:  
-                gc_ar_forecast = atmospheric_river_forecast_setup.get_cira_gc_ar_forecast("Graphcast", "IFS", include_ivt=True)
+                gc_ar_forecast = atmospheric_river_forecast_setup.get_cira_forecast("Graphcast", "IFS", include_ivt=True)
             ivt = get_ivt(my_case, gc_ar_forecast)
             gc_graphics[my_id, "ivt"] = ivt
 
         if args.run_cira_pangu:
             print("Computing IVT for PANG")
             if pang_ar_forecast is None:
-                pang_ar_forecast = atmospheric_river_forecast_setup.get_cira_ar_forecast("Pangu", "IFS", include_ivt=True)
+                pang_ar_forecast = atmospheric_river_forecast_setup.get_cira_forecast("Pangu", "IFS", include_ivt=True)
             ivt = get_ivt(my_case, pang_ar_forecast)
             pang_graphics[my_id, "ivt"] = ivt
 
