@@ -1,5 +1,5 @@
 import numpy as np
-
+import pandas as pd
 # utilities to process the results, mostly used to make plotting easier
 
 
@@ -105,11 +105,14 @@ def subset_results_to_xarray_by_init_time(
     lead_times_arr = np.array(lead_times)
 
     # map case_id_number -> end_date so we can compute lead time per row
-    end_date_by_case = {case.case_id_number: case.end_date for case in ewb_cases}
+    # end_date_by_case = {case.case_id_number: case.end_date for case in ewb_cases}
+    end_date_by_case = {case.case_id_number: pd.Timestamp(case.end_date) for case in ewb_cases
+}
 
     # add lead_time column: for each row, end_date - init_time (on the main subset)
     subset2 = subset.copy()
-    subset2["lead_time"] = subset["case_id_number"].map(end_date_by_case) - subset["init_time"]
+    subset2["lead_time"] = subset["case_id_number"].map(end_date_by_case) - pd.to_datetime(subset["init_time"])
+    # subset2["lead_time"] = subset["case_id_number"].map(end_date_by_case) - subset["init_time"]
     # keep only rows whose computed lead time is in the requested lead_times
     subset2 = subset2.loc[np.isin(subset2["lead_time"].values, lead_times_arr)]
 
@@ -141,7 +144,7 @@ def compute_mean_by_lead_time(
     """
 
 
-    if 'DurationMeanError' in metric:
+    if 'DurationMeanError' in metric or 'landfall' in metric:
         subset = subset_results_to_xarray_by_init_time(
             ewb_cases,
             results_df,

@@ -88,7 +88,7 @@ if __name__ == "__main__":
     # load in all of the events in the yaml file
     ewb_cases = cases.load_ewb_events_yaml_into_case_list()
     ewb_cases = [n for n in ewb_cases if n.event_type == "atmospheric_river"]
-    ewb_cases = [n for n in ewb_cases if n.case_id_number == 113 or n.case_id_number == 116]
+    # ewb_cases = [n for n in ewb_cases if n.case_id_number == 113 or n.case_id_number == 116]
 
 
     hres_graphics = dict()
