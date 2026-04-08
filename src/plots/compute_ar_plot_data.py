@@ -75,12 +75,27 @@ if __name__ == "__main__":
         help="Run ERA5 evaluation (default: False)",
     )
 
+    parser.add_argument(
+        "--case_ids",
+        nargs="+",
+        default=[],
+        help="Case IDs to run (default: all)",
+    )
+
     args = parser.parse_args()
 
     # make the basepath - change this to your local path
     basepath = Path.home() / "extreme-weather-bench-paper" / ""
     basepath = str(basepath) + "/"
 
+    # convert the case ids to integers
+    if len(args.case_ids) > 0:
+        # split the list by commas and convert to integers
+        args.case_ids = [int(n) for n in args.case_ids[0].split(",")]
+    else:
+        args.case_ids = None
+
+    print(args.case_ids)
 
     atmospheric_river_forecast_setup = AtmosphericRiverForecastSetup()
     atmospheric_river_evaluation_setup = AtmosphericRiverEvaluationSetup()
@@ -90,6 +105,9 @@ if __name__ == "__main__":
     ewb_cases = [n for n in ewb_cases if n.event_type == "atmospheric_river"]
     # ewb_cases = [n for n in ewb_cases if n.case_id_number == 113 or n.case_id_number == 116]
 
+    # if we are subsetting the cases, do it here
+    if args.case_ids is not None:
+        ewb_cases = [n for n in ewb_cases if n.case_id_number in args.case_ids]
 
     hres_graphics = dict()
     gc_graphics = dict()
@@ -183,25 +201,30 @@ if __name__ == "__main__":
             era5_graphics[my_id, "ivt"] = ivt
 
     print("Saving the graphics objects")
+    if args.case_ids is not None:
+        suffix = "_paper"
+    else:
+        suffix = ""
+
     if args.run_hres:
         pickle.dump(
-            hres_graphics, open(basepath + "saved_data/hres_ar_graphics.pkl", "wb")
+            hres_graphics, open(basepath + "saved_data/hres_ar_graphics" + suffix + ".pkl", "wb")
         )
     if args.run_cira_fourv2:
         pickle.dump(
-            fourv2_graphics, open(basepath + "saved_data/fourv2_cira_ar_graphics.pkl", "wb")
+            fourv2_graphics, open(basepath + "saved_data/fourv2_cira_ar_graphics" + suffix + ".pkl", "wb")
         )
     if args.run_cira_gc:
         pickle.dump(
-            gc_graphics, open(basepath + "saved_data/gc_cira_ar_graphics.pkl", "wb")
+            gc_graphics, open(basepath + "saved_data/gc_cira_ar_graphics" + suffix + ".pkl", "wb")
         )
     if args.run_cira_pangu:
         pickle.dump(
-            pang_graphics, open(basepath + "saved_data/pang_cira_ar_graphics.pkl", "wb")
+            pang_graphics, open(basepath + "saved_data/pang_cira_ar_graphics" + suffix + ".pkl", "wb")
         )  
     if args.run_bb_graphcast:
         pickle.dump(
-            gc_graphics, open(basepath + "saved_data/gc_bb_ar_graphics.pkl", "wb")
+            gc_graphics, open(basepath + "saved_data/gc_bb_ar_graphics" + suffix + ".pkl", "wb")
         )
     if args.run_bb_pangu:
         pickle.dump(
@@ -209,11 +232,11 @@ if __name__ == "__main__":
         )
     if args.run_bb_aifs:
         pickle.dump(
-            aifs_graphics, open(basepath + "saved_data/aifs_bb_ar_graphics.pkl", "wb")
+            aifs_graphics, open(basepath + "saved_data/aifs_bb_ar_graphics" + suffix + ".pkl", "wb")
         )
     if args.run_era5:
         pickle.dump(
-            era5_graphics, open(basepath + "saved_data/era5_ar_graphics.pkl", "wb")
+            era5_graphics, open(basepath + "saved_data/era5_ar_graphics" + suffix + ".pkl", "wb")
         )
 
     print("Done")
