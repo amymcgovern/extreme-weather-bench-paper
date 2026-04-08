@@ -68,6 +68,7 @@ def subset_results_to_xarray_by_init_time(
     lead_time_days,
     case_id_list=None,
     target_variable=None,
+    landfalls=None,
 ):
     """
     takes in one of the overall results tables and returns a multi-dimensional xarray
@@ -85,6 +86,8 @@ def subset_results_to_xarray_by_init_time(
            from the lead_time column.
         case_id_list: list of integers, the case ids to subset the data to
             (None if you don't want to subset)
+        target_variable: string, the target variable to plot (None if not needed)
+        landfalls: list of landfalls, needed to compute the lead time (None if not needed)
     returns:
         subset_xa: xarray dataset containing the subsetted data
     """
@@ -110,19 +113,34 @@ def subset_results_to_xarray_by_init_time(
     lead_times = [
         np.timedelta64(lead_time_days[i], "D") for i in range(len(lead_time_days))
     ]    
-    lead_times_arr = np.array(lead_times)
+    #print(subset)
 
     # map case_id_number -> end_date so we can compute lead time per row
-    # end_date_by_case = {case.case_id_number: case.end_date for case in ewb_cases}
-    end_date_by_case = {case.case_id_number: pd.Timestamp(case.end_date) for case in ewb_cases}
+    if landfalls is None:
+        end_date_by_case = {case.case_id_number: pd.Timestamp(case.end_date) for case in ewb_cases}
+    else:
+        # landfalls is a list of (case_id, DataArray) tuples; match by case_id directly.
+        # ceil to the next 6H boundary (0, 6, 12, 18Z) so we never round down.
+        case_id_set = set(case_id_list) if case_id_list is not None else None
+        end_date_by_case = {
+            case_id: pd.Timestamp(landfall_da.valid_time.values[0]).ceil('6H')
+            for case_id, landfall_da in landfalls
+            if (case_id_set is None or case_id in case_id_set)
+            and len(landfall_da.valid_time) > 0
+        }
 
     # add lead_time column: for each row, end_date - init_time (on the main subset)
     subset2 = subset.copy()
     subset2["lead_time"] = subset["case_id_number"].map(end_date_by_case) - pd.to_datetime(subset["init_time"])
-    # subset2["lead_time"] = subset["case_id_number"].map(end_date_by_case) - subset["init_time"]
-    # keep only rows whose computed lead time is in the requested lead_times
-    subset2 = subset2.loc[np.isin(subset2["lead_time"].values, lead_times_arr)]
+    print(subset2)
+    print(lead_times)
 
+    # keep only rows whose computed lead time is in the requested lead_times
+    # subset2 = subset2.loc[np.isin(subset2["lead_time"].values, lead_times)]
+    subset2 = subset2.loc[
+        subset2["lead_time"].dt.days.isin(lead_time_days)
+        & (subset2["lead_time"].dt.seconds == 0)
+    ]
     # prepare for xarray conversion (set_index/sort_index return new DataFrame)
     subset2 = subset2.set_index(["lead_time", "case_id_number"]).sort_index()
     subset_xa = subset2.to_xarray()
@@ -189,6 +207,7 @@ def compute_relative_error(
     lead_time_days,
     case_ids=None,
     higher_is_better=False,
+    target_variable=None,
 ):
     """Computes the relative error of the results by lead time Error
     is defined as relative to the comparison results.
@@ -222,7 +241,8 @@ def compute_relative_error(
         target_source,
         metric,
         lead_time_days,
-        case_ids,
+        case_ids=case_ids,
+        target_variable=target_variable,
     )
     comparison_mean = compute_mean_by_lead_time(
         ewb_cases,
@@ -231,7 +251,8 @@ def compute_relative_error(
         target_source,
         metric,
         lead_time_days,
-        case_ids,
+        case_ids=case_ids,
+        target_variable=target_variable,
     )
     if higher_is_better:
         my_relative_error = (comparison_mean - my_mean) / comparison_mean * 100
