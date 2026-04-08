@@ -10,6 +10,7 @@ def subset_results_to_xarray(
     metric,
     lead_time_days=None,
     case_id_list=None,
+    target_variable=None,
 ):
     """
     takes in one of the overall results tables and returns a multi-dimensional xarray
@@ -41,6 +42,9 @@ def subset_results_to_xarray(
             & (results_df["metric"] == metric)
         ]
 
+    if target_variable is not None:
+        subset = subset[subset["target_variable"] == target_variable]
+
     lead_times = [
         np.timedelta64(lead_time_days[i], "D") for i in range(len(lead_time_days))
     ]
@@ -63,6 +67,7 @@ def subset_results_to_xarray_by_init_time(
     metric,
     lead_time_days,
     case_id_list=None,
+    target_variable=None,
 ):
     """
     takes in one of the overall results tables and returns a multi-dimensional xarray
@@ -98,6 +103,9 @@ def subset_results_to_xarray_by_init_time(
             & (results_df["metric"] == metric)
         ]
 
+    if target_variable is not None:
+        subset = subset[subset["target_variable"] == target_variable]
+
     # compute the lead times in time deltas so we can do math on it later
     lead_times = [
         np.timedelta64(lead_time_days[i], "D") for i in range(len(lead_time_days))
@@ -106,8 +114,7 @@ def subset_results_to_xarray_by_init_time(
 
     # map case_id_number -> end_date so we can compute lead time per row
     # end_date_by_case = {case.case_id_number: case.end_date for case in ewb_cases}
-    end_date_by_case = {case.case_id_number: pd.Timestamp(case.end_date) for case in ewb_cases
-}
+    end_date_by_case = {case.case_id_number: pd.Timestamp(case.end_date) for case in ewb_cases}
 
     # add lead_time column: for each row, end_date - init_time (on the main subset)
     subset2 = subset.copy()
@@ -130,6 +137,7 @@ def compute_mean_by_lead_time(
     metric,
     lead_time_days,
     case_ids=None,
+    target_variable=None,
 ):
     """Computes the mean of the results by lead time.
     parameters:
@@ -139,6 +147,7 @@ def compute_mean_by_lead_time(
         metric: string, the metric to plot
         lead_times: list of timedelta objects, the lead times to compute the mean for
         case_ids: list of strings, the case ids to subset the data to
+        target_variable: string, the target variable to plot (None if not needed)
     returns:
         my_mean: numpy array containing the mean of the results by lead time
     """
@@ -153,6 +162,7 @@ def compute_mean_by_lead_time(
             metric,
             lead_time_days,
             case_id_list=case_ids,
+            target_variable=target_variable,
         )
     else:   
         subset = subset_results_to_xarray(
@@ -162,6 +172,7 @@ def compute_mean_by_lead_time(
             metric=metric,
             lead_time_days=lead_time_days,
             case_id_list=case_ids,
+            target_variable=target_variable,
         )
     my_mean = subset["value"].mean("case_id_number")
     return my_mean

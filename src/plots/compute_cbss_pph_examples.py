@@ -2,12 +2,10 @@
 import argparse
 import pickle
 from pathlib import Path
+import importlib
 
-from extremeweatherbench import (
-    cases,
-    evaluate,
-    inputs,
-)
+import extremeweatherbench as ewb
+from extremeweatherbench import data
 
 from src.data.severe_forecast_setup import (
     SevereEvaluationSetup,
@@ -22,9 +20,9 @@ basepath = str(basepath) + "/"
 
 
 def get_cbss_and_pph_outputs(ewb_case, forecast_source):
-    pph_target = inputs.PPH()
-    pph = evaluate.run_pipeline(ewb_case, pph_target)
-    cbss = evaluate.run_pipeline(ewb_case, forecast_source)
+    pph_target = ewb.inputs.PPH()
+    pph = ewb.evaluate.run_pipeline(ewb_case, pph_target)
+    cbss = ewb.evaluate.run_pipeline(ewb_case, forecast_source)
 
     return cbss, pph
 
@@ -76,14 +74,48 @@ if __name__ == "__main__":
         help="Run BB Pangu evaluation (default: False)",
     )
 
+    parser.add_argument(
+        "--case_ids",
+        nargs="+",
+        default=[],
+        help="Case IDs to run (default: all)",
+    )
+
+    parser.add_argument(
+        "--run_marginal",
+        action="store_true",
+        default=False,
+        help="Use the marginal severe cases instead",
+    )
+
     args = parser.parse_args()
 
-    # load in all of the events in the yaml file
-    ewb_cases = cases.load_ewb_events_yaml_into_case_list()
-    ewb_cases = [n for n in ewb_cases if n.event_type == "severe_convection"]
-    #ewb_cases = [n for n in ewb_cases if n.case_id_number in [331, 269]]
+    # convert the case ids to integers
+    if len(args.case_ids) > 0:
+        # split the list by commas and convert to integers
+        args.case_ids = [int(n) for n in args.case_ids[0].split(",")]
+    else:
+        args.case_ids = None
 
-    # hres_graphics = dict()
+    print(args.case_ids)
+
+    # load in all of the events in the yaml file
+
+    if args.run_marginal:
+        events_yaml_file = importlib.resources.files(data).joinpath(
+                "marginal-severe-convection-cases.yaml"
+            )
+
+        ewb_cases = ewb.cases.load_individual_cases_from_yaml(events_yaml_file)
+    else:
+        ewb_cases = ewb.cases.load_ewb_events_yaml_into_case_list()
+        ewb_cases = [n for n in ewb_cases if n.event_type == "severe_convection"]
+
+    # if we are subsetting the cases, do it here
+    if args.case_ids is not None:
+        ewb_cases = [n for n in ewb_cases if n.case_id_number in args.case_ids]
+
+    # initialize the graphics dictionaries
     gc_graphics = dict()
     pang_graphics = dict()
     fourv2_graphics = dict()
@@ -172,31 +204,41 @@ if __name__ == "__main__":
             aifs_graphics[my_id, "pph"] = pph
 
     print("Saving the graphics objects")
+    if args.case_ids is not None:
+        suffix = "_paper"
+    else:
+        suffix = ""
+
+    if args.run_marginal:
+        suffix = suffix +"_marginal"
+    else:
+        suffix = suffix + ""
+
     if args.run_hres:
         pickle.dump(
-            hres_graphics, open(basepath + "saved_data/hres_graphics_paper.pkl", "wb")
+            hres_graphics, open(basepath + "saved_data/hres_graphics_severe" + suffix + ".pkl", "wb")
         )
     if args.run_cira_fourv2:
         pickle.dump(
-            fourv2_graphics, open(basepath + "saved_data/fourv2_cira_graphics_paper.pkl", "wb")
+            fourv2_graphics, open(basepath + "saved_data/fourv2_cira_severe_graphics" + suffix + ".pkl", "wb")
         )
     if args.run_cira_gc:
         pickle.dump(
-            gc_graphics, open(basepath + "saved_data/gc_cira_graphics_paper.pkl", "wb")
+            gc_graphics, open(basepath + "saved_data/gc_cira_severe_graphics" + suffix + ".pkl", "wb")
         )
     if args.run_cira_pangu:
         pickle.dump(
-            pang_graphics, open(basepath + "saved_data/pang_cira_graphics_paper.pkl", "wb")
+            pang_graphics, open(basepath + "saved_data/pang_cira_severe_graphics" + suffix + ".pkl", "wb")
         )  
     if args.run_bb_graphcast:
         pickle.dump(
-            gc_graphics, open(basepath + "saved_data/gc_bb_graphics_paper.pkl", "wb")
+            gc_graphics, open(basepath + "saved_data/gc_bb_severe_graphics" + suffix + ".pkl", "wb")
         )
     if args.run_bb_pangu:
         pickle.dump(
-            pang_graphics, open(basepath + "saved_data/pang_bb_graphics_paper.pkl", "wb")
+            pang_graphics, open(basepath + "saved_data/pang_bb_severe_graphics" + suffix + ".pkl", "wb")
         )
     if args.run_bb_aifs:
         pickle.dump(
-            aifs_graphics, open(basepath + "saved_data/aifs_bb_graphics_paper.pkl", "wb")
+            aifs_graphics, open(basepath + "saved_data/aifs_bb_severe_graphics" + suffix + ".pkl", "wb")
         )
