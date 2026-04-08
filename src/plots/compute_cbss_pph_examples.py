@@ -126,7 +126,7 @@ if __name__ == "__main__":
         if args.run_cira_fourv2:
             print("Computing CBSS and PPH for FOURV2")
             if cira_fourv2_severe_forecast is None:
-                cira_fourv2_severe_forecast = severe_forecast_setup.get_cira_severe_convection_forecast("FOURv2", "IFS")
+                cira_fourv2_severe_forecast = severe_forecast_setup.get_cira_severe_convection_forecast("Fourv2", "IFS")
             [cbss, pph] = get_cbss_and_pph_outputs(my_case, cira_fourv2_severe_forecast)
             fourv2_graphics[my_id, "cbss"] = cbss
             fourv2_graphics[my_id, "pph"] = pph
@@ -134,7 +134,7 @@ if __name__ == "__main__":
         if args.run_cira_gc:
             print("Computing CBSS and PPH for GC")
             if gc_severe_forecast is None:  
-                gc_severe_forecast = severe_forecast_setup.get_cira_severe_convection_forecast("Graphcast", "GFS")
+                gc_severe_forecast = severe_forecast_setup.get_cira_severe_convection_forecast("Graphcast", "IFS")
             [cbss, pph] = get_cbss_and_pph_outputs(my_case, gc_severe_forecast)
             gc_graphics[my_id, "cbss"] = cbss
             gc_graphics[my_id, "pph"] = pph
