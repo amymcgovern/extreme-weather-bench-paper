@@ -59,14 +59,14 @@ def subset_results_to_xarray(
 
     return subset_xa
 
-def subset_results_to_xarray_by_init_time(
+def subset_results_to_xarray_by_init_time_tropical_cyclone(
     ewb_cases,
     results_df,
     forecast_source,
     target_source,
     metric,
     lead_time_days,
-    case_id_list=None,
+    case_ids=None,
     target_variable=None,
     landfalls=None,
 ):
@@ -92,12 +92,12 @@ def subset_results_to_xarray_by_init_time(
         subset_xa: xarray dataset containing the subsetted data
     """
     # if the case_id_list is not empty, subset to the specific cases
-    if case_id_list is not None:
+    if case_ids is not None:
         subset = results_df[
             (results_df["forecast_source"] == forecast_source)
             & (results_df["target_source"] == target_source)
             & (results_df["metric"] == metric)
-            & (results_df["case_id_number"].isin(case_id_list))
+            & (results_df["case_id_number"].isin(case_ids))
         ]
     else:
         subset = results_df[
@@ -113,7 +113,7 @@ def subset_results_to_xarray_by_init_time(
     lead_times = [
         np.timedelta64(lead_time_days[i], "D") for i in range(len(lead_time_days))
     ]    
-    #print(subset)
+    # print(subset)
 
     # map case_id_number -> end_date so we can compute lead time per row
     if landfalls is None:
@@ -121,7 +121,7 @@ def subset_results_to_xarray_by_init_time(
     else:
         # landfalls is a list of (case_id, DataArray) tuples; match by case_id directly.
         # ceil to the next 6H boundary (0, 6, 12, 18Z) so we never round down.
-        case_id_set = set(case_id_list) if case_id_list is not None else None
+        case_id_set = set(case_ids) if case_ids is not None else None
         end_date_by_case = {
             case_id: pd.Timestamp(landfall_da.valid_time.values[0]).ceil('6H')
             for case_id, landfall_da in landfalls
@@ -132,8 +132,9 @@ def subset_results_to_xarray_by_init_time(
     # add lead_time column: for each row, end_date - init_time (on the main subset)
     subset2 = subset.copy()
     subset2["lead_time"] = subset["case_id_number"].map(end_date_by_case) - pd.to_datetime(subset["init_time"])
-    print(subset2)
-    print(lead_times)
+
+    # print the init times and lead times column
+    # print(subset2)
 
     # keep only rows whose computed lead time is in the requested lead_times
     # subset2 = subset2.loc[np.isin(subset2["lead_time"].values, lead_times)]
@@ -172,16 +173,8 @@ def compute_mean_by_lead_time(
 
 
     if 'DurationMeanError' in metric or 'landfall' in metric:
-        subset = subset_results_to_xarray_by_init_time(
-            ewb_cases,
-            results_df,
-            forecast_source,
-            target_source,
-            metric,
-            lead_time_days,
-            case_id_list=case_ids,
-            target_variable=target_variable,
-        )
+        print("don't call subset_results_to_xarray for tropical cyclones or duration metrics")   
+        return None     
     else:   
         subset = subset_results_to_xarray(
             results_df=results_df,
@@ -254,6 +247,88 @@ def compute_relative_error(
         case_ids=case_ids,
         target_variable=target_variable,
     )
+    if higher_is_better:
+        my_relative_error = (comparison_mean - my_mean) / comparison_mean * 100
+    else:
+        my_relative_error = (my_mean - comparison_mean) / comparison_mean * 100
+
+    # replace nan with 0
+    my_relative_error = np.nan_to_num(my_relative_error)
+    my_mean = np.nan_to_num(my_mean)
+
+    return (my_mean, my_relative_error)
+
+def compute_relative_error_tropical_cyclone(
+    ewb_cases,
+    results_df,
+    forecast_source,
+    comparison_results_df,
+    comparison_forecast_source,
+    target_source,
+    metric,
+    lead_time_days,
+    case_ids=None,
+    higher_is_better=False,
+    target_variable=None,
+    landfalls=None,
+):
+    """Computes the relative error of the results for tropical cyclones.
+    Because TCs have to make landfall to copute lead time, this is separate
+    from the other results.
+
+    If the metric is better when lower,
+        the relative error is computed as (my_mean - comparison_mean) /
+            comparison_mean * 100.
+    If the metric is better when higher,
+        the relative error is computed as (comparison_mean - my_mean) /
+            comparison_mean * 100.
+    parameters:
+        results_df: pandas dataframe containing the results
+        comparison_results_df: pandas dataframe containing the comparison results
+        comparison_forecast_source: string, the comparison forecast source
+        forecast_source: string, the forecast source
+        target_source: string, the target source
+        metric: string, the metric to plot
+        lead_time_days: list of integers, the lead times to compute the relative
+            error for
+        case_ids: list of strings, the case ids to subset the data to
+        higher_is_better: boolean, set to True if the metric is better when higher,
+            set to False if the metric is better when lower (default is False)
+    returns:
+        my_relative_error: numpy array containing the relative error of
+            the results by lead time
+    """
+
+    subset = subset_results_to_xarray_by_init_time_tropical_cyclone(
+        ewb_cases=ewb_cases,
+        results_df=results_df,
+        forecast_source=forecast_source,
+        target_source=target_source,
+        metric=metric,
+        lead_time_days=lead_time_days,
+        case_ids=case_ids,
+        target_variable=target_variable,
+        landfalls=landfalls,
+    )
+    #print("first call to subset gives me")
+    #print(subset)
+    comparison_subset = subset_results_to_xarray_by_init_time_tropical_cyclone(
+        ewb_cases=ewb_cases,
+        results_df=comparison_results_df,
+        forecast_source=comparison_forecast_source,
+        target_source=target_source,
+        metric=metric,
+        lead_time_days=lead_time_days,
+        case_ids=case_ids,
+        target_variable=target_variable,
+        landfalls=landfalls,
+    )
+    #print(subset)
+    #print(comparison_subset)
+
+    my_mean = subset["value"].mean("case_id_number")
+    comparison_mean = comparison_subset["value"].mean("case_id_number")
+
     if higher_is_better:
         my_relative_error = (comparison_mean - my_mean) / comparison_mean * 100
     else:
