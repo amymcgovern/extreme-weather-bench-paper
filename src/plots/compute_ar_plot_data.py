@@ -153,7 +153,7 @@ if __name__ == "__main__":
         if args.run_cira_fourv2:
             print("Computing IVT for FOURV2")
             if cira_fourv2_ar_forecast is None:
-                 cira_fourv2_ar_ifs_forecast = atmospheric_river_forecast_setup.get_cira_forecast("Fourv2", "IFS", include_ivt=True)
+                cira_fourv2_ar_ifs_forecast = atmospheric_river_forecast_setup.get_cira_forecast("Fourv2", "IFS", include_ivt=True)
 
             ivt = get_ivt(my_case, cira_fourv2_ar_forecast)
             fourv2_graphics[my_id, "ivt"] = ivt
