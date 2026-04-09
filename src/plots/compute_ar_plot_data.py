@@ -16,7 +16,10 @@ from src.data.ar_forecast_setup import (
 
 # to plot the targets, we need to run the pipeline for each case and target
 def get_ivt(ewb_case, forecast_source):
-    ivt = evaluate.run_pipeline(ewb_case, forecast_source)
+    if (forecast_source is not None):
+        ivt = evaluate.run_pipeline(ewb_case, forecast_source)
+    else:
+        ivt = None
 
     return ivt
 
