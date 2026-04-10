@@ -231,7 +231,7 @@ if __name__ == "__main__":
         )
     if args.run_bb_pangu:
         pickle.dump(
-            pang_graphics, open(basepath + "saved_data/pang_bb_ar_graphics.pkl", "wb")
+            pang_graphics, open(basepath + "saved_data/pang_bb_ar_graphics" + suffix + ".pkl", "wb")
         )
     if args.run_bb_aifs:
         pickle.dump(
