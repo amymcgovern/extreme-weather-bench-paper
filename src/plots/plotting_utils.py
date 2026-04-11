@@ -632,6 +632,7 @@ def plot_all_cases(
     fill_boxes=False,
     ax=None,
     title=None,
+    title_loc="center",
 ):
     """A function to plot all cases
     Args:
@@ -845,7 +846,7 @@ def plot_all_cases(
                 f"{event_type.replace('_', ' ').title()} (n = {counts_by_type[event_type]})"
             )
 
-    ax.set_title(title, loc="center", fontsize=20)
+    ax.set_title(title, loc=title_loc, fontsize=20)
 
     # save if there is a filename specified (otherwise the user
     # just wants to see the plot)
@@ -1629,7 +1630,7 @@ def add_scorecard_colorbar_right(
     label_text = (
         label
         if label is not None
-        else "Better ← % difference vs IFS HRES → Worse"
+        else "% difference vs IFS HRES"
     )
 
     boxes = [ax.get_position() for ax in axes_list]
@@ -1648,8 +1649,8 @@ def add_scorecard_colorbar_right(
     base_size = plt.rcParams["font.size"]
     font_scalings = fm.font_scalings
     if label_fontsize is None:
-        label_fontsize = base_size * font_scalings.get("large", 1.0) * 1.2
-    cb.ax.tick_params(axis="y", labelsize=label_fontsize)
+        label_fontsize = 18
+    cb.ax.tick_params(axis="y", labelsize=14)
     cb.ax.set_ylabel(label_text, rotation=-90, labelpad=12, fontsize=label_fontsize)
     return cb
 
@@ -1743,6 +1744,8 @@ def plot_heatmap(
     ax=None,
     show_colorbar=False,
     return_mappable: bool = False,
+    show_xlabel: bool = True,
+    show_titles: bool = True,
 ):
     """
     Plots a heatmap of the relative error of the models versus the IFS HRES
@@ -1807,7 +1810,7 @@ def plot_heatmap(
         subplot_width = (total_width - spacing * (n_cols - 1)) / n_cols
 
         # Leave some space at top and bottom for labels when used as subplot
-        label_padding = 0.05  # fraction of height to reserve for labels
+        label_padding = 0.01  # fraction of height to reserve for labels
         plot_height = total_height * (1 - label_padding)
         plot_bottom = parent_pos.y0 + total_height * label_padding * 0.3
 
@@ -1824,9 +1827,9 @@ def plot_heatmap(
 
     # Adjust font sizes based on whether we're a subplot
     if is_subplot:
-        title_fontsize = "large"
-        label_fontsize = "large"
-        tick_fontsize = "large"
+        title_fontsize = 18
+        label_fontsize = 18
+        tick_fontsize = 14
         title_y = 1.05
         annot_fontsize = 12
     else:
@@ -1883,8 +1886,12 @@ def plot_heatmap(
             ax.set_yticklabels([])
 
         ax.set_xticklabels(settings["lead_time_days"], fontsize=tick_fontsize)
-        ax.set_xlabel("Lead time [days]", fontsize=label_fontsize)
-        ax.set_title(my_title, fontsize=title_fontsize, y=title_y)
+        if show_xlabel:
+            ax.set_xlabel("Lead Time [Days]", fontsize=label_fontsize)
+        else:
+            ax.set_xlabel("")
+        if show_titles:
+            ax.set_title(my_title, fontsize=title_fontsize, y=title_y)
 
         # Add padding for labels when used as subplot
         if is_subplot:
@@ -1925,7 +1932,7 @@ def plot_heatmap(
         cbar_fontsize = label_size_numeric * 1.2
         cb.ax.tick_params(labelsize=cbar_fontsize)
         cb.ax.set_xlabel(
-            "Better ← % difference vs IFS HRES → Worse", fontsize=cbar_fontsize
+            "% difference vs IFS HRES", fontsize=cbar_fontsize
         )
     elif show_colorbar:
         # make the colorbar take up 90% of the width of the figure and center it on the bottom of the figure
@@ -1940,7 +1947,7 @@ def plot_heatmap(
         label_size_numeric = base_size * font_scalings.get(label_fontsize, 1.0)
         cbar_fontsize = label_size_numeric * 1.2
         cb.ax.set_xlabel(
-            "Better ← % difference vs IFS HRES → Worse", fontsize=cbar_fontsize
+            "% difference vs IFS HRES", fontsize=cbar_fontsize
         )
 
     # Only call tight_layout if we created the figure ourselves
