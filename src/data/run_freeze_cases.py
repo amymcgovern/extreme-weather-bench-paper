@@ -13,6 +13,7 @@ from src.data.heat_freeze_forecast_setup import (
 if __name__ == "__main__":
     # make the basepath for saving the results - change this to your local path
     basepath = Path.home() / "extreme-weather-bench-paper" / ""
+    (basepath / "saved_data").mkdir(parents=True, exist_ok=True)
     basepath = str(basepath) + "/"
 
     parser = argparse.ArgumentParser(
@@ -69,6 +70,12 @@ if __name__ == "__main__":
         default=False,
         help="Run BB Pangu evaluation (default: False)",
     )
+    parser.add_argument(
+        "--n_jobs",
+        type=int,
+        default=32,
+        help="Number of parallel jobs (default: 32)",
+    )
 
     args = parser.parse_args()
 
@@ -82,7 +89,7 @@ if __name__ == "__main__":
     # load in the results for all freeze cases in parallel
     # this will take awhile to run if you do them all in one code box
     # if you have already saved them (from running this once), then skip this box
-    parallel_config = {"backend": "loky", "n_jobs": 32}
+    parallel_config = {"backend": "loky", "n_jobs": args.n_jobs}
 
     if args.run_hres:
         print("running HRES evaluation")
