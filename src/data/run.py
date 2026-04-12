@@ -142,7 +142,7 @@ def parse_args():
     return args
 
 
-_GCS_BUCKET = "gs://extremeweatherbench/tmp/"
+_GCS_BUCKET = "gs://extremeweatherbench/results/"
 _SAVED_DATA_DIR = Path.home() / "extreme-weather-bench-paper" / "saved_data"
 
 
@@ -152,7 +152,7 @@ def _upload_new_pkls(modified_after: float, timestamp: str) -> None:
         if pkl.stat().st_mtime >= modified_after:
             dest = _GCS_BUCKET + f"{pkl.stem}_{timestamp}.pkl"
             print(f"  Uploading {pkl.name} -> {dest}")
-            subprocess.run(["gsutil", "cp", str(pkl), dest], check=True)
+            subprocess.run(["gcloud", "storage", "cp", str(pkl), dest], check=True)
 
 
 if __name__ == "__main__":
