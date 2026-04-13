@@ -1,21 +1,16 @@
-from pathlib import Path
-import xarray as xr
-
 import extremeweatherbench as ewb
+import xarray as xr
+from check_icechunk import open_mlwp_archive_icechunk_dataset
 
 from src.data.aifs_util import (
     BB_MLWP_VARIABLE_MAPPING,
-    DEFAULT_ICECHUNK_BUCKET,
     InMemoryForecast,
 )  # noqa: E402
 from src.data.arraylake_utils import (
-    ArraylakeForecast, BB_metadata_variable_mapping,
-) # noqa: E402
-from check_icechunk import open_mlwp_archive_icechunk_dataset
-
+    ArraylakeForecast,
+    BB_metadata_variable_mapping,
+)  # noqa: E402
 from src.data.model_name_setup import (
-    BB_MODEL_NAME_TO_CREDENTIALS_PREFIX,
-    BB_MODEL_NAME_TO_PREFIX,
     CIRA_MODEL_NAME_TO_SOURCE,
 )
 
@@ -26,7 +21,7 @@ composite_landfall_metrics = [
             ewb.metrics.LandfallTimeMeanError(),
             ewb.metrics.LandfallDisplacement(),
         ],
-        approach="first",
+        approach="next",
     )
 ]
 

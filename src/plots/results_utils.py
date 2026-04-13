@@ -1,5 +1,9 @@
+import extremeweatherbench as ewb
 import numpy as np
 import pandas as pd
+import xarray as xr
+from joblib import Parallel, delayed
+
 # utilities to process the results, mostly used to make plotting easier
 
 
@@ -55,20 +59,130 @@ def subset_results_to_xarray(
         .set_index(["lead_time", "case_id_number"])
         .sort_index()
     )
+
+    # drop any rows with nan values in the value column and handle non unique index
+    subset2 = subset2.dropna(subset=['value'])
+    subset2 = subset2.reset_index()[['case_id_number','lead_time','value']].groupby(['lead_time','case_id_number',]).mean()
     subset_xa = subset2.to_xarray()
 
     return subset_xa
 
+def _round_to_nearest_6h(dt64: np.datetime64) -> pd.Timestamp:
+    """Round a numpy datetime64 to the nearest 6-hour UTC boundary."""
+    return pd.Timestamp(dt64).round("6h")
+
+def _landfall_for_case(
+    case_id: int,
+    case_meta,
+    ibtracs: ewb.targets.IBTrACS,
+    raw_ibtracs_df,
+) -> tuple[int, xr.DataArray] | None:
+    """Process a single case; returns (case_id, landfalls) or None."""
+    subset = ibtracs.subset_data_to_case(raw_ibtracs_df.lazy(), case_meta)
+    target_ds = ibtracs.maybe_convert_to_dataset(subset)
+
+    if not target_ds or "surface_wind_speed" not in target_ds:
+        return None
+
+    target_track = target_ds["surface_wind_speed"]
+    target_landfalls = ewb.calc.find_landfalls(target_track)
+
+    if len(target_landfalls) == 0:
+        return None
+    return (case_id, target_landfalls)
+
+
+def generate_ibtracs_landfalls(
+    n_workers: int = 1,
+) -> dict[int, xr.DataArray]:
+    """Build a mapping of case_id → landfall DataArray for all TC cases.
+
+    Parameters
+    ----------
+    n_workers:
+        Number of parallel joblib workers. 1 (default) runs serially.
+        Pass -1 to use all available CPUs.
+    """
+    all_cases = ewb.load_cases()
+    case_map = {c.case_id_number: c for c in all_cases}
+
+    ibtracs = ewb.targets.IBTrACS()
+    # Collect once after renaming to avoid re-downloading per case.
+    # maybe_map_variable_names renames SEASON→season, NAME→tc_name, etc.
+    raw_ibtracs_lazy = (
+        ibtracs.open_and_maybe_preprocess_data_from_source()
+        .pipe(ibtracs.maybe_map_variable_names)
+    )
+    raw_ibtracs_df = raw_ibtracs_lazy.collect(engine="streaming")
+
+    results = Parallel(n_jobs=n_workers)(
+        delayed(_landfall_for_case)(case_id, case_meta, ibtracs, raw_ibtracs_df)
+        for case_id, case_meta in case_map.items()
+    )
+
+    return dict(r for r in results if r is not None)
+
+def _compute_lead_time_to_landfall(
+    df: pd.DataFrame,
+    ibtracs_landfalls: dict[int, xr.DataArray] | None = None,
+) -> pd.Series:
+    """Return a Series of lead_time_to_landfall (hours) for every row.
+
+    For each unique (case_id_number, init_time) pair the function:
+    1. Loads IBTrACS best-track data for the corresponding case (skipped
+       when ibtracs_landfalls is supplied).
+    2. Finds all landfalls in the IBTrACS track geometry.
+    3. Picks the first landfall whose valid_time is *after* init_time.
+    4. Rounds that landfall time to the nearest 6-hour boundary.
+    5. Returns (landfall_rounded - init_time) in fractional hours.
+
+    Rows with no future landfall receive NaN.
+
+    Parameters
+    ----------
+    df:
+        Results DataFrame; must contain case_id_number and init_time cols.
+    ibtracs_landfalls:
+        Pre-computed output of generate_ibtracs_landfalls(). When provided,
+        IBTrACS data are not re-downloaded or re-processed.
+    """
+    if ibtracs_landfalls is None:
+        ibtracs_landfalls = generate_ibtracs_landfalls()
+
+    lead_series = pd.Series(np.nan, index=df.index, dtype=float)
+
+    for case_id in df["case_id_number"].unique():
+        target_landfalls = ibtracs_landfalls.get(case_id)
+        if target_landfalls is None or len(target_landfalls) == 0:
+            continue
+
+        # sorted array of interpolated landfall valid_times
+        target_times = target_landfalls.coords["valid_time"].values
+
+        case_mask = df["case_id_number"] == case_id
+
+        for init_time in df.loc[case_mask, "init_time"].unique():
+            init_np = np.datetime64(init_time, "ns")
+            next_idx = np.searchsorted(target_times, init_np, side="right")
+
+            if next_idx >= len(target_times):
+                continue
+
+            landfall_time = target_times[next_idx]
+            landfall_rounded = _round_to_nearest_6h(landfall_time)
+            lead_h = (
+                landfall_rounded - pd.Timestamp(init_time)
+            ).total_seconds() / 3600.0
+
+            row_mask = case_mask & (df["init_time"] == init_time)
+            lead_series.loc[row_mask] = lead_h
+
+    return lead_series
+
+
 def subset_results_to_xarray_by_init_time_tropical_cyclone(
-    ewb_cases,
     results_df,
-    forecast_source,
-    target_source,
-    metric,
-    lead_time_days,
-    case_ids=None,
-    target_variable=None,
-    landfalls=None,
+    ibtracs_landfalls: dict[int, xr.DataArray] | None = None,
 ):
     """
     takes in one of the overall results tables and returns a multi-dimensional xarray
@@ -91,62 +205,19 @@ def subset_results_to_xarray_by_init_time_tropical_cyclone(
     returns:
         subset_xa: xarray dataset containing the subsetted data
     """
-    # if the case_id_list is not empty, subset to the specific cases
-    if case_ids is not None:
-        subset = results_df[
-            (results_df["forecast_source"] == forecast_source)
-            & (results_df["target_source"] == target_source)
-            & (results_df["metric"] == metric)
-            & (results_df["case_id_number"].isin(case_ids))
-        ]
-    else:
-        subset = results_df[
-            (results_df["forecast_source"] == forecast_source)
-            & (results_df["target_source"] == target_source)
-            & (results_df["metric"] == metric)
-        ]
-
-    if target_variable is not None:
-        subset = subset[subset["target_variable"] == target_variable]
-
-    # compute the lead times in time deltas so we can do math on it later
-    lead_times = [
-        np.timedelta64(lead_time_days[i], "D") for i in range(len(lead_time_days))
-    ]    
-    # print(subset)
-
-    # map case_id_number -> end_date so we can compute lead time per row
-    if landfalls is None:
-        end_date_by_case = {case.case_id_number: pd.Timestamp(case.end_date) for case in ewb_cases}
-    else:
-        # landfalls is a list of (case_id, DataArray) tuples; match by case_id directly.
-        # ceil to the next 6H boundary (0, 6, 12, 18Z) so we never round down.
-        case_id_set = set(case_ids) if case_ids is not None else None
-        end_date_by_case = {
-            case_id: pd.Timestamp(landfall_da.valid_time.values[0]).ceil('6H')
-            for case_id, landfall_da in landfalls
-            if (case_id_set is None or case_id in case_id_set)
-            and len(landfall_da.valid_time) > 0
-        }
-
-    # add lead_time column: for each row, end_date - init_time (on the main subset)
-    subset2 = subset.copy()
-    subset2["lead_time"] = subset["case_id_number"].map(end_date_by_case) - pd.to_datetime(subset["init_time"])
-
-    # print the init times and lead times column
-    # print(subset2)
-
-    # keep only rows whose computed lead time is in the requested lead_times
-    # subset2 = subset2.loc[np.isin(subset2["lead_time"].values, lead_times)]
-    subset2 = subset2.loc[
-        subset2["lead_time"].dt.days.isin(lead_time_days)
-        & (subset2["lead_time"].dt.seconds == 0)
-    ]
+    lead_time_series = _compute_lead_time_to_landfall(
+        results_df, ibtracs_landfalls=ibtracs_landfalls
+    )
     # prepare for xarray conversion (set_index/sort_index return new DataFrame)
-    subset2 = subset2.set_index(["lead_time", "case_id_number"]).sort_index()
-    subset_xa = subset2.to_xarray()
+    results_df["lead_time"] = lead_time_series
+    results_df = results_df.set_index(["lead_time", "case_id_number"]).sort_index()
+    try:
+        results_xa = results_df.to_xarray()
+        return results_xa
+    except ValueError:
+        return results_df
 
-    return subset_xa
+    
 
 def compute_mean_by_lead_time(
     ewb_cases,
@@ -172,7 +243,7 @@ def compute_mean_by_lead_time(
     """
 
 
-    if 'DurationMeanError' in metric or 'landfall' in metric:
+    if 'DurationMeanError' in metric:
         print("don't call subset_results_to_xarray for tropical cyclones or duration metrics")   
         return None     
     else:   
@@ -252,25 +323,27 @@ def compute_relative_error(
     else:
         my_relative_error = (my_mean - comparison_mean) / comparison_mean * 100
 
-    # replace nan with 0
+    all_lead_times = pd.to_timedelta(lead_time_days, unit="D")
+    mean_missing = ~np.isin(all_lead_times, my_mean.lead_time.values)
+    rel_missing = ~np.isin(all_lead_times, my_relative_error.lead_time.values)
+    if mean_missing.any() or rel_missing.any():
+        print(f"Warning: {metric} for {forecast_source} has less than 5 lead times")
+        print(my_mean)
+        print(my_relative_error)
+    my_mean = my_mean.reindex(lead_time=all_lead_times)
+    my_relative_error = my_relative_error.reindex(lead_time=all_lead_times)
+    # replace computational nan with 0, then restore structural NaNs
     my_relative_error = np.nan_to_num(my_relative_error)
     my_mean = np.nan_to_num(my_mean)
-
+    my_mean[mean_missing] = np.nan
+    my_relative_error[rel_missing] = np.nan
     return (my_mean, my_relative_error)
 
 def compute_relative_error_tropical_cyclone(
-    ewb_cases,
     results_df,
-    forecast_source,
     comparison_results_df,
-    comparison_forecast_source,
-    target_source,
-    metric,
-    lead_time_days,
-    case_ids=None,
     higher_is_better=False,
-    target_variable=None,
-    landfalls=None,
+    ibtracs_landfalls: dict[int, xr.DataArray] | None = None,
 ):
     """Computes the relative error of the results for tropical cyclones.
     Because TCs have to make landfall to copute lead time, this is separate
@@ -285,13 +358,6 @@ def compute_relative_error_tropical_cyclone(
     parameters:
         results_df: pandas dataframe containing the results
         comparison_results_df: pandas dataframe containing the comparison results
-        comparison_forecast_source: string, the comparison forecast source
-        forecast_source: string, the forecast source
-        target_source: string, the target source
-        metric: string, the metric to plot
-        lead_time_days: list of integers, the lead times to compute the relative
-            error for
-        case_ids: list of strings, the case ids to subset the data to
         higher_is_better: boolean, set to True if the metric is better when higher,
             set to False if the metric is better when lower (default is False)
     returns:
@@ -300,34 +366,13 @@ def compute_relative_error_tropical_cyclone(
     """
 
     subset = subset_results_to_xarray_by_init_time_tropical_cyclone(
-        ewb_cases=ewb_cases,
         results_df=results_df,
-        forecast_source=forecast_source,
-        target_source=target_source,
-        metric=metric,
-        lead_time_days=lead_time_days,
-        case_ids=case_ids,
-        target_variable=target_variable,
-        landfalls=landfalls,
+        ibtracs_landfalls=ibtracs_landfalls,
     )
-    #print("first call to subset gives me")
-    #print(subset)
-    comparison_subset = subset_results_to_xarray_by_init_time_tropical_cyclone(
-        ewb_cases=ewb_cases,
-        results_df=comparison_results_df,
-        forecast_source=comparison_forecast_source,
-        target_source=target_source,
-        metric=metric,
-        lead_time_days=lead_time_days,
-        case_ids=case_ids,
-        target_variable=target_variable,
-        landfalls=landfalls,
-    )
-    #print(subset)
-    #print(comparison_subset)
 
-    my_mean = subset["value"].mean("case_id_number")
-    comparison_mean = comparison_subset["value"].mean("case_id_number")
+
+    my_mean = subset[['value','lead_time']].groupby(['lead_time']).mean()["value"]
+    comparison_mean = comparison_results_df[['value','lead_time']].groupby(['lead_time']).mean()
 
     if higher_is_better:
         my_relative_error = (comparison_mean - my_mean) / comparison_mean * 100

@@ -17,6 +17,7 @@ from src.data.tc_forecast_setup import (
 if __name__ == "__main__":
     # make the basepath - change this to your local path
     basepath = Path.home() / "extreme-weather-bench-paper" / ""
+    (basepath / "saved_data").mkdir(parents=True, exist_ok=True)
     basepath = str(basepath) + "/"
 
     parser = argparse.ArgumentParser(
@@ -64,6 +65,12 @@ if __name__ == "__main__":
         default=False,
         help="Run BB Pangu evaluation (default: False)",
     )
+    parser.add_argument(
+        "--n_jobs",
+        type=int,
+        default=24,
+        help="Number of parallel jobs (default: 24)",
+    )
 
     args = parser.parse_args()
 
@@ -71,7 +78,7 @@ if __name__ == "__main__":
     ewb_cases = cases.load_ewb_events_yaml_into_case_list()
     ewb_cases = [n for n in ewb_cases if n.event_type == "tropical_cyclone"]
 
-    parallel_config = {"backend": "loky", "n_jobs": 24}
+    parallel_config = {"backend": "loky", "n_jobs": args.n_jobs}
 
     tropical_cyclone_forecast_setup = TropicalCycloneForecastSetup()
     tropical_cyclone_evaluation_setup = TropicalCycloneEvaluationSetup()

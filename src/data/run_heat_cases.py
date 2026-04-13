@@ -1,16 +1,16 @@
 # setup all the imports
 import argparse
+import warnings
 from pathlib import Path
 
-import pandas as pd  # noqa: E402
 import extremeweatherbench as ewb
+import pandas as pd  # noqa: E402
 
 from src.data.heat_freeze_forecast_setup import (
     HeatFreezeEvaluationSetup,
     HeatFreezeForecastSetup,
 )
 
-import warnings
 warnings.filterwarnings(
   "ignore",
   message="Numcodecs codecs are not in the Zarr version 3 specification*",
@@ -20,6 +20,7 @@ warnings.filterwarnings(
 if __name__ == "__main__":
     # make the basepath for saving the results - change this to your local path
     basepath = Path.home() / "extreme-weather-bench-paper" / ""
+    (basepath / "saved_data").mkdir(parents=True, exist_ok=True)
     basepath = str(basepath) + "/"
 
     parser = argparse.ArgumentParser(
@@ -75,14 +76,28 @@ if __name__ == "__main__":
         default=False,
         help="Run BB Pangu evaluation (default: False)",
     )
-
+    
+    parser.add_argument(
+        "--n_jobs",
+        type=int,
+        default=36,
+        help="Number of jobs to run in parallel (default: 36)",
+    )
     args = parser.parse_args()
 
+    if args.run_all:
+        args.run_hres = True
+        args.run_cira_fourv2 = True
+        args.run_cira_graphcast = True
+        args.run_cira_pangu = True
+        args.run_bb_aifs = True
+        args.run_bb_graphcast = True
+        args.run_bb_pangu = True
     # load in the events
     ewb_cases = ewb.cases.load_ewb_events_yaml_into_case_list()
     ewb_cases = [n for n in ewb_cases if n.event_type == "heat_wave"]
 
-    parallel_config = {"backend": "loky", "n_jobs": 32}
+    parallel_config = {"backend": "loky", "n_jobs": args.n_jobs}
 
     heat_freeze_forecast_setup = HeatFreezeForecastSetup()
     heat_freeze_evaluation_setup = HeatFreezeEvaluationSetup()

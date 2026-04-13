@@ -19,8 +19,9 @@ warnings.filterwarnings(
 
 if __name__ == "__main__":
     # make the basepath for saving the results - change this to your local path
-    basepath = Path.home() / "extreme-weather-bench-paper" / ""
+    basepath = Path.home() / "code" / "extreme-weather-bench-paper" / ""
     basepath = str(basepath) + "/"
+    yaml_path = Path(ewb.__file__).parent / "data" / "marginal_temperature_events.yaml"
 
     parser = argparse.ArgumentParser(
         description="Run heat wave evaluation against ExtremeWeatherBench cases."
@@ -83,16 +84,21 @@ if __name__ == "__main__":
         help="Run marginal temperature evaluation (default: False)",
     )
 
+    parser.add_argument(
+        "--n_jobs",
+        type=int,
+        default=32,
+        help="Number of jobs to run in parallel (default: 32)",
+    )
+
     args = parser.parse_args()
 
     # load in the events
-    ewb_cases = ewb.cases.load_individual_cases_from_yaml(
-        basepath + "marginal_temperature_events.yaml"
-    )
+    ewb_cases = ewb.cases.load_individual_cases_from_yaml(yaml_path)
     ewb_cases = [n for n in ewb_cases if n.event_type == "marginal_temperature"]
     print(f"Running {len(ewb_cases)} marginal temperature cases")
 
-    parallel_config = {"backend": "loky", "n_jobs": 32}
+    parallel_config = {"backend": "loky", "n_jobs": args.n_jobs}
 
     marginal_temperature_forecast_setup = MarginalTemperatureForecastSetup()
     marginal_temperature_evaluation_setup = MarginalTemperatureEvaluationSetup()
