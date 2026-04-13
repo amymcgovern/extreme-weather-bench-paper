@@ -59,6 +59,10 @@ def subset_results_to_xarray(
         .set_index(["lead_time", "case_id_number"])
         .sort_index()
     )
+
+    # drop any rows with nan values in the value column and handle non unique index
+    subset2 = subset2.dropna(subset=['value'])
+    subset2 = subset2.reset_index()[['case_id_number','lead_time','value']].groupby(['lead_time','case_id_number',]).mean()
     subset_xa = subset2.to_xarray()
 
     return subset_xa
@@ -239,7 +243,7 @@ def compute_mean_by_lead_time(
     """
 
 
-    if 'DurationMeanError' in metric or 'landfall' in metric:
+    if 'DurationMeanError' in metric:
         print("don't call subset_results_to_xarray for tropical cyclones or duration metrics")   
         return None     
     else:   
@@ -319,10 +323,20 @@ def compute_relative_error(
     else:
         my_relative_error = (my_mean - comparison_mean) / comparison_mean * 100
 
-    # replace nan with 0
+    all_lead_times = pd.to_timedelta(lead_time_days, unit="D")
+    mean_missing = ~np.isin(all_lead_times, my_mean.lead_time.values)
+    rel_missing = ~np.isin(all_lead_times, my_relative_error.lead_time.values)
+    if mean_missing.any() or rel_missing.any():
+        print(f"Warning: {metric} for {forecast_source} has less than 5 lead times")
+        print(my_mean)
+        print(my_relative_error)
+    my_mean = my_mean.reindex(lead_time=all_lead_times)
+    my_relative_error = my_relative_error.reindex(lead_time=all_lead_times)
+    # replace computational nan with 0, then restore structural NaNs
     my_relative_error = np.nan_to_num(my_relative_error)
     my_mean = np.nan_to_num(my_mean)
-
+    my_mean[mean_missing] = np.nan
+    my_relative_error[rel_missing] = np.nan
     return (my_mean, my_relative_error)
 
 def compute_relative_error_tropical_cyclone(
