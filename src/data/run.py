@@ -12,7 +12,7 @@ warnings.filterwarnings(
   category=UserWarning
 )
 
-ALL_EVENT_TYPES = ["heat", "freeze", "tc", "severe", "ar"]
+ALL_EVENT_TYPES = ["heat", "freeze", "tc", "severe", "ar", "marginal_temp"]
 
 _HERE = Path(__file__).parent
 
@@ -22,6 +22,7 @@ EVENT_SCRIPTS = {
     "tc":     _HERE / "run_tc_cases.py",
     "severe": _HERE / "run_severe_cases.py",
     "ar":     _HERE / "run_ar_cases.py",
+    "marginal_temp": _HERE / "run_marginal_temp.py",
 }
 
 MODEL_FLAGS = [
