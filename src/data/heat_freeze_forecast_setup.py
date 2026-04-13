@@ -1,18 +1,15 @@
-from pathlib import Path
-import extremeweatherbench as ewb
 import operator
+
+import extremeweatherbench as ewb
 import xarray as xr
-from src.data.aifs_util import (
-    BB_MLWP_VARIABLE_MAPPING,
-    DEFAULT_ICECHUNK_BUCKET,
-    InMemoryForecast,
-)  # noqa: E402
 from check_icechunk import open_mlwp_archive_icechunk_dataset
 
+from src.data.aifs_util import (
+    BB_MLWP_VARIABLE_MAPPING,
+    InMemoryForecast,
+)  # noqa: E402
 from src.data.arraylake_utils import ArraylakeForecast  # noqa: E402
 from src.data.model_name_setup import (
-    BB_MODEL_NAME_TO_CREDENTIALS_PREFIX,
-    BB_MODEL_NAME_TO_PREFIX,
     CIRA_MODEL_NAME_TO_SOURCE,
 )
 
@@ -69,6 +66,7 @@ class HeatFreezeForecastSetup:
             variable_mapping=ewb.inputs.HRES_metadata_variable_mapping,
             storage_options={"remote_options": {"anon": True}},
             name="ECMWF HRES",
+            preprocess=ewb.defaults.preprocess_heatwave_forecast_dataset
         )
         return hres_heat_freeze_forecast
 
@@ -80,6 +78,7 @@ class HeatFreezeForecastSetup:
                 "t2m": "surface_air_temperature",
             },
             name="ECMWF HRES",
+            preprocess=ewb.defaults.preprocess_heatwave_forecast_dataset
         )
         return bb_hres_heat_freeze_forecast
 
@@ -92,6 +91,7 @@ class HeatFreezeForecastSetup:
             name=f"BB {model_name}",
             variables=["surface_air_temperature"],
             variable_mapping=BB_MLWP_VARIABLE_MAPPING,
+            preprocess=ewb.defaults.preprocess_heatwave_forecast_dataset
         )
         return bb_heat_freeze_forecast
 
