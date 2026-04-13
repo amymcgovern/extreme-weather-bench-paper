@@ -696,6 +696,7 @@ def plot_all_cases(
         "tropical_cyclone": sns_palette[1],
         "severe_convection": sns_palette[5],
         "atmospheric_river": sns_palette[7],
+        "marginal_temperature": sns_palette[2],
     }
 
     # Initialize counts for each event type
@@ -706,6 +707,7 @@ def plot_all_cases(
             "severe_convection": 0,
             "atmospheric_river": 0,
             "tropical_cyclone": 0,
+            "marginal_temperature": 0,
         }
     )
 
@@ -715,13 +717,16 @@ def plot_all_cases(
         "atmospheric_river": 2,
         "tropical_cyclone": 10,
         "severe_convection": 0,
+        "marginal_temperature": 8,
     }
+
     alphas = {
         "freeze": 0.2,
         "heat_wave": 0.2,
         "atmospheric_river": 0.3,
         "tropical_cyclone": 0.07,
         "severe_convection": 0.02,
+        "marginal_temperature": 0.2,
     }
 
     # Handle both IndividualCase and list of IndividualCases
@@ -823,6 +828,11 @@ def plot_all_cases(
                 facecolor=event_colors["tropical_cyclone"],
                 alpha=0.9,
                 label="Tropical Cyclone (n = %d)" % counts_by_type["tropical_cyclone"],
+            ),
+            Patch(
+                facecolor=event_colors["marginal_temperature"],
+                alpha=0.9,
+                label="Marginal Temperature (n = %d)" % counts_by_type["marginal_temperature"],
             ),
         ]
 
