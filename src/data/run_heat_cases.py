@@ -83,6 +83,14 @@ if __name__ == "__main__":
         default=36,
         help="Number of jobs to run in parallel (default: 36)",
     )
+
+    parser.add_argument(
+        "--run_all",
+        action="store_true",
+        default=False,
+        help="Run all evaluations (default: False)",
+    )
+    
     args = parser.parse_args()
 
     if args.run_all:

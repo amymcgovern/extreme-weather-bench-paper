@@ -633,6 +633,7 @@ def plot_all_cases(
     ax=None,
     title=None,
     title_loc="center",
+    y_label=None,
 ):
     """A function to plot all cases
     Args:
@@ -856,7 +857,15 @@ def plot_all_cases(
                 f"{event_type.replace('_', ' ').title()} (n = {counts_by_type[event_type]})"
             )
 
-    ax.set_title(title, loc=title_loc, fontsize=20)
+    ax.set_title(title, loc=title_loc, fontsize=16)
+    if y_label is not None:
+        ax.text(
+            -0.05, 0.5, y_label,
+            va='center', ha='right',
+            rotation='vertical',
+            transform=ax.transAxes,
+            fontsize=14,
+        )
 
     # save if there is a filename specified (otherwise the user
     # just wants to see the plot)
@@ -876,6 +885,7 @@ def plot_all_cases_and_obs(
     ax=None,
     show_legend=True,
     title=None,
+    y_label=None,
     map_gridlines: Optional[Union[bool, Dict[str, Any]]] = None,
 ):
     """Plot all cases (outlined) and observations (filled) on map.
@@ -941,6 +951,7 @@ def plot_all_cases_and_obs(
         "tropical_cyclone": sns_palette[1],
         "severe_convection": sns_palette[5],
         "atmospheric_river": sns_palette[7],
+        "marginal_temperature": sns_palette[2],
     }
 
     # Initialize counts for each event type
@@ -951,6 +962,7 @@ def plot_all_cases_and_obs(
             "severe_convection": 0,
             "atmospheric_river": 0,
             "tropical_cyclone": 0,
+            "marginal_temperature": 0,
         }
     )
 
@@ -969,6 +981,7 @@ def plot_all_cases_and_obs(
             "tropical_cyclone": 0,
             "severe_convection": 0,
             "atmospheric_river": 0,
+            "marginal_temperature": 0,
         }
     )
 
@@ -978,6 +991,7 @@ def plot_all_cases_and_obs(
         "atmospheric_river": 2,
         "tropical_cyclone": 10,
         "severe_convection": 0,
+        "marginal_temperature": 8,
     }
     alphas = {
         "freeze": 1,
@@ -985,6 +999,7 @@ def plot_all_cases_and_obs(
         "atmospheric_river": 1,
         "tropical_cyclone": 1,
         "severe_convection": 1,
+        "marginal_temperature": 1,
     }
 
     # Handle both IndividualCase and list of IndividualCases
@@ -1064,13 +1079,20 @@ def plot_all_cases_and_obs(
                     if n[0] == indiv_case.case_id_number
                     and n[1].attrs["source"] == "local_storm_reports"
                 ]
-            elif indiv_event_type in ["heat_wave", "freeze", "tropical_cyclone"]:
-                my_target_info = [
-                    n[1]
-                    for n in targets
-                    if n[0] == indiv_case.case_id_number
-                    and n[1].attrs["source"] != "ERA5"
-                ]
+            elif indiv_event_type in ["heat_wave", "freeze", "tropical_cyclone", "marginal_temperature"]:
+                try:
+                    my_target_info = [
+                        n[1]
+                        for n in targets
+                        if n[0] == indiv_case.case_id_number
+                        and n[1].attrs["source"] != "ERA5"
+                    ]
+                except Exception as e:
+                    print(
+                        f"Error getting target info for "
+                        f"{indiv_case.case_id_number}: {e}"
+                    )
+                    continue
             # print(my_target_info)
 
             # make a scatter plot of the target points (for hot/cold/tc events)
@@ -1288,8 +1310,15 @@ def plot_all_cases_and_obs(
                 % counts_by_type[event_type]
             )
 
-    ax.set_title(title, fontsize=20)
-
+    ax.set_title(title, fontsize=16)
+    if y_label is not None:
+        ax.text(
+            -0.05, 0.5, y_label,
+            va='center', ha='right',
+            rotation='vertical',
+            transform=ax.transAxes,
+            fontsize=14,
+        )
     # save if there is a filename specified (otherwise the user
     # just wants to see the plot)
     if filename is not None:
