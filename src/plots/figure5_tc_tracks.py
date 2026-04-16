@@ -25,9 +25,13 @@ from matplotlib.gridspec import GridSpec
 from src.plots.plotting_utils import generate_extent
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
+
+# Change this to the directory where the TC track data is stored
 TC_DATA_DIR = (
     pathlib.Path.home() / "code" / "ewb_tc_track_mapper" / "data" / "a2130f5"
 )
+
+# Change this to the directory where the output will be saved
 OUTPUT_DIR = REPO_ROOT / "graphics" / "paper"
 
 MODEL_COLS = [
@@ -45,11 +49,11 @@ STORM_ROWS = [
 N_ROWS = len(STORM_ROWS)
 N_COLS = len(MODEL_COLS)
 
-TITLE_FONTSIZE = 20
+TITLE_FONTSIZE = 24
 TICK_FONTSIZE = 14
 CBAR_LABEL_FONTSIZE = 14
 CBAR_TICK_FONTSIZE = 12
-STORM_LABEL_FONTSIZE = 20
+STORM_LABEL_FONTSIZE = 24
 
 
 def _setup_colormap(bounds):
