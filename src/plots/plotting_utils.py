@@ -1817,6 +1817,7 @@ def plot_heatmap(
     return_mappable: bool = False,
     show_xlabel: bool = True,
     show_titles: bool = True,
+    show_coloring: bool | list[bool] = True,
     title_fontsize=None,
     label_fontsize=None,
     tick_fontsize=None,
@@ -1839,6 +1840,11 @@ def plot_heatmap(
         return_mappable: if True, return the mappable from the first heatmap panel
             (for use with :func:`add_scorecard_colorbar_right`). Typically use
             ``show_colorbar=False`` on multi-panel figures.
+        show_coloring: if False, all subplot columns are rendered in the neutral
+            grey background color (no red/blue coloring) while annotation text
+            is still displayed. Can also be a list of bools (one per metric
+            subplot) to control coloring individually per column.
+            
     """
     n_rows = 1
     n_cols = len(settings["metric_str"])
@@ -1943,8 +1949,14 @@ def plot_heatmap(
         else:
             fmt = ".2f"  # Three decimals for small numbers
 
+        _color_this = show_coloring[i] if isinstance(show_coloring, list) else show_coloring
+        color_data = (
+            np.zeros_like(relative_error_array[metric])
+            if not _color_this
+            else relative_error_array[metric]
+        )
         ax = sns.heatmap(
-            relative_error_array[metric],
+            color_data,
             annot=error_array[metric],
             fmt=fmt,
             cmap=cmap,
