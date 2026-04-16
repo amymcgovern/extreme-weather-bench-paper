@@ -1785,6 +1785,10 @@ def plot_heatmap(
     return_mappable: bool = False,
     show_xlabel: bool = True,
     show_titles: bool = True,
+    title_fontsize=None,
+    label_fontsize=None,
+    tick_fontsize=None,
+    annot_fontsize=None,
 ):
     """
     Plots a heatmap of the relative error of the models versus the IFS HRES
@@ -1864,19 +1868,25 @@ def plot_heatmap(
         ax.set_visible(False)
         is_subplot = True
 
-    # Adjust font sizes based on whether we're a subplot
+    # Adjust font sizes based on whether we're a subplot. Caller-provided
+    # overrides take precedence over the defaults.
     if is_subplot:
-        title_fontsize = 18
-        label_fontsize = 18
-        tick_fontsize = 14
+        _title_fs = 18
+        _label_fs = 18
+        _tick_fs = 14
         title_y = 1.05
-        annot_fontsize = 12
+        _annot_fs = 12
     else:
-        title_fontsize = "xx-large"
-        label_fontsize = "large"
-        tick_fontsize = "large"
+        _title_fs = "xx-large"
+        _label_fs = "large"
+        _tick_fs = "large"
         title_y = 1.1
-        annot_fontsize = "large"
+        _annot_fs = "large"
+
+    title_fontsize = title_fontsize if title_fontsize is not None else _title_fs
+    label_fontsize = label_fontsize if label_fontsize is not None else _label_fs
+    tick_fontsize = tick_fontsize if tick_fontsize is not None else _tick_fs
+    annot_fontsize = annot_fontsize if annot_fontsize is not None else _annot_fs
 
     subplot_titles = settings["subplot_titles"]
     for i, my_title in enumerate(subplot_titles):
