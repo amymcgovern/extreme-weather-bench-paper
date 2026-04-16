@@ -751,19 +751,6 @@ def plot_all_cases(
         # Get color based on event type
         indiv_event_type = indiv_case.event_type
 
-        combined_event_type = None
-        if is_marginal:
-            if indiv_event_type == "severe_convection":
-                combined_event_type = "marginal_severe_convection"
-            else:
-                combined_event_type = "marginal_temperature"
-        else:
-            combined_event_type = indiv_event_type
-        
-        color = event_colors.get(
-            combined_event_type, "gray"
-        )  # Default to gray if event type not found
-
         # check if the case is inside the bounding box
         if bounding_box is not None:
             if not shapely.intersects(
@@ -773,11 +760,24 @@ def plot_all_cases(
                 # f"as it is outside the bounding box.")
                 continue
 
-        # count the events by type
-        counts_by_type[combined_event_type] += 1
-
         # Plot the case geopandas info
         if event_type is None or indiv_event_type == event_type:
+            combined_event_type = None
+            if is_marginal:
+                if indiv_event_type == "severe_convection":
+                    combined_event_type = "marginal_severe_convection"
+                else:
+                    combined_event_type = "marginal_temperature"
+            else:
+                combined_event_type = indiv_event_type
+            
+            color = event_colors.get(
+                combined_event_type, "gray"
+            )  # Default to gray if event type not found
+
+            # count the events by type
+            counts_by_type[combined_event_type] += 1
+
             # to handle wrapping around the prime meridian, we
             # can't use geopandas plot (and besides it is slow)
             # instead we have multi-polygon patches if it wraps
@@ -808,6 +808,7 @@ def plot_all_cases(
     # Create a custom legend for event types
     if event_type is not None:
         # if we are only plotting one event type, only show that in the legend
+        print(f"combined_event_type: {combined_event_type}")
         legend_elements = [
             Patch(
                 facecolor=event_colors[combined_event_type],
