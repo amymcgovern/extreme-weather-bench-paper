@@ -17,9 +17,9 @@ from src.data.model_name_setup import (
 composite_landfall_metrics = [
     ewb.metrics.LandfallMetric(
         metrics=[
-            ewb.metrics.LandfallIntensityMeanAbsoluteError(),
-            ewb.metrics.LandfallTimeMeanError(),
-            ewb.metrics.LandfallDisplacement(),
+            ewb.metrics.LandfallIntensityMeanAbsoluteError,
+            ewb.metrics.LandfallTimeMeanError,
+            ewb.metrics.LandfallDisplacement,
         ],
         approach="next",
     )

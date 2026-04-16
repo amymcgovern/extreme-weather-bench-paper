@@ -7,6 +7,47 @@ from joblib import Parallel, delayed
 # utilities to process the results, mostly used to make plotting easier
 
 
+def _snap_lead_time_to_bins(
+    lead_col: pd.Series,
+    bin_days: list[int],
+) -> pd.Series:
+    """Snap each lead_time to the nearest bin (in days).
+
+    Handles both timedelta and numeric (hours) lead_time
+    columns. Values further than half the smallest bin gap
+    from any target are left as-is (and filtered out later
+    by the ``isin`` check).
+    """
+    target_hours = np.array([d * 24 for d in bin_days])
+    if pd.api.types.is_timedelta64_dtype(lead_col):
+        hours = lead_col.dt.total_seconds() / 3600.0
+    else:
+        hours = lead_col.astype(float)
+
+    h_vals = hours.values.copy()
+    result = np.full(len(h_vals), np.nan)
+    finite = np.isfinite(h_vals)
+
+    if finite.any():
+        dists = np.abs(
+            h_vals[finite, None] - target_hours[None, :]
+        )
+        nearest_idx = dists.argmin(axis=1)
+        snapped = target_hours[nearest_idx].astype("float64")
+
+        half_gaps = np.diff(
+            target_hours,
+            prepend=0,
+            append=target_hours[-1] + target_hours[0],
+        )
+        max_dist = np.minimum(half_gaps[:-1], half_gaps[1:]) / 2
+        too_far = dists[np.arange(len(nearest_idx)), nearest_idx] > max_dist[nearest_idx]
+        snapped[too_far] = np.nan
+        result[finite] = snapped
+
+    return pd.to_timedelta(result, unit="h")
+
+
 def subset_results_to_xarray(
     results_df,
     forecast_source,
@@ -15,6 +56,7 @@ def subset_results_to_xarray(
     lead_time_days=None,
     case_id_list=None,
     target_variable=None,
+    snap_lead_times=False,
 ):
     """
     takes in one of the overall results tables and returns a multi-dimensional xarray
@@ -28,10 +70,13 @@ def subset_results_to_xarray(
             (None if you don't want to subset by init time)
         case_id_list: list of integers, the case ids to subset the data to
             (None if you don't want to subset)
+        snap_lead_times: if True, snap each row's lead_time
+            to the nearest bin center before filtering.
+            Useful for TC landfall metrics whose lead times
+            fall at 6-hour granularity.
     returns:
         subset_xa: xarray dataset containing the subsetted data
     """
-    # if the case_id_list is not empty, subset to the specific cases
     if case_id_list is not None:
         subset = results_df[
             (results_df["forecast_source"] == forecast_source)
@@ -50,17 +95,21 @@ def subset_results_to_xarray(
         subset = subset[subset["target_variable"] == target_variable]
 
     lead_times = [
-        np.timedelta64(lead_time_days[i], "D") for i in range(len(lead_time_days))
+        np.timedelta64(d, "D") for d in lead_time_days
     ]
 
-    # prepare for xarray conversion
+    if snap_lead_times:
+        subset = subset.copy()
+        subset["lead_time"] = _snap_lead_time_to_bins(
+            subset["lead_time"], lead_time_days
+        )
+
     subset2 = (
         subset[subset.lead_time.isin(lead_times)]
         .set_index(["lead_time", "case_id_number"])
         .sort_index()
     )
 
-    # drop any rows with nan values in the value column and handle non unique index
     subset2 = subset2.dropna(subset=['value'])
     subset2 = subset2.reset_index()[['case_id_number','lead_time','value']].groupby(['lead_time','case_id_number',]).mean()
     subset_xa = subset2.to_xarray()
@@ -128,43 +177,61 @@ def _compute_lead_time_to_landfall(
 ) -> pd.Series:
     """Return a Series of lead_time_to_landfall (hours) for every row.
 
-    For each unique (case_id_number, init_time) pair the function:
-    1. Loads IBTrACS best-track data for the corresponding case (skipped
-       when ibtracs_landfalls is supplied).
-    2. Finds all landfalls in the IBTrACS track geometry.
-    3. Picks the first landfall whose valid_time is *after* init_time.
-    4. Rounds that landfall time to the nearest 6-hour boundary.
-    5. Returns (landfall_rounded - init_time) in fractional hours.
+    If the DataFrame already contains a ``target_landfall_valid_time``
+    column (produced by ``LandfallMetric._attach_landfall_metadata``),
+    that value is used directly — it reflects the same target-matching
+    logic (track-start filtering, fallback to next coverable landfall)
+    that the metric pipeline applied.
 
-    Rows with no future landfall receive NaN.
+    Otherwise, falls back to re-deriving landfall times from IBTrACS
+    by picking the first landfall whose valid_time is after init_time.
+
+    The landfall time is rounded to the nearest 6-hour boundary and
+    lead time is ``(landfall_rounded - init_time)`` in hours.
+    Rows with no landfall receive NaN.
 
     Parameters
     ----------
     df:
-        Results DataFrame; must contain case_id_number and init_time cols.
+        Results DataFrame; must contain ``case_id_number`` and
+        ``init_time`` columns.
     ibtracs_landfalls:
-        Pre-computed output of generate_ibtracs_landfalls(). When provided,
-        IBTrACS data are not re-downloaded or re-processed.
+        Pre-computed output of ``generate_ibtracs_landfalls()``.
+        Only used when ``target_landfall_valid_time`` is not
+        present in *df*.
     """
+    lead_series = pd.Series(np.nan, index=df.index, dtype=float)
+
+    if "target_landfall_valid_time" in df.columns:
+        valid = df["target_landfall_valid_time"].notna()
+        lf_times = pd.to_datetime(
+            df.loc[valid, "target_landfall_valid_time"]
+        )
+        init_times = pd.to_datetime(
+            df.loc[valid, "init_time"]
+        )
+        rounded = lf_times.apply(_round_to_nearest_6h)
+        lead_series.loc[valid] = (
+            (rounded - init_times).dt.total_seconds() / 3600.0
+        )
+        return lead_series
+
     if ibtracs_landfalls is None:
         ibtracs_landfalls = generate_ibtracs_landfalls()
-
-    lead_series = pd.Series(np.nan, index=df.index, dtype=float)
 
     for case_id in df["case_id_number"].unique():
         target_landfalls = ibtracs_landfalls.get(case_id)
         if target_landfalls is None or len(target_landfalls) == 0:
             continue
 
-        # sorted array of interpolated landfall valid_times
         target_times = target_landfalls.coords["valid_time"].values
-
         case_mask = df["case_id_number"] == case_id
 
         for init_time in df.loc[case_mask, "init_time"].unique():
             init_np = np.datetime64(init_time, "ns")
-            next_idx = np.searchsorted(target_times, init_np, side="right")
-
+            next_idx = np.searchsorted(
+                target_times, init_np, side="right"
+            )
             if next_idx >= len(target_times):
                 continue
 
@@ -228,6 +295,7 @@ def compute_mean_by_lead_time(
     lead_time_days,
     case_ids=None,
     target_variable=None,
+    snap_lead_times=False,
 ):
     """Computes the mean of the results by lead time.
     parameters:
@@ -238,6 +306,8 @@ def compute_mean_by_lead_time(
         lead_times: list of timedelta objects, the lead times to compute the mean for
         case_ids: list of strings, the case ids to subset the data to
         target_variable: string, the target variable to plot (None if not needed)
+        snap_lead_times: if True, snap lead times to
+            nearest bin center before filtering.
     returns:
         my_mean: numpy array containing the mean of the results by lead time
     """
@@ -255,6 +325,7 @@ def compute_mean_by_lead_time(
             lead_time_days=lead_time_days,
             case_id_list=case_ids,
             target_variable=target_variable,
+            snap_lead_times=snap_lead_times,
         )
     my_mean = subset["value"].mean("case_id_number")
     return my_mean
@@ -272,6 +343,7 @@ def compute_relative_error(
     case_ids=None,
     higher_is_better=False,
     target_variable=None,
+    snap_lead_times=False,
 ):
     """Computes the relative error of the results by lead time Error
     is defined as relative to the comparison results.
@@ -307,6 +379,7 @@ def compute_relative_error(
         lead_time_days,
         case_ids=case_ids,
         target_variable=target_variable,
+        snap_lead_times=snap_lead_times,
     )
     comparison_mean = compute_mean_by_lead_time(
         ewb_cases,
@@ -317,7 +390,9 @@ def compute_relative_error(
         lead_time_days,
         case_ids=case_ids,
         target_variable=target_variable,
+        snap_lead_times=snap_lead_times,
     )
+
     if higher_is_better:
         my_relative_error = (comparison_mean - my_mean) / comparison_mean * 100
     else:
@@ -333,11 +408,11 @@ def compute_relative_error(
     my_mean = my_mean.reindex(lead_time=all_lead_times)
     my_relative_error = my_relative_error.reindex(lead_time=all_lead_times)
     # replace computational nan with 0, then restore structural NaNs
-    my_relative_error = np.nan_to_num(my_relative_error)
-    my_mean = np.nan_to_num(my_mean)
-    my_mean[mean_missing] = np.nan
-    my_relative_error[rel_missing] = np.nan
-    return (my_mean, my_relative_error)
+    my_relative_error_arr = np.nan_to_num(my_relative_error)
+    my_mean_arr = np.nan_to_num(my_mean)
+    my_mean_arr[mean_missing] = np.nan
+    my_relative_error_arr[rel_missing] = np.nan
+    return (my_mean_arr, my_relative_error_arr)
 
 def compute_relative_error_tropical_cyclone(
     results_df,
