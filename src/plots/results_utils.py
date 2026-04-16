@@ -10,13 +10,20 @@ from joblib import Parallel, delayed
 def _snap_lead_time_to_bins(
     lead_col: pd.Series,
     bin_days: list[int],
+    tolerance_hours: float | None = None,
 ) -> pd.Series:
     """Snap each lead_time to the nearest bin (in days).
 
-    Handles both timedelta and numeric (hours) lead_time
-    columns. Values further than half the smallest bin gap
-    from any target are left as-is (and filtered out later
-    by the ``isin`` check).
+    Handles both timedelta and numeric (hours) lead_time columns.
+    Values further than the tolerance from any target are set to NaN
+    (and filtered out later by the isin check).
+    parameters:
+        lead_col: Series of lead times (timedelta or numeric hours).
+        bin_days: target bin centers in whole days.
+        tolerance_hours: max distance (hours) from a bin center to snap.
+            if None, uses half the narrower gap on each side of each bin.
+            pass 6 for a fixed +-6 h window (appropriate for 6-hourly
+            model output).
     """
     target_hours = np.array([d * 24 for d in bin_days])
     if pd.api.types.is_timedelta64_dtype(lead_col):
@@ -35,13 +42,20 @@ def _snap_lead_time_to_bins(
         nearest_idx = dists.argmin(axis=1)
         snapped = target_hours[nearest_idx].astype("float64")
 
-        half_gaps = np.diff(
-            target_hours,
-            prepend=0,
-            append=target_hours[-1] + target_hours[0],
+        if tolerance_hours is not None:
+            max_dist = np.full(len(target_hours), tolerance_hours)
+        else:
+            half_gaps = np.diff(
+                target_hours,
+                prepend=0,
+                append=target_hours[-1] + target_hours[0],
+            )
+            max_dist = np.minimum(half_gaps[:-1], half_gaps[1:]) / 2
+
+        too_far = (
+            dists[np.arange(len(nearest_idx)), nearest_idx]
+            > max_dist[nearest_idx]
         )
-        max_dist = np.minimum(half_gaps[:-1], half_gaps[1:]) / 2
-        too_far = dists[np.arange(len(nearest_idx)), nearest_idx] > max_dist[nearest_idx]
         snapped[too_far] = np.nan
         result[finite] = snapped
 
@@ -57,6 +71,7 @@ def subset_results_to_xarray(
     case_id_list=None,
     target_variable=None,
     snap_lead_times=False,
+    snap_tolerance_hours: float | None = None,
 ):
     """
     takes in one of the overall results tables and returns a multi-dimensional xarray
@@ -74,6 +89,9 @@ def subset_results_to_xarray(
             to the nearest bin center before filtering.
             Useful for TC landfall metrics whose lead times
             fall at 6-hour granularity.
+        snap_tolerance_hours: passed to _snap_lead_time_to_bins.
+            use 6 for a fixed +-6 h window (6-hourly models).
+            ignored when snap_lead_times is False.
     returns:
         subset_xa: xarray dataset containing the subsetted data
     """
@@ -101,7 +119,7 @@ def subset_results_to_xarray(
     if snap_lead_times:
         subset = subset.copy()
         subset["lead_time"] = _snap_lead_time_to_bins(
-            subset["lead_time"], lead_time_days
+            subset["lead_time"], lead_time_days, snap_tolerance_hours
         )
 
     subset2 = (
@@ -296,6 +314,7 @@ def compute_mean_by_lead_time(
     case_ids=None,
     target_variable=None,
     snap_lead_times=False,
+    snap_tolerance_hours=6,
 ):
     """Computes the mean of the results by lead time.
     parameters:
@@ -308,6 +327,9 @@ def compute_mean_by_lead_time(
         target_variable: string, the target variable to plot (None if not needed)
         snap_lead_times: if True, snap lead times to
             nearest bin center before filtering.
+        snap_tolerance_hours: passed to _snap_lead_time_to_bins.
+            use 6 for a fixed +-6 h window (6-hourly models).
+            ignored when snap_lead_times is False.
     returns:
         my_mean: numpy array containing the mean of the results by lead time
     """
@@ -326,6 +348,7 @@ def compute_mean_by_lead_time(
             case_id_list=case_ids,
             target_variable=target_variable,
             snap_lead_times=snap_lead_times,
+            snap_tolerance_hours=snap_tolerance_hours,
         )
     my_mean = subset["value"].mean("case_id_number")
     return my_mean
@@ -344,6 +367,7 @@ def compute_relative_error(
     higher_is_better=False,
     target_variable=None,
     snap_lead_times=False,
+    snap_tolerance_hours=6,
 ):
     """Computes the relative error of the results by lead time Error
     is defined as relative to the comparison results.
@@ -365,6 +389,11 @@ def compute_relative_error(
         case_ids: list of strings, the case ids to subset the data to
         higher_is_better: boolean, set to True if the metric is better when higher,
             set to False if the metric is better when lower (default is False)
+        snap_lead_times: if True, snap lead times to
+            nearest bin center before filtering.
+        snap_tolerance_hours: passed to _snap_lead_time_to_bins.
+            use 6 for a fixed +-6 h window (6-hourly models).
+            ignored when snap_lead_times is False.
     returns:
         my_relative_error: numpy array containing the relative error of
             the results by lead time
@@ -380,6 +409,7 @@ def compute_relative_error(
         case_ids=case_ids,
         target_variable=target_variable,
         snap_lead_times=snap_lead_times,
+        snap_tolerance_hours=snap_tolerance_hours,
     )
     comparison_mean = compute_mean_by_lead_time(
         ewb_cases,
@@ -391,6 +421,7 @@ def compute_relative_error(
         case_ids=case_ids,
         target_variable=target_variable,
         snap_lead_times=snap_lead_times,
+        snap_tolerance_hours=snap_tolerance_hours,
     )
 
     if higher_is_better:
