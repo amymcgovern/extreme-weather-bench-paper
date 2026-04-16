@@ -634,6 +634,7 @@ def plot_all_cases(
     title=None,
     title_loc="center",
     y_label=None,
+    is_marginal=False,
 ):
     """A function to plot all cases
     Args:
@@ -698,6 +699,7 @@ def plot_all_cases(
         "severe_convection": sns_palette[5],
         "atmospheric_river": sns_palette[7],
         "marginal_temperature": sns_palette[2],
+        "marginal_severe_convection": sns_palette[8],
     }
 
     # Initialize counts for each event type
@@ -709,6 +711,7 @@ def plot_all_cases(
             "atmospheric_river": 0,
             "tropical_cyclone": 0,
             "marginal_temperature": 0,
+            "marginal_severe_convection": 0,
         }
     )
 
@@ -719,6 +722,7 @@ def plot_all_cases(
         "tropical_cyclone": 10,
         "severe_convection": 0,
         "marginal_temperature": 8,
+        "marginal_severe_convection": 8,
     }
 
     alphas = {
@@ -726,8 +730,9 @@ def plot_all_cases(
         "heat_wave": 0.2,
         "atmospheric_river": 0.3,
         "tropical_cyclone": 0.07,
-        "severe_convection": 0.02,
+        "severe_convection": 0.1,
         "marginal_temperature": 0.2,
+        "marginal_severe_convection": 0.3,
     }
 
     # Handle both IndividualCase and list of IndividualCases
@@ -745,8 +750,18 @@ def plot_all_cases(
     for indiv_case in cases_to_plot:
         # Get color based on event type
         indiv_event_type = indiv_case.event_type
+
+        combined_event_type = None
+        if is_marginal:
+            if indiv_event_type == "severe_convection":
+                combined_event_type = "marginal_severe_convection"
+            else:
+                combined_event_type = "marginal_temperature"
+        else:
+            combined_event_type = indiv_event_type
+        
         color = event_colors.get(
-            indiv_event_type, "gray"
+            combined_event_type, "gray"
         )  # Default to gray if event type not found
 
         # check if the case is inside the bounding box
@@ -759,7 +774,7 @@ def plot_all_cases(
                 continue
 
         # count the events by type
-        counts_by_type[indiv_event_type] += 1
+        counts_by_type[combined_event_type] += 1
 
         # Plot the case geopandas info
         if event_type is None or indiv_event_type == event_type:
@@ -795,10 +810,10 @@ def plot_all_cases(
         # if we are only plotting one event type, only show that in the legend
         legend_elements = [
             Patch(
-                facecolor=event_colors[event_type],
+                facecolor=event_colors[combined_event_type],
                 alpha=0.9,
-                label=f"{event_type.replace('_', ' ').title()} (n = %d)"
-                % counts_by_type[event_type],
+                label=f"{combined_event_type.replace('_', ' ').title()} (n = %d)"
+                % counts_by_type[combined_event_type],
             ),
         ]
     else:
@@ -887,6 +902,7 @@ def plot_all_cases_and_obs(
     title=None,
     y_label=None,
     map_gridlines: Optional[Union[bool, Dict[str, Any]]] = None,
+    is_marginal=False,
 ):
     """Plot all cases (outlined) and observations (filled) on map.
     Args:
@@ -907,6 +923,8 @@ def plot_all_cases_and_obs(
         map_gridlines: If None (default), do not add gridlines. If True, call
             setup_gridlines with defaults. If a dict, keyword arguments for
             setup_gridlines (e.g. show_left_labels=False for unlabeled grid).
+        is_marginal (bool): Whether the cases are marginal. If True, the 
+            legend will use marginal in the words and the colors will be shifted
     """
     # plot all cases on one giant world map
     if ax is None:
@@ -952,6 +970,7 @@ def plot_all_cases_and_obs(
         "severe_convection": sns_palette[5],
         "atmospheric_river": sns_palette[7],
         "marginal_temperature": sns_palette[2],
+        "marginal_severe_convection": sns_palette[8],
     }
 
     # Initialize counts for each event type
@@ -963,6 +982,7 @@ def plot_all_cases_and_obs(
             "atmospheric_river": 0,
             "tropical_cyclone": 0,
             "marginal_temperature": 0,
+            "marginal_severe_convection": 0,
         }
     )
 
@@ -982,6 +1002,7 @@ def plot_all_cases_and_obs(
             "severe_convection": 0,
             "atmospheric_river": 0,
             "marginal_temperature": 0,
+            "marginal_severe_convection": 0,
         }
     )
 
@@ -992,6 +1013,7 @@ def plot_all_cases_and_obs(
         "tropical_cyclone": 10,
         "severe_convection": 0,
         "marginal_temperature": 8,
+        "marginal_severe_convection": 0,
     }
     alphas = {
         "freeze": 1,
@@ -1000,6 +1022,7 @@ def plot_all_cases_and_obs(
         "tropical_cyclone": 1,
         "severe_convection": 1,
         "marginal_temperature": 1,
+        "marginal_severe_convection": 1,
     }
 
     # Handle both IndividualCase and list of IndividualCases
@@ -1017,8 +1040,17 @@ def plot_all_cases_and_obs(
     for indiv_case in cases_to_plot:
         # Get color based on event type
         indiv_event_type = indiv_case.event_type
+        combined_event_type = None
+        if is_marginal:
+            if indiv_event_type == "severe_convection":
+                combined_event_type = "marginal_severe_convection"
+            else:
+                combined_event_type = "marginal_temperature"
+        else:
+            combined_event_type = indiv_event_type
+
         color = event_colors.get(
-            indiv_event_type, "gray"
+            combined_event_type, "gray"
         )  # Default to gray if event type not found
 
         if bounding_box is not None:
@@ -1034,7 +1066,7 @@ def plot_all_cases_and_obs(
             continue
 
         # count the events by type
-        counts_by_type[indiv_event_type] += 1
+        counts_by_type[combined_event_type] += 1
 
         # Plot the case geopandas info
         if indiv_event_type == event_type or event_type is None:
@@ -1207,7 +1239,7 @@ def plot_all_cases_and_obs(
         # Create a custom legend for event types
         if event_type is not None:
             # if we are only plotting one event type, only show that in the legend
-            if event_type == "severe_convection":
+            if event_type == "severe_convection" or combined_event_type == "marginal_severe_convection":
                 legend_elements = [
                     plt.Line2D(
                         [0],
@@ -1227,7 +1259,7 @@ def plot_all_cases_and_obs(
                     ),
                 ]
             else:
-                if event_type in ["heat_wave", "freeze"]:
+                if event_type in ["heat_wave", "freeze"] or combined_event_type == "marginal_temperature":
                     my_label = (
                         "GHCNh stations (n = %d)"
                         % observation_counts_by_type[event_type]
@@ -1246,7 +1278,7 @@ def plot_all_cases_and_obs(
                     plt.Line2D(
                         [0],
                         [0],
-                        color=event_colors[event_type],
+                        color=event_colors[combined_event_type],
                         linestyle="none",
                         marker=".",
                         markersize=10,
