@@ -746,6 +746,13 @@ def plot_all_cases(
             f"list of IndividualCases, got {type(ewb_cases)}"
         )
 
+    combined_event_type = event_type
+    if is_marginal:
+        if event_type == "severe_convection":
+            combined_event_type = "marginal_severe_convection"
+        else:
+            combined_event_type = "marginal_temperature"
+    
     # Plot boxes for each case
     for indiv_case in cases_to_plot:
         # Get color based on event type
@@ -762,14 +769,6 @@ def plot_all_cases(
 
         # Plot the case geopandas info
         if event_type is None or indiv_event_type == event_type:
-            combined_event_type = None
-            if is_marginal:
-                if indiv_event_type == "severe_convection":
-                    combined_event_type = "marginal_severe_convection"
-                else:
-                    combined_event_type = "marginal_temperature"
-            else:
-                combined_event_type = indiv_event_type
             
             color = event_colors.get(
                 combined_event_type, "gray"
