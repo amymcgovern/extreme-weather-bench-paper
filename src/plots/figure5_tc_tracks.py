@@ -207,14 +207,14 @@ def plot_tc_panel(
         ax.plot(
             lons_v, lats_v, "-",
             color=colors[i], alpha=0.8,
-            linewidth=1.5, transform=ccrs.PlateCarree(),
+            linewidth=4, transform=ccrs.PlateCarree(),
         )
 
     ax.plot(
         analysis_track_data.longitude,
         analysis_track_data.latitude,
         "-ok", transform=ccrs.PlateCarree(),
-        linewidth=1.2, markersize=2.5,
+        linewidth=4, markersize=6,
         markeredgecolor="white", markeredgewidth=0.3,
     )
 
