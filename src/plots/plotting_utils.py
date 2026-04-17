@@ -2044,6 +2044,9 @@ def plot_heatmap(
             "% difference vs IFS HRES", fontsize=cbar_fontsize
         )
 
+    if title is not None:
+        fig.suptitle(title, fontsize=title_fontsize, y=1.02)
+
     # Only call tight_layout if we created the figure ourselves
     if not is_subplot:
         fig.tight_layout()
