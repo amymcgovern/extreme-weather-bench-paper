@@ -189,6 +189,102 @@ def plot_ar_mask_single_timestep(
     return ax
 
 
+def plot_ar_mask_global(
+    ivt_data: xr.DataArray,
+    ar_mask: xr.DataArray,
+    title: Optional[str] = None,
+    ax: Optional[plt.Axes] = None,
+    colorbar: bool = True,
+) -> plt.Axes:
+    """Plot IVT and AR mask on a global map for a single timestep.
+
+    Unlike plot_ar_mask_single_timestep, this function sets a global
+    extent rather than zooming into the data domain.
+
+    Args:
+        ivt_data: 2D IVT DataArray with latitude and longitude dims.
+        ar_mask: 2D AR mask DataArray with latitude and longitude dims.
+        title: Optional title for the plot.
+        ax: Existing Axes to plot on; creates a new figure if None.
+        colorbar: Whether to add a colorbar.
+
+    Returns:
+        Axes object.
+    """
+    cmap, norm = setup_atmospheric_river_colormap_and_levels()
+
+    if len(ivt_data.dims) != 2 or len(ar_mask.dims) != 2:
+        raise ValueError("IVT and AR mask data must have only 2 dimensions.")
+    if "longitude" not in ivt_data.dims or "latitude" not in ivt_data.dims:
+        raise ValueError("IVT data must have longitude and latitude dimensions.")
+    if "longitude" not in ar_mask.dims or "latitude" not in ar_mask.dims:
+        raise ValueError("AR mask must have longitude and latitude dimensions.")
+
+    if ax is None:
+        fig = plt.figure(figsize=(18, 9))
+        fig.subplots_adjust(left=0.05, right=0.88, top=0.90, bottom=0.05)
+        ax = plt.axes(projection=ccrs.PlateCarree())
+        is_subplot = False
+    else:
+        fig = ax.figure
+        is_subplot = True
+
+    plotting.add_geographic_features(ax, include_land_ocean=True, land_ocean_alpha=0.1)
+    ax.add_feature(cfeature.BORDERS, linestyle=":")
+    ax.set_global()
+
+    im = ax.pcolormesh(
+        ivt_data.longitude,
+        ivt_data.latitude,
+        ivt_data.values,
+        transform=ccrs.PlateCarree(),
+        cmap=cmap,
+        norm=norm,
+    )
+    ax.contour(
+        ar_mask.longitude,
+        ar_mask.latitude,
+        ar_mask.values,
+        levels=[0.5],
+        colors="black",
+        linewidths=1.5,
+        transform=ccrs.PlateCarree(),
+    )
+
+    title_size = "large" if is_subplot else 18
+    if title:
+        ax.set_title(title, loc="left", size=title_size)
+
+    if colorbar:
+        # For PlateCarree the axes rect fills the map exactly, so we can
+        # read the axes position directly in figure coordinates.
+        fig.canvas.draw()
+        spine = ax.spines["geo"]
+        path_fig = spine.get_path().transformed(
+            spine.get_transform() + fig.transFigure.inverted()
+        )
+        verts = path_fig.vertices
+        y_bot = float(verts[:, 1].min())
+        y_top = float(verts[:, 1].max())
+        x_right = float(verts[:, 0].max())
+
+        cbar_gap = 0.012
+        cbar_width = 0.020
+        cbar_ax = fig.add_axes(
+            [x_right + cbar_gap, y_bot, cbar_width, y_top - y_bot]
+        )
+        cbar = fig.colorbar(im, cax=cbar_ax, orientation="vertical")
+        cbar.set_label(
+            r"Integrated Vapor Transport (kg m$^{-1}$ s$^{-1}$)",
+            size=16,
+            rotation=270,
+            labelpad=22,
+        )
+        cbar.ax.tick_params(labelsize=14)
+
+    return ax
+
+
 def plot_ar_mask_animation(
     case_id: int,
     title: str,

@@ -113,6 +113,11 @@ def plot_heatwave_case(
     single_case: cases.IndividualCase,
     filename: Optional[str] = None,
     ax: Optional[plt.Axes] = None,
+    add_colorbar: bool = True,
+    extent: Optional[tuple[float, float, float, float]] = None,
+    add_map_features: bool = True,
+    add_gridlines: bool = True,
+    show_case_label: bool = True,
 ):
     """Plot the heatwave case
     Args:
@@ -121,6 +126,18 @@ def plot_heatwave_case(
         single_case: cases.IndividualCase object with metadata
         filename: Optional[str] = if not None, the plots will be saved to this filename
         ax: Optional[plt.Axes] = if not None, the axis to plot the case on
+        add_colorbar: if False, skip drawing the per-axes colorbar so the
+            caller can supply a single shared colorbar.
+        extent: Optional (lon_min, lon_max, lat_min, lat_max) in PlateCarree
+            to enforce a fixed map extent (e.g. shared aspect ratio across
+            cases). When None, xarray's auto-extent is used.
+        add_map_features: if False, skip the built-in coastlines/borders/
+            land/lakes/rivers/states styling so the caller can apply its
+            own (e.g. to match another panel's look).
+        add_gridlines: if False, skip the built-in lat/lon gridlines.
+        show_case_label: if False, drop the "<title>, Case ID N" line
+            from the panel title (useful when the same label is already
+            shown in another panel for the same case).
     """
     
     time_based_heatwave_dataset = heatwave_dataset.mean(["latitude", "longitude"])
@@ -167,23 +184,25 @@ def plot_heatwave_case(
             transform=ccrs.PlateCarree(),
         )
     )
-    # Add coastlines and gridlines
-    ax1.coastlines()
-    ax1.add_feature(cfeature.BORDERS, linestyle=":")
-    ax1.add_feature(cfeature.LAND, edgecolor="black")
-    ax1.add_feature(cfeature.LAKES, edgecolor="black")
-    ax1.add_feature(
-        cfeature.RIVERS, edgecolor=[0.59375, 0.71484375, 0.8828125], alpha=0.5
-    )
-    ax1.add_feature(cfeature.STATES, edgecolor="grey")
-    # Add gridlines
-    gl = ax1.gridlines(draw_labels=True, alpha=0.25)
-    gl.top_labels = False
-    gl.right_labels = False
-    gl.xformatter = LongitudeFormatter()
-    gl.yformatter = LatitudeFormatter()
-    gl.xlabel_style = {"size": 12, "color": "k"}
-    gl.ylabel_style = {"size": 12, "color": "k"}
+    if extent is not None:
+        ax1.set_extent(extent, crs=ccrs.PlateCarree())
+    if add_map_features:
+        ax1.coastlines()
+        ax1.add_feature(cfeature.BORDERS, linestyle=":")
+        ax1.add_feature(cfeature.LAND, edgecolor="black")
+        ax1.add_feature(cfeature.LAKES, edgecolor="black")
+        ax1.add_feature(
+            cfeature.RIVERS, edgecolor=[0.59375, 0.71484375, 0.8828125], alpha=0.5
+        )
+        ax1.add_feature(cfeature.STATES, edgecolor="grey")
+    if add_gridlines:
+        gl = ax1.gridlines(draw_labels=True, alpha=0.25)
+        gl.top_labels = False
+        gl.right_labels = False
+        gl.xformatter = LongitudeFormatter()
+        gl.yformatter = LatitudeFormatter()
+        gl.xlabel_style = {"size": 12, "color": "k"}
+        gl.ylabel_style = {"size": 12, "color": "k"}
     ax1.set_title("")  # clears the default xarray title
     time_str = (
         heatwave_dataset["valid_time"]
@@ -191,26 +210,34 @@ def plot_heatwave_case(
         .dt.strftime("%Y-%m-%d %Hz")
         .values
     )
-    ax1.set_title(
-        f"Temperature Where > 85th Percentile Climatology\n"
-        f"{single_case.title}, Case ID {single_case.case_id_number}\n"
-        f"{time_str}",
-        loc="left",
-    )
+    if show_case_label:
+        title_text = (
+            f"Temperature Where > 85th Percentile Climatology\n"
+            f"{single_case.title}, Case ID {single_case.case_id_number}\n"
+            f"{time_str}"
+        )
+    else:
+        title_text = (
+            f"Temperature Where > 85th Percentile Climatology\n"
+            f"{time_str}"
+        )
+    ax1.set_title(title_text, loc="left")
     # Add the location coordinate as a dot on the map
     ax1.tick_params(axis="y", which="major", labelsize=12)
-    # Create a colorbar with the same height as the plot
-    divider = make_axes_locatable(ax1)
-    cax = divider.append_axes("right", size="5%", pad=0.1, axes_class=plt.Axes)
-    cbar = fig1.colorbar(im, cax=cax, label="Temp > 85th Percentile (C)")
-    cbar.set_label("Temperature (C)", size=14)
-    cbar.ax.tick_params(labelsize=12)
+    if add_colorbar:
+        # Create a colorbar with the same height as the plot
+        divider = make_axes_locatable(ax1)
+        cax = divider.append_axes("right", size="5%", pad=0.1, axes_class=plt.Axes)
+        cbar = fig1.colorbar(im, cax=cax, label="Temp > 85th Percentile (C)")
+        cbar.set_label("Temperature (C)", size=14)
+        cbar.ax.tick_params(labelsize=12)
 
     # if ax is None:
     #     plt.tight_layout()
     #     if filename is not None:
     #         plt.savefig(filename, transparent=True)
     #     plt.show()
+    return im
 
 
 def plot_heatwave_time_series(
@@ -371,6 +398,11 @@ def plot_freeze_case(
     single_case: cases.IndividualCase,
     filename: Optional[str] = None,
     ax: Optional[plt.Axes] = None,
+    add_colorbar: bool = True,
+    extent: Optional[tuple[float, float, float, float]] = None,
+    add_map_features: bool = True,
+    add_gridlines: bool = True,
+    show_case_label: bool = True,
 ):
     """Plot the freeze case
     Args:
@@ -379,30 +411,31 @@ def plot_freeze_case(
         single_case: cases.IndividualCase object with metadata
         filename: Optional[str] = if not None, the plots will be saved to this filename
         ax: Optional[plt.Axes] = if not None, the axis to plot the case on
+        add_colorbar: if False, skip drawing the per-axes colorbar so the
+            caller can supply a single shared colorbar.
+        extent: Optional (lon_min, lon_max, lat_min, lat_max) in PlateCarree
+            to enforce a fixed map extent.
+        add_map_features: if False, skip the built-in coastlines/borders/
+            land/lakes/rivers/states styling.
+        add_gridlines: if False, skip the built-in lat/lon gridlines.
+        show_case_label: if False, drop the "<title>, Case ID N" line
+            from the panel title.
     """
-    # if not provided, create a new figure and axis
     if ax is None:
         fig1 = plt.figure(figsize=(12, 6))
         ax1 = plt.axes(projection=ccrs.PlateCarree())
     else:
-        # this will be a subplot within a larger figure so use the existing axis
         ax1 = ax
         fig1 = ax.get_figure()
 
     time_based_freeze_dataset = freeze_dataset.mean(["latitude", "longitude"])
-    # Select the timestep with the maximum spatially averaged temp
     subset_timestep = time_based_freeze_dataset["valid_time"][
         time_based_freeze_dataset["2m_temperature"].argmin()
     ]
-    # Mask places where temp >= 15th percentile climatology
     temp_data = freeze_dataset["2m_temperature"] - 273.15
     climatology_data = freeze_dataset["surface_temperature_15th_percentile"] - 273.15
 
-    # Create mask for values where temp < climatology
-    # (freeze condition)
     mask = temp_data < climatology_data
-
-    # Apply mask to temperature data
     masked_temp = temp_data.where(mask)
     cmap, norm = celsius_colormap_and_normalize()
     im = masked_temp.sel(valid_time=subset_timestep).plot(
@@ -412,54 +445,60 @@ def plot_freeze_case(
         norm=norm,
         add_colorbar=False,
     )
-    (
-        temp_data.sel(valid_time=subset_timestep).plot.contour(
-            ax=ax1,
-            levels=[0],
-            colors="r",
-            linewidths=0.75,
-            ls=":",
-            transform=ccrs.PlateCarree(),
+    temp_data.sel(valid_time=subset_timestep).plot.contour(
+        ax=ax1,
+        levels=[0],
+        colors="r",
+        linewidths=0.75,
+        ls=":",
+        transform=ccrs.PlateCarree(),
+    )
+    if extent is not None:
+        ax1.set_extent(extent, crs=ccrs.PlateCarree())
+    if add_map_features:
+        ax1.coastlines()
+        ax1.add_feature(cfeature.BORDERS, linestyle=":")
+        ax1.add_feature(cfeature.LAND, edgecolor="black")
+        ax1.add_feature(cfeature.LAKES, edgecolor="black")
+        ax1.add_feature(
+            cfeature.RIVERS, edgecolor=[0.59375, 0.71484375, 0.8828125], alpha=0.5
         )
-    )
-    # Add coastlines and gridlines
-    ax1.coastlines()
-    ax1.add_feature(cfeature.BORDERS, linestyle=":")
-    ax1.add_feature(cfeature.LAND, edgecolor="black")
-    ax1.add_feature(cfeature.LAKES, edgecolor="black")
-    ax1.add_feature(
-        cfeature.RIVERS, edgecolor=[0.59375, 0.71484375, 0.8828125], alpha=0.5
-    )
-    ax1.add_feature(cfeature.STATES, edgecolor="grey")
-    # Add gridlines
-    gl = ax1.gridlines(draw_labels=True, alpha=0.25)
-    gl.top_labels = False
-    gl.right_labels = False
-    gl.xformatter = LongitudeFormatter()
-    gl.yformatter = LatitudeFormatter()
-    gl.xlabel_style = {"size": 12, "color": "k"}
-    gl.ylabel_style = {"size": 12, "color": "k"}
-    ax1.set_title("")  # clears the default xarray title
+        ax1.add_feature(cfeature.STATES, edgecolor="grey")
+    if add_gridlines:
+        gl = ax1.gridlines(draw_labels=True, alpha=0.25)
+        gl.top_labels = False
+        gl.right_labels = False
+        gl.xformatter = LongitudeFormatter()
+        gl.yformatter = LatitudeFormatter()
+        gl.xlabel_style = {"size": 12, "color": "k"}
+        gl.ylabel_style = {"size": 12, "color": "k"}
+    ax1.set_title("")
     time_str = (
         freeze_dataset["valid_time"]
         .sel(valid_time=subset_timestep)
         .dt.strftime("%Y-%m-%d %Hz")
         .values
     )
-    ax1.set_title(
-        f"Temperature Where < 15th Percentile Climatology\n"
-        f"{single_case.title}, Case ID {single_case.case_id_number}\n"
-        f"{time_str}",
-        loc="left",
-    )
-    # Add the location coordinate as a dot on the map
+    if show_case_label:
+        title_text = (
+            f"Temperature Where < 15th Percentile Climatology\n"
+            f"{single_case.title}, Case ID {single_case.case_id_number}\n"
+            f"{time_str}"
+        )
+    else:
+        title_text = (
+            f"Temperature Where < 15th Percentile Climatology\n"
+            f"{time_str}"
+        )
+    ax1.set_title(title_text, loc="left")
     ax1.tick_params(axis="y", which="major", labelsize=12)
-    # Create a colorbar with the same height as the plot
-    divider = make_axes_locatable(ax1)
-    cax = divider.append_axes("right", size="5%", pad=0.1, axes_class=plt.Axes)
-    cbar = fig1.colorbar(im, cax=cax, label="Temp < 15th Percentile (C)")
-    cbar.set_label("Temperature (C)", size=14)
-    cbar.ax.tick_params(labelsize=12)
+    if add_colorbar:
+        divider = make_axes_locatable(ax1)
+        cax = divider.append_axes("right", size="5%", pad=0.1, axes_class=plt.Axes)
+        cbar = fig1.colorbar(im, cax=cax, label="Temp < 15th Percentile (C)")
+        cbar.set_label("Temperature (C)", size=14)
+        cbar.ax.tick_params(labelsize=12)
+    return im
 
     # if ax is None:
     #     plt.tight_layout()
