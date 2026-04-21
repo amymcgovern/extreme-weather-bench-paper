@@ -93,8 +93,8 @@ def plot_storm_reports(
 
 def plot_pph_contours(
     ax, pph_data: xr.DataArray, pph_cmap, pph_norm, pph_levels: List[float]
-) -> List[plt.Line2D]:
-    """Plot PPH contours and return legend elements.
+) -> Tuple[Any, List[plt.Line2D]]:
+    """Plot PPH contours and return the contour set plus legend elements.
 
     Args:
         ax: Cartopy axis to plot on.
@@ -104,7 +104,10 @@ def plot_pph_contours(
         pph_levels: PPH contour levels.
 
     Returns:
-        List of legend elements for PPH contours.
+        Tuple of (contour_set, legend_elements). ``contour_set`` is the
+        ``QuadContourSet`` returned by ``ax.contour`` and can be used as a
+        colorbar mappable. ``legend_elements`` is a list of ``Line2D`` proxies
+        for use in a custom legend.
     """
     legend_elements = []
 
@@ -113,7 +116,7 @@ def plot_pph_contours(
     pph_cmap_with_alpha = pph_cmap.copy()
     pph_cmap_with_alpha.set_bad("none", alpha=0)
 
-    ax.contour(
+    contour_set = ax.contour(
         pph_data.longitude,
         pph_data.latitude,
         pph_mask,
@@ -134,7 +137,7 @@ def plot_pph_contours(
             plt.Line2D([0], [0], color=color, linewidth=1.5, label=label)
         )
 
-    return legend_elements
+    return contour_set, legend_elements
 
 
 def plot_cbss_forecast_panel(
@@ -363,7 +366,9 @@ def plot_cbss_forecast_multipanel(
 
         # Add PPH contours if available
         if pph_data is not None:
-            pph_legend = plot_pph_contours(ax, pph_data, pph_cmap, pph_norm, pph_levels)
+            _, pph_legend = plot_pph_contours(
+                ax, pph_data, pph_cmap, pph_norm, pph_levels
+            )
             if i == 0:  # Only add to legend once
                 all_legend_elements.extend(pph_legend)
 

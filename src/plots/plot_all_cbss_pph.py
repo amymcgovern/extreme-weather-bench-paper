@@ -8,13 +8,7 @@ import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from extremeweatherbench import (
-    cases,
-    defaults,
-    evaluate,
-    inputs,
-    utils,
-)
+import extremeweatherbench as ewb
 from joblib import Parallel, delayed  # noqa: E402
 from joblib.externals.loky import get_reusable_executor  # noqa: E402
 
@@ -25,9 +19,9 @@ import src.plots.severe_convection_utils as severe_utils
 # to plot the targets, we need to run the pipeline for each case and target
 
 def get_cbss_and_pph_outputs(ewb_case, forecast_source):
-    pph_target = inputs.PPH()
-    pph = evaluate.run_pipeline(ewb_case, pph_target)
-    cbss = evaluate.run_pipeline(ewb_case, forecast_source)
+    pph_target = ewb.inputs.PPH()
+    pph = ewb.evaluate.run_pipeline(ewb_case, pph_target)
+    cbss = ewb.evaluate.run_pipeline(ewb_case, forecast_source)
 
     return cbss, pph
 
@@ -54,7 +48,7 @@ def plot_cbss_pph_panel(cbss, pph, my_case, lsrs, ax=None, title=None, lead_time
         # grab the lsrs and convert to a dataframe
         lsrs = lsrs.sel(valid_time=valid_time)
 
-        non_sparse_lsrs = utils.stack_dataarray_from_dims(
+        non_sparse_lsrs = ewb.utils.stack_dataarray_from_dims(
                             lsrs["report_type"], ["latitude", "longitude"]
                         ).squeeze()
         
@@ -154,8 +148,14 @@ if __name__ == "__main__":
     basepath = str(basepath) + "/"
 
     # load in all of the events in the yaml file
-    ewb_cases = cases.load_ewb_events_yaml_into_case_list()
+    ewb_cases = ewb.cases.load_ewb_events_yaml_into_case_list()
     ewb_cases = [n for n in ewb_cases if n.event_type == "severe_convection"]
+
+    # build out all of the expected data to evalate the case (we need this so we can plot
+    # the LSR reports)
+    case_operators = ewb.cases.build_case_operators(
+        ewb_cases, ewb.defaults.get_brightband_evaluation_objects()
+    )
 
     # uncomment this for debugging and faster plotting
     parser = argparse.ArgumentParser(
@@ -168,16 +168,35 @@ if __name__ == "__main__":
         help="Plot for paper (default: False)",
     )
 
+    parser.add_argument(
+        "--marginal",
+        action="store_true",
+        default=False,
+        help="Plot for marginal cases (default: False)",
+    )
+
     args = parser.parse_args()
     paper = args.paper
+    
+    if (args.marginal):
+        # load the marginal severe cases
+        marginal_severe_yaml_path = Path(ewb.__file__).parent / "data" / "marginal_severe_convection_cases.yaml"
+        marginal_severe_cases = ewb.cases.load_individual_cases_from_yaml(marginal_severe_yaml_path)
+        marginal_severe_cases = [n for n in marginal_severe_cases if n.event_type == "severe_convection"]
+        marginal_severe_case_operators = ewb.cases.build_case_operators(
+            marginal_severe_cases, ewb.defaults.get_brightband_evaluation_objects()
+        )
+        ewb_cases = marginal_severe_cases
+        case_operators = marginal_severe_case_operators
+
 
     if paper:
         ewb_cases = [n for n in ewb_cases if n.case_id_number in [316, 269]]
     
     # build out all of the expected data to evalate the case (we need this so we can plot
     # the LSR reports)
-    case_operators = cases.build_case_operators(
-        ewb_cases, defaults.get_brightband_evaluation_objects()
+    case_operators = ewb.cases.build_case_operators(
+        ewb_cases, ewb.defaults.get_brightband_evaluation_objects()
     )
 
     # load in all the case info (note this takes awhile in non-parallel form as it has to
@@ -189,7 +208,7 @@ if __name__ == "__main__":
         delayed(
             lambda co: (
                 co.case_metadata.case_id_number,
-                evaluate.run_pipeline(co.case_metadata, co.target),
+                ewb.evaluate.run_pipeline(co.case_metadata, co.target),
             )
         )(case_operator)
         for case_operator in case_operators
@@ -203,21 +222,29 @@ if __name__ == "__main__":
 
     print("Loading in the graphics objects")
     # load in the graphics objects
-    print("Loading in the HRES graphics object")
     if paper:
-        hres_graphics = pickle.load(open(basepath + "saved_data/hres_graphics_paper.pkl", "rb"))
-        bb_graphcast_graphics = pickle.load(open(basepath + "saved_data/gc_bb_graphics_paper.pkl", "rb"))
-        bb_pangu_graphics = pickle.load(open(basepath + "saved_data/pang_bb_graphics_paper.pkl", "rb"))
-        bb_aifs_graphics = pickle.load(open(basepath + "saved_data/aifs_bb_graphics_paper.pkl", "rb"))
-
-    else:
-        hres_graphics = pickle.load(open(basepath + "saved_data/hres_graphics.pkl", "rb"))
+        hres_graphics = pickle.load(open(basepath + "saved_data/hres_severe_graphics_paper.pkl", "rb"))
+        bb_graphcast_graphics = pickle.load(open(basepath + "saved_data/gc_bb_severe_graphics_paper.pkl", "rb"))
+        bb_pangu_graphics = pickle.load(open(basepath + "saved_data/pang_bb_severe_graphics_paper.pkl", "rb"))
+        bb_aifs_graphics = pickle.load(open(basepath + "saved_data/aifs_bb_severe_graphics_paper.pkl", "rb"))
+    elif (args.marginal):
+        print("Loading in the HRES graphics object")
+        hres_graphics = pickle.load(open(basepath + "saved_data/hres_graphics_severe_marginal.pkl", "rb"))
         print("Loading in the GraphCast graphics object")
-        bb_graphcast_graphics = pickle.load(open(basepath + "saved_data/gc_bb_graphics.pkl", "rb"))
+        bb_graphcast_graphics = pickle.load(open(basepath + "saved_data/gc_bb_severe_graphics_marginal.pkl", "rb"))
         print("Loading in the Pangu graphics object")
-        bb_pangu_graphics = pickle.load(open(basepath + "saved_data/pang_bb_graphics.pkl", "rb"))
+        bb_pangu_graphics = pickle.load(open(basepath + "saved_data/pang_bb_severe_graphics_marginal.pkl", "rb"))
         print("Loading in the AIFS graphics object")
-        bb_aifs_graphics = pickle.load(open(basepath + "saved_data/aifs_bb_graphics.pkl", "rb"))
+        bb_aifs_graphics = pickle.load(open(basepath + "saved_data/aifs_bb_severe_graphics_marginal.pkl", "rb"))
+    else:
+        print("Loading in the HRES graphics object")
+        hres_graphics = pickle.load(open(basepath + "saved_data/hres_graphics_severe_marginal.pkl", "rb"))
+        print("Loading in the GraphCast graphics object")
+        bb_graphcast_graphics = pickle.load(open(basepath + "saved_data/gc_bb_severe_graphics.pkl", "rb"))
+        print("Loading in the Pangu graphics object")
+        bb_pangu_graphics = pickle.load(open(basepath + "saved_data/pang_bb_severe_graphics.pkl", "rb"))
+        print("Loading in the AIFS graphics object")
+        bb_aifs_graphics = pickle.load(open(basepath + "saved_data/aifs_bb_severe_graphics.pkl", "rb"))
 
     lead_times_to_plot = [10*24, 7*24, 5*24, 3*24, 24]
 

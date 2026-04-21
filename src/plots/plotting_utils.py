@@ -895,7 +895,6 @@ def plot_all_cases_and_obs(
     filename=None,
     bounding_box=None,
     targets=None,
-    show_orig_pph=False,
     case_id=None,
     ax=None,
     show_legend=True,
@@ -916,7 +915,6 @@ def plot_all_cases_and_obs(
             None, the full world map will be plotted.
         targets (dict): A dictionary containing observation metadata for each case,
             such as PPH and LSR reports.
-        show_orig_pph (bool): Whether to show the original PPH reports.
         case_id (str): The ID of the case to plot. If None, all cases will be plotted.
         ax (matplotlib.axes.Axes): The axis to plot the cases on. If None, a new axis
             will be created using plt.axes(projection=ccrs.PlateCarree()).
