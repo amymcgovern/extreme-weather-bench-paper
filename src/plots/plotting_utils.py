@@ -1873,6 +1873,13 @@ def plot_heatmap(
     if ax is None:
         # Create new figure and subplots
         fig, axs = plt.subplots(n_rows, n_cols, figsize=figsize)
+        # Normalize axs to a flat list so single-metric/single-row cases
+        # (where plt.subplots returns a bare Axes or 2D ndarray) behave
+        # the same as multi-column cases below.
+        if n_rows == 1 and n_cols == 1:
+            axs = [axs]
+        else:
+            axs = np.atleast_1d(axs).ravel().tolist()
         is_subplot = False
     else:
         # Use existing axis - create subplots within it
@@ -1991,7 +1998,6 @@ def plot_heatmap(
     # if there are less than n_cols subplots, add a blank subplot
     if len(subplot_titles) < n_cols:
         for i in range(len(subplot_titles), n_cols):
-            print(f"adding blank subplot {i}")
             axs[i].set_visible(False)
 
     # Position colorbar appropriately based on whether we're a subplot
