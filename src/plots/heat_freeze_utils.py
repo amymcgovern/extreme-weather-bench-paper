@@ -14,52 +14,62 @@ from matplotlib.patches import Patch
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
+# def celsius_colormap_and_normalize() -> tuple[mcolors.Colormap, mcolors.Normalize]:
+#     """Gets the colormap and normalization for 2m temperature.
+
+#     Uses a custom colormap for temperature in Celsius.
+
+#     Returns:
+#         A tuple (cmap, norm) for plotting.
+#     """
+#     lo_colors = [
+#         "#E4C7F4",
+#         "#E53885",
+#         "#C17CBE",
+#         "#694396",
+#         "#CBCCE9",
+#         "#6361BD",
+#         "#77FBFE",
+#     ]
+#     hi_colors = [
+#         "#8CE9B0",
+#         "#479F31",
+#         "#F0F988",
+#         "#AD311B",
+#         "#ECB9F1",
+#         "#7F266F",
+#     ]
+#     colors = lo_colors + hi_colors
+
+#     # Calculate the position where we want the 0C jump
+#     lo = -67.8
+#     hi = 54.4
+#     threshold = 0
+#     threshold_pos = (threshold - lo) / (hi - lo)  # normalize 0°C position to [0,1]
+
+#     # Create positions for colors with a small gap around zero_pos
+#     positions = np.concatenate(
+#         [
+#             np.linspace(0, threshold_pos - 0.02, len(lo_colors)),  # Colors up to white
+#             # [threshold_pos],  # White position
+#             np.linspace(threshold_pos + 0.02, 1, len(hi_colors)),  # Colors after white
+#         ]
+#     )
+
+#     return mcolors.LinearSegmentedColormap.from_list(
+#         "temp_colormap", list(zip(positions, colors))
+#     ), mcolors.Normalize(vmin=lo, vmax=hi)
+
 def celsius_colormap_and_normalize() -> tuple[mcolors.Colormap, mcolors.Normalize]:
     """Gets the colormap and normalization for 2m temperature.
-
-    Uses a custom colormap for temperature in Celsius.
-
+    Uses the managua colormap for temperature in Celsius.
     Returns:
         A tuple (cmap, norm) for plotting.
     """
-    lo_colors = [
-        "#E4C7F4",
-        "#E53885",
-        "#C17CBE",
-        "#694396",
-        "#CBCCE9",
-        "#6361BD",
-        "#77FBFE",
-    ]
-    hi_colors = [
-        "#8CE9B0",
-        "#479F31",
-        "#F0F988",
-        "#AD311B",
-        "#ECB9F1",
-        "#7F266F",
-    ]
-    colors = lo_colors + hi_colors
-
-    # Calculate the position where we want the 0C jump
-    lo = -67.8
-    hi = 54.4
-    threshold = 0
-    threshold_pos = (threshold - lo) / (hi - lo)  # normalize 0°C position to [0,1]
-
-    # Create positions for colors with a small gap around zero_pos
-    positions = np.concatenate(
-        [
-            np.linspace(0, threshold_pos - 0.02, len(lo_colors)),  # Colors up to white
-            # [threshold_pos],  # White position
-            np.linspace(threshold_pos + 0.02, 1, len(hi_colors)),  # Colors after white
-        ]
-    )
-
-    return mcolors.LinearSegmentedColormap.from_list(
-        "temp_colormap", list(zip(positions, colors))
-    ), mcolors.Normalize(vmin=lo, vmax=hi)
-
+    lo = 0
+    hi = 45
+    cmap = plt.get_cmap("inferno")
+    return cmap, mcolors.Normalize(vmin=lo, vmax=hi)
 
 def generate_heatwave_dataset(
     era5: xr.Dataset,
