@@ -3,6 +3,7 @@ import operator
 import extremeweatherbench as ewb
 import xarray as xr
 from check_icechunk import open_mlwp_archive_icechunk_dataset
+from extremeweatherbench.defaults import get_climatology
 
 from src.data.aifs_util import (
     BB_MLWP_VARIABLE_MAPPING,
@@ -14,8 +15,8 @@ from src.data.model_name_setup import (
 )
 
 # Load the climatology for DurationMeanError
-heat_climatology = ewb.get_climatology(quantile=0.85)
-freeze_climatology = ewb.get_climatology(quantile=0.15)
+heat_climatology = get_climatology(quantile=0.85)
+freeze_climatology = get_climatology(quantile=0.15)
 
 heat_metrics = [
     ewb.metrics.MaximumMeanAbsoluteError(),

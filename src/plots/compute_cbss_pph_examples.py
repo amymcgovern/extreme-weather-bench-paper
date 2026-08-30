@@ -1,30 +1,87 @@
 # setup all the imports
 import argparse
+import importlib
 import pickle
 from pathlib import Path
-import importlib
 
 import extremeweatherbench as ewb
 from extremeweatherbench import data
+from joblib import Parallel, delayed
 
 from src.data.severe_forecast_setup import (
     SevereEvaluationSetup,
     SevereForecastSetup,
 )
 
-# to plot the targets, we need to run the pipeline for each case and target
-
 # make the basepath - change this to your local path
 basepath = Path.home() / "extreme-weather-bench-paper" / ""
 basepath = str(basepath) + "/"
 
 
-def get_cbss_and_pph_outputs(ewb_case, forecast_source):
-    pph_target = ewb.inputs.PPH()
-    pph = ewb.evaluate.run_pipeline(ewb_case, pph_target)
-    cbss = ewb.evaluate.run_pipeline(ewb_case, forecast_source)
+def _process_case(
+    case,
+    forecast,
+    out_dir: Path,
+    overwrite: bool,
+    pph_target,
+    fallback_forecast=None,
+    label: str = "",
+) -> str:
+    """Compute CBSS + PPH for a single case and pickle it as ``{"cbss": ..., "pph": ...}``."""
+    cid = case.case_id_number
+    out_path = out_dir / f"case_{cid}.pkl"
+    if out_path.exists() and not overwrite:
+        return f"[{label}] skip case {cid} (exists)"
 
-    return cbss, pph
+    print(f"Computing CBSS + PPH for {label} case {cid}", flush=True)
+
+    cbss = ewb.evaluate.run_pipeline(case, forecast)
+    if len(cbss) == 0 and fallback_forecast is not None:
+        print(f"Fallback forecast found for {label} case {cid}", flush=True)
+        cbss = ewb.evaluate.run_pipeline(case, fallback_forecast)
+    if len(cbss) == 0:
+        return f"[{label}] empty case {cid}"
+
+    pph = ewb.evaluate.run_pipeline(case, pph_target)
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "wb") as f:
+        pickle.dump({"cbss": cbss, "pph": pph}, f)
+    return f"[{label}] ok case {cid}"
+
+
+def _run_model(
+    label: str,
+    ewb_cases,
+    forecast,
+    out_dir: Path,
+    n_jobs: int,
+    overwrite: bool,
+    pph_target,
+    fallback_forecast=None,
+) -> None:
+    """Dispatch per-case CBSS+PPH computation across worker processes for one model.
+
+    Uses the ``loky`` (process) backend rather than threads because the CBSS
+    pipeline calls into numba ``parallel=True`` kernels and the only numba
+    threading layer available in this venv is ``workqueue``, which is not
+    thread-safe (concurrent access aborts the interpreter). Each worker process
+    gets its own numba runtime, sidestepping the issue.
+    """
+    print(
+        f"Computing CBSS+PPH for {label} ({len(ewb_cases)} cases, n_jobs={n_jobs})",
+        flush=True,
+    )
+    out_dir.mkdir(parents=True, exist_ok=True)
+    results = Parallel(n_jobs=n_jobs, backend="loky")(
+        delayed(_process_case)(
+            c, forecast, out_dir, overwrite, pph_target,
+            fallback_forecast=fallback_forecast, label=label,
+        )
+        for c in ewb_cases
+    )
+    for r in results:
+        print(r, flush=True)
 
 
 if __name__ == "__main__":
@@ -88,44 +145,60 @@ if __name__ == "__main__":
         help="Use the marginal severe cases instead",
     )
 
+    parser.add_argument(
+        "--n_jobs",
+        type=int,
+        default=1,
+        help="Number of parallel worker processes per model (loky backend; "
+             "processes are used instead of threads because the CBSS numba "
+             "kernels are not thread-safe in this venv). Default: 1",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        default=False,
+        help="Recompute cases whose per-case pickle already exists. Default: skip existing (resume-friendly).",
+    )
+
     args = parser.parse_args()
 
-    # convert the case ids to integers
     if len(args.case_ids) > 0:
-        # split the list by commas and convert to integers
         args.case_ids = [int(n) for n in args.case_ids[0].split(",")]
     else:
         args.case_ids = None
 
-    print(args.case_ids)
-
-    # load in all of the events in the yaml file
+    print(f"Case IDs: {args.case_ids}", flush=True)
 
     if args.run_marginal:
         events_yaml_file = importlib.resources.files(data).joinpath(
-                "marginal-severe-convection-cases.yaml"
-            )
-
+            "marginal-severe-convection-cases.yaml"
+        )
         ewb_cases = ewb.cases.load_individual_cases_from_yaml(events_yaml_file)
     else:
         ewb_cases = ewb.cases.load_ewb_events_yaml_into_case_list()
         ewb_cases = [n for n in ewb_cases if n.event_type == "severe_convection"]
 
-    # if we are subsetting the cases, do it here
     if args.case_ids is not None:
         ewb_cases = [n for n in ewb_cases if n.case_id_number in args.case_ids]
 
-    # initialize the graphics dictionaries
-    gc_graphics = dict()
-    pang_graphics = dict()
-    fourv2_graphics = dict()
-    hres_graphics = dict()
-    aifs_graphics = dict()
+    # compose suffix: matches previous semantics -- "_paper" when subsetting by case_ids,
+    # "_marginal" when using marginal yaml, "_paper_marginal" when both.
+    if args.case_ids is not None:
+        suffix = "_paper"
+    else:
+        suffix = ""
+    if args.run_marginal:
+        suffix = suffix + "_marginal"
+
+    saved_data_root = Path(basepath) / "saved_data"
+
+    # instantiate the PPH target once (was previously re-created for every case)
+    pph_target = ewb.inputs.PPH()
 
     severe_forecast_setup = SevereForecastSetup()
     severe_evaluation_setup = SevereEvaluationSetup()
 
-    # this is a hack to handle only opening icechunk once
+    # hack to open each icechunk / zarr forecast handle only once per model
     hres_severe_forecast = None
     bb_hres_severe_forecast = None
     cira_fourv2_severe_forecast = None
@@ -135,110 +208,98 @@ if __name__ == "__main__":
     bb_pangu_severe_forecast = None
     bb_aifs_severe_forecast = None
 
-    for my_case in ewb_cases:
-        # compute CBSS and PPH for all the AI models and HRES for the case we chose
-        my_id = my_case.case_id_number
-        print(my_id)
-        # my_case = [n for n in ewb_cases if n.case_id_number == my_id][0]
-
-        if args.run_hres:
-            print("Computing CBSS and PPH for HRES")
-            if hres_severe_forecast is None:
-                hres_severe_forecast = severe_forecast_setup.get_hres_severe_convection_forecast()
-            if bb_hres_severe_forecast is None:
-                bb_hres_severe_forecast = severe_forecast_setup.get_bb_hres_severe_convection_forecast()
-            [cbss, pph] = get_cbss_and_pph_outputs(my_case, hres_severe_forecast)
-            if len(cbss) == 0:
-                print("Computing CBSS and PPH for BB HRES")
-                [cbss, pph] = get_cbss_and_pph_outputs(my_case, bb_hres_severe_forecast)
-            
-            hres_graphics[my_id, "cbss"] = cbss
-            hres_graphics[my_id, "pph"] = pph
-
-        if args.run_cira_fourv2:
-            print("Computing CBSS and PPH for FOURV2")
-            if cira_fourv2_severe_forecast is None:
-                cira_fourv2_severe_forecast = severe_forecast_setup.get_cira_severe_convection_forecast("Fourv2", "IFS")
-            [cbss, pph] = get_cbss_and_pph_outputs(my_case, cira_fourv2_severe_forecast)
-            fourv2_graphics[my_id, "cbss"] = cbss
-            fourv2_graphics[my_id, "pph"] = pph
-
-        if args.run_cira_gc:
-            print("Computing CBSS and PPH for GC")
-            if gc_severe_forecast is None:  
-                gc_severe_forecast = severe_forecast_setup.get_cira_severe_convection_forecast("Graphcast", "IFS")
-            [cbss, pph] = get_cbss_and_pph_outputs(my_case, gc_severe_forecast)
-            gc_graphics[my_id, "cbss"] = cbss
-            gc_graphics[my_id, "pph"] = pph
-
-        if args.run_cira_pangu:
-            print("Computing CBSS and PPH for PANG")
-            if pang_severe_forecast is None:
-                pang_severe_forecast = severe_forecast_setup.get_cira_severe_convection_forecast("Pangu", "IFS")
-            [cbss, pph] = get_cbss_and_pph_outputs(my_case, pang_severe_forecast)
-            pang_graphics[my_id, "cbss"] = cbss
-            pang_graphics[my_id, "pph"] = pph
-
-        if args.run_bb_graphcast:
-            print("Computing CBSS and PPH for Graphcast")
-            if bb_graphcast_severe_forecast is None:
-                bb_graphcast_severe_forecast = severe_forecast_setup.get_bb_severe_convection_forecast("graphcast")
-            [cbss, pph] = get_cbss_and_pph_outputs(my_case, bb_graphcast_severe_forecast)
-            gc_graphics[my_id, "cbss"] = cbss
-            gc_graphics[my_id, "pph"] = pph
-
-        if args.run_bb_pangu:
-            print("Computing CBSS and PPH for Pangu")
-            if bb_pangu_severe_forecast is None:
-                bb_pangu_severe_forecast = severe_forecast_setup.get_bb_severe_convection_forecast("panguweather")
-            [cbss, pph] = get_cbss_and_pph_outputs(my_case, bb_pangu_severe_forecast)
-            pang_graphics[my_id, "cbss"] = cbss
-            pang_graphics[my_id, "pph"] = pph
-
-        if args.run_bb_aifs:
-            print("Computing CBSS and PPH for AIFS")
-            if bb_aifs_severe_forecast is None:
-                bb_aifs_severe_forecast = severe_forecast_setup.get_bb_severe_convection_forecast("aifs-single")
-            [cbss, pph] = get_cbss_and_pph_outputs(my_case, bb_aifs_severe_forecast)
-            aifs_graphics[my_id, "cbss"] = cbss
-            aifs_graphics[my_id, "pph"] = pph
-
-    print("Saving the graphics objects")
-    if args.case_ids is not None:
-        suffix = "_paper"
-    else:
-        suffix = ""
-
-    if args.run_marginal:
-        suffix = suffix +"_marginal"
-    else:
-        suffix = suffix + ""
-
     if args.run_hres:
-        pickle.dump(
-            hres_graphics, open(basepath + "saved_data/hres_graphics_severe" + suffix + ".pkl", "wb")
+        if hres_severe_forecast is None:
+            hres_severe_forecast = severe_forecast_setup.get_hres_severe_convection_forecast()
+        if bb_hres_severe_forecast is None:
+            bb_hres_severe_forecast = severe_forecast_setup.get_bb_hres_severe_convection_forecast()
+        _run_model(
+            label="hres",
+            ewb_cases=ewb_cases,
+            forecast=hres_severe_forecast,
+            out_dir=saved_data_root / f"hres_severe_graphics{suffix}",
+            n_jobs=args.n_jobs,
+            overwrite=args.overwrite,
+            pph_target=pph_target,
+            fallback_forecast=bb_hres_severe_forecast,
         )
+
     if args.run_cira_fourv2:
-        pickle.dump(
-            fourv2_graphics, open(basepath + "saved_data/fourv2_cira_severe_graphics" + suffix + ".pkl", "wb")
+        if cira_fourv2_severe_forecast is None:
+            cira_fourv2_severe_forecast = severe_forecast_setup.get_cira_severe_convection_forecast("Fourv2", "IFS")
+        _run_model(
+            label="fourv2_cira",
+            ewb_cases=ewb_cases,
+            forecast=cira_fourv2_severe_forecast,
+            out_dir=saved_data_root / f"fourv2_cira_severe_graphics{suffix}",
+            n_jobs=args.n_jobs,
+            overwrite=args.overwrite,
+            pph_target=pph_target,
         )
+
     if args.run_cira_gc:
-        pickle.dump(
-            gc_graphics, open(basepath + "saved_data/gc_cira_severe_graphics" + suffix + ".pkl", "wb")
+        if gc_severe_forecast is None:
+            gc_severe_forecast = severe_forecast_setup.get_cira_severe_convection_forecast("Graphcast", "IFS")
+        _run_model(
+            label="gc_cira",
+            ewb_cases=ewb_cases,
+            forecast=gc_severe_forecast,
+            out_dir=saved_data_root / f"gc_cira_severe_graphics{suffix}",
+            n_jobs=args.n_jobs,
+            overwrite=args.overwrite,
+            pph_target=pph_target,
         )
+
     if args.run_cira_pangu:
-        pickle.dump(
-            pang_graphics, open(basepath + "saved_data/pang_cira_severe_graphics" + suffix + ".pkl", "wb")
-        )  
+        if pang_severe_forecast is None:
+            pang_severe_forecast = severe_forecast_setup.get_cira_severe_convection_forecast("Pangu", "IFS")
+        _run_model(
+            label="pang_cira",
+            ewb_cases=ewb_cases,
+            forecast=pang_severe_forecast,
+            out_dir=saved_data_root / f"pang_cira_severe_graphics{suffix}",
+            n_jobs=args.n_jobs,
+            overwrite=args.overwrite,
+            pph_target=pph_target,
+        )
+
     if args.run_bb_graphcast:
-        pickle.dump(
-            gc_graphics, open(basepath + "saved_data/gc_bb_severe_graphics" + suffix + ".pkl", "wb")
+        if bb_graphcast_severe_forecast is None:
+            bb_graphcast_severe_forecast = severe_forecast_setup.get_bb_severe_convection_forecast("graphcast")
+        _run_model(
+            label="gc_bb",
+            ewb_cases=ewb_cases,
+            forecast=bb_graphcast_severe_forecast,
+            out_dir=saved_data_root / f"gc_bb_severe_graphics{suffix}",
+            n_jobs=args.n_jobs,
+            overwrite=args.overwrite,
+            pph_target=pph_target,
         )
+
     if args.run_bb_pangu:
-        pickle.dump(
-            pang_graphics, open(basepath + "saved_data/pang_bb_severe_graphics" + suffix + ".pkl", "wb")
+        if bb_pangu_severe_forecast is None:
+            bb_pangu_severe_forecast = severe_forecast_setup.get_bb_severe_convection_forecast("panguweather")
+        _run_model(
+            label="pang_bb",
+            ewb_cases=ewb_cases,
+            forecast=bb_pangu_severe_forecast,
+            out_dir=saved_data_root / f"pang_bb_severe_graphics{suffix}",
+            n_jobs=args.n_jobs,
+            overwrite=args.overwrite,
+            pph_target=pph_target,
         )
+
     if args.run_bb_aifs:
-        pickle.dump(
-            aifs_graphics, open(basepath + "saved_data/aifs_bb_severe_graphics" + suffix + ".pkl", "wb")
+        if bb_aifs_severe_forecast is None:
+            bb_aifs_severe_forecast = severe_forecast_setup.get_bb_severe_convection_forecast("aifs-single")
+        _run_model(
+            label="aifs_bb",
+            ewb_cases=ewb_cases,
+            forecast=bb_aifs_severe_forecast,
+            out_dir=saved_data_root / f"aifs_bb_severe_graphics{suffix}",
+            n_jobs=args.n_jobs,
+            overwrite=args.overwrite,
+            pph_target=pph_target,
         )
+
+    print("Done", flush=True)

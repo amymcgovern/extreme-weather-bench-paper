@@ -7,6 +7,7 @@ from extremeweatherbench import (
     cases,
     evaluate,
 )
+from joblib import Parallel, delayed
 
 from src.data.ar_forecast_setup import (
     AtmosphericRiverEvaluationSetup,
@@ -14,14 +15,59 @@ from src.data.ar_forecast_setup import (
 )
 
 
-# to plot the targets, we need to run the pipeline for each case and target
-def get_ivt(ewb_case, forecast_source):
-    ivt = evaluate.run_pipeline(ewb_case, forecast_source)
-    return ivt
+def _process_case(
+    case,
+    forecast,
+    out_dir: Path,
+    overwrite: bool,
+    fallback_forecast=None,
+    label: str = "",
+) -> str:
+    """Compute IVT for a single case and pickle it to ``out_dir/case_{id}.pkl``.
 
-def get_ivt_by_init_time(ewb_case, forecast_source):
-    ivt = evaluate.run_pipeline(ewb_case, forecast_source)
-    return ivt
+    Returns a short status string suitable for logging.
+    """
+    case_id = case.case_id_number
+    out_path = out_dir / f"case_{case_id}.pkl"
+    if out_path.exists() and not overwrite:
+        return f"[{label}] skip case {case_id} (exists)"
+
+    print(f"Computing IVT for {label} case {case_id}", flush=True)
+
+    ivt = evaluate.run_pipeline(case, forecast)
+    if len(ivt) == 0 and fallback_forecast is not None:
+        print(f"Fallback forecast found for {label} case {case_id}", flush=True)
+        ivt = evaluate.run_pipeline(case, fallback_forecast)
+    if len(ivt) == 0:
+        return f"[{label}] empty case {case_id}"
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "wb") as f:
+        pickle.dump(ivt, f)
+    return f"[{label}] ok case {case_id}"
+
+
+def _run_model(
+    label: str,
+    ewb_cases,
+    forecast,
+    out_dir: Path,
+    n_jobs: int,
+    overwrite: bool,
+    fallback_forecast=None,
+) -> None:
+    """Dispatch per-case IVT computation across threads for one model."""
+    print(f"Computing IVT for {label} ({len(ewb_cases)} cases, n_jobs={n_jobs})", flush=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    results = Parallel(n_jobs=n_jobs, backend="threading")(
+        delayed(_process_case)(
+            c, forecast, out_dir, overwrite,
+            fallback_forecast=fallback_forecast, label=label,
+        )
+        for c in ewb_cases
+    )
+    for r in results:
+        print(r, flush=True)
 
 
 if __name__ == "__main__":
@@ -84,6 +130,18 @@ if __name__ == "__main__":
         default=[],
         help="Case IDs to run (default: all)",
     )
+    parser.add_argument(
+        "--n_jobs",
+        type=int,
+        default=1,
+        help="Number of parallel workers per model (threading backend). Default: 1",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        default=False,
+        help="Recompute cases whose per-case pickle already exists. Default: skip existing (resume-friendly).",
+    )
 
     args = parser.parse_args()
 
@@ -98,7 +156,7 @@ if __name__ == "__main__":
     else:
         args.case_ids = None
 
-    print(args.case_ids)
+    print(f"Case IDs: {args.case_ids}", flush=True)
 
     atmospheric_river_forecast_setup = AtmosphericRiverForecastSetup()
     atmospheric_river_evaluation_setup = AtmosphericRiverEvaluationSetup()
@@ -106,24 +164,19 @@ if __name__ == "__main__":
     # load in all of the events in the yaml file
     ewb_cases = cases.load_ewb_events_yaml_into_case_list()
     ewb_cases = [n for n in ewb_cases if n.event_type == "atmospheric_river"]
-    # ewb_cases = [n for n in ewb_cases if n.case_id_number == 113 or n.case_id_number == 116]
 
     # if we are subsetting the cases, do it here
     if args.case_ids is not None:
         ewb_cases = [n for n in ewb_cases if n.case_id_number in args.case_ids]
 
-    hres_graphics = dict()
-    gc_graphics = dict()
-    pang_graphics = dict()
-    fourv2_graphics = dict()
-    hres_graphics = dict()
-    aifs_graphics = dict()
-    era5_graphics = dict()
+    if args.case_ids is not None:
+        suffix = "_paper"
+    else:
+        suffix = ""
 
-    atmospheric_river_forecast_setup = AtmosphericRiverForecastSetup()
-    atmospheric_river_evaluation_setup = AtmosphericRiverEvaluationSetup()
+    saved_data_root = Path(basepath) / "saved_data"
 
-    # this is a hack to handle only opening icechunk once
+    # this is a hack to handle only opening icechunk once per model
     hres_ar_forecast = None
     bb_hres_ar_forecast = None
     cira_fourv2_ar_forecast = None
@@ -134,112 +187,103 @@ if __name__ == "__main__":
     bb_aifs_ar_forecast = None
     era5 = None
 
-    for my_case in ewb_cases:
-        # compute IVT for all the AI models and HRES for the case we chose
-        print(my_case.case_id_number)
-        my_id = my_case.case_id_number
-        # my_case = [n for n in ewb_cases if n.case_id_number == my_id][0]
-
-        if args.run_hres:
-            print("Computing IVT for HRES")
-            if hres_ar_forecast is None:
-                hres_ar_forecast = atmospheric_river_forecast_setup.get_hres_forecast(include_ivt=True)
-            if bb_hres_ar_forecast is None:
-                bb_hres_ar_forecast = atmospheric_river_forecast_setup.get_bb_hres_forecast(include_ivt=True)
-            ivt = get_ivt(my_case, hres_ar_forecast)
-            if len(ivt) == 0:
-                print("Computing IVT for BB HRES")
-                ivt = get_ivt(my_case, bb_hres_ar_forecast)
-            
-            hres_graphics[my_id, "ivt"] = ivt
-
-        if args.run_cira_fourv2:
-            print("Computing IVT for FOURV2")
-            if cira_fourv2_ar_forecast is None:
-                cira_fourv2_ar_forecast = atmospheric_river_forecast_setup.get_cira_forecast("Fourv2", "IFS", include_ivt=True)
-
-            ivt = get_ivt(my_case, cira_fourv2_ar_forecast)
-            fourv2_graphics[my_id, "ivt"] = ivt
-
-        if args.run_cira_gc:
-            print("Computing IVT for GC")
-            if gc_ar_forecast is None:  
-                gc_ar_forecast = atmospheric_river_forecast_setup.get_cira_forecast("Graphcast", "IFS", include_ivt=True)
-            ivt = get_ivt(my_case, gc_ar_forecast)
-            gc_graphics[my_id, "ivt"] = ivt
-
-        if args.run_cira_pangu:
-            print("Computing IVT for PANG")
-            if pang_ar_forecast is None:
-                pang_ar_forecast = atmospheric_river_forecast_setup.get_cira_forecast("Pangu", "IFS", include_ivt=True)
-            ivt = get_ivt(my_case, pang_ar_forecast)
-            pang_graphics[my_id, "ivt"] = ivt
-
-        if args.run_bb_graphcast:
-            print("Computing IVT for Graphcast")
-            if bb_graphcast_ar_forecast is None:
-                bb_graphcast_ar_forecast = atmospheric_river_forecast_setup.get_bb_ar_forecast("graphcast", include_ivt=True)
-            ivt = get_ivt(my_case, bb_graphcast_ar_forecast)
-            gc_graphics[my_id, "ivt"] = ivt
-
-        if args.run_bb_pangu:
-            print("Computing IVT for Pangu")
-            if bb_pangu_ar_forecast is None:
-                bb_pangu_ar_forecast = atmospheric_river_forecast_setup.get_bb_ar_forecast("panguweather", include_ivt=True)
-            ivt = get_ivt(my_case, bb_pangu_ar_forecast)
-            pang_graphics[my_id, "ivt"] = ivt
-
-        if args.run_bb_aifs:
-            print("Computing IVT for AIFS")
-            if bb_aifs_ar_forecast is None:
-                bb_aifs_ar_forecast = atmospheric_river_forecast_setup.get_bb_ar_forecast("aifs-single", include_ivt=True)
-            ivt = get_ivt(my_case, bb_aifs_ar_forecast)
-            aifs_graphics[my_id, "ivt"] = ivt
-
-        if args.run_era5:
-            print("Computing IVT for ERA5")
-            if era5 is None:
-                era5 = atmospheric_river_forecast_setup.get_era5(include_ivt=True)
-            ivt = get_ivt(my_case, era5)
-            era5_graphics[my_id, "ivt"] = ivt
-
-    print("Saving the graphics objects")
-    if args.case_ids is not None:
-        suffix = "_paper"
-    else:
-        suffix = ""
-
     if args.run_hres:
-        pickle.dump(
-            hres_graphics, open(basepath + "saved_data/hres_ar_graphics" + suffix + ".pkl", "wb")
-        )
-    if args.run_cira_fourv2:
-        pickle.dump(
-            fourv2_graphics, open(basepath + "saved_data/fourv2_cira_ar_graphics" + suffix + ".pkl", "wb")
-        )
-    if args.run_cira_gc:
-        pickle.dump(
-            gc_graphics, open(basepath + "saved_data/gc_cira_ar_graphics" + suffix + ".pkl", "wb")
-        )
-    if args.run_cira_pangu:
-        pickle.dump(
-            pang_graphics, open(basepath + "saved_data/pang_cira_ar_graphics" + suffix + ".pkl", "wb")
-        )  
-    if args.run_bb_graphcast:
-        pickle.dump(
-            gc_graphics, open(basepath + "saved_data/gc_bb_ar_graphics" + suffix + ".pkl", "wb")
-        )
-    if args.run_bb_pangu:
-        pickle.dump(
-            pang_graphics, open(basepath + "saved_data/pang_bb_ar_graphics" + suffix + ".pkl", "wb")
-        )
-    if args.run_bb_aifs:
-        pickle.dump(
-            aifs_graphics, open(basepath + "saved_data/aifs_bb_ar_graphics" + suffix + ".pkl", "wb")
-        )
-    if args.run_era5:
-        pickle.dump(
-            era5_graphics, open(basepath + "saved_data/era5_ar_graphics" + suffix + ".pkl", "wb")
+        if hres_ar_forecast is None:
+            hres_ar_forecast = atmospheric_river_forecast_setup.get_hres_forecast(include_ivt=True)
+        if bb_hres_ar_forecast is None:
+            bb_hres_ar_forecast = atmospheric_river_forecast_setup.get_bb_hres_forecast(include_ivt=True)
+        _run_model(
+            label="hres",
+            ewb_cases=ewb_cases,
+            forecast=hres_ar_forecast,
+            out_dir=saved_data_root / f"hres_ar_graphics{suffix}",
+            n_jobs=args.n_jobs,
+            overwrite=args.overwrite,
+            fallback_forecast=bb_hres_ar_forecast,
         )
 
-    print("Done")
+    if args.run_cira_fourv2:
+        if cira_fourv2_ar_forecast is None:
+            cira_fourv2_ar_forecast = atmospheric_river_forecast_setup.get_cira_forecast("Fourv2", "IFS", include_ivt=True)
+        _run_model(
+            label="fourv2_cira",
+            ewb_cases=ewb_cases,
+            forecast=cira_fourv2_ar_forecast,
+            out_dir=saved_data_root / f"fourv2_cira_ar_graphics{suffix}",
+            n_jobs=args.n_jobs,
+            overwrite=args.overwrite,
+        )
+
+    if args.run_cira_gc:
+        if gc_ar_forecast is None:
+            gc_ar_forecast = atmospheric_river_forecast_setup.get_cira_forecast("Graphcast", "IFS", include_ivt=True)
+        _run_model(
+            label="gc_cira",
+            ewb_cases=ewb_cases,
+            forecast=gc_ar_forecast,
+            out_dir=saved_data_root / f"gc_cira_ar_graphics{suffix}",
+            n_jobs=args.n_jobs,
+            overwrite=args.overwrite,
+        )
+
+    if args.run_cira_pangu:
+        if pang_ar_forecast is None:
+            pang_ar_forecast = atmospheric_river_forecast_setup.get_cira_forecast("Pangu", "IFS", include_ivt=True)
+        _run_model(
+            label="pang_cira",
+            ewb_cases=ewb_cases,
+            forecast=pang_ar_forecast,
+            out_dir=saved_data_root / f"pang_cira_ar_graphics{suffix}",
+            n_jobs=args.n_jobs,
+            overwrite=args.overwrite,
+        )
+
+    if args.run_bb_graphcast:
+        if bb_graphcast_ar_forecast is None:
+            bb_graphcast_ar_forecast = atmospheric_river_forecast_setup.get_bb_ar_forecast("graphcast", include_ivt=True)
+        _run_model(
+            label="gc_bb",
+            ewb_cases=ewb_cases,
+            forecast=bb_graphcast_ar_forecast,
+            out_dir=saved_data_root / f"gc_bb_ar_graphics{suffix}",
+            n_jobs=args.n_jobs,
+            overwrite=args.overwrite,
+        )
+
+    if args.run_bb_pangu:
+        if bb_pangu_ar_forecast is None:
+            bb_pangu_ar_forecast = atmospheric_river_forecast_setup.get_bb_ar_forecast("panguweather", include_ivt=True)
+        _run_model(
+            label="pang_bb",
+            ewb_cases=ewb_cases,
+            forecast=bb_pangu_ar_forecast,
+            out_dir=saved_data_root / f"pang_bb_ar_graphics{suffix}",
+            n_jobs=args.n_jobs,
+            overwrite=args.overwrite,
+        )
+
+    if args.run_bb_aifs:
+        if bb_aifs_ar_forecast is None:
+            bb_aifs_ar_forecast = atmospheric_river_forecast_setup.get_bb_ar_forecast("aifs-single", include_ivt=True)
+        _run_model(
+            label="aifs_bb",
+            ewb_cases=ewb_cases,
+            forecast=bb_aifs_ar_forecast,
+            out_dir=saved_data_root / f"aifs_bb_ar_graphics{suffix}",
+            n_jobs=args.n_jobs,
+            overwrite=args.overwrite,
+        )
+
+    if args.run_era5:
+        if era5 is None:
+            era5 = atmospheric_river_forecast_setup.get_era5(include_ivt=True)
+        _run_model(
+            label="era5",
+            ewb_cases=ewb_cases,
+            forecast=era5,
+            out_dir=saved_data_root / f"era5_ar_graphics{suffix}",
+            n_jobs=args.n_jobs,
+            overwrite=args.overwrite,
+        )
+
+    print("Done", flush=True)

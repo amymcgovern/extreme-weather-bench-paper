@@ -14,6 +14,19 @@ from matplotlib.cm import ScalarMappable  # noqa: E402
 
 import src.plots.atmospheric_river_utils as ar_plot_utils
 
+
+def _load_case(model_dir: Path, case_id: int):
+    """Load a single case's IVT pickle from a per-case model directory.
+
+    Returns None if the file doesn't exist.
+    """
+    p = model_dir / f"case_{case_id}.pkl"
+    if not p.exists():
+        return None
+    with open(p, "rb") as f:
+        return pickle.load(f)
+
+
 if __name__ == "__main__":
     # make the basepath - change this to your local path
     basepath = Path.home() / "extreme-weather-bench-paper" / ""
@@ -53,18 +66,12 @@ if __name__ == "__main__":
     pang_ar_results = pd.read_pickle(basepath + "saved_data/bb_pangu_ar_results.pkl")
     aifs_ar_results = pd.read_pickle(basepath + "saved_data/bb_aifs_ar_results.pkl")
 
-    print("Loading in the graphics objects")
-    # load in the graphics objects
-    print("Loading in the HRES graphics object")
-    hres_graphics = pickle.load(open(basepath + "saved_data/hres_ar_graphics.pkl", "rb"))
-    print("Loading in the GraphCast graphics object")
-    bb_graphcast_graphics = pickle.load(open(basepath + "saved_data/gc_bb_ar_graphics.pkl", "rb"))
-    print("Loading in the Pangu graphics object")
-    bb_pangu_graphics = pickle.load(open(basepath + "saved_data/pang_bb_ar_graphics.pkl", "rb"))
-    print("Loading in the AIFS graphics object")
-    bb_aifs_graphics = pickle.load(open(basepath + "saved_data/aifs_bb_ar_graphics.pkl", "rb"))
-    print("Loading in the ERA5 graphics object")
-    era5_graphics = pickle.load(open(basepath + "saved_data/era5_ar_graphics.pkl", "rb"))
+    # per-case pickle directories (written by src/plots/compute_ar_plot_data.py)
+    hres_dir = Path(basepath) / "saved_data/hres_ar_graphics"
+    gc_dir = Path(basepath) / "saved_data/gc_bb_ar_graphics"
+    pang_dir = Path(basepath) / "saved_data/pang_bb_ar_graphics"
+    aifs_dir = Path(basepath) / "saved_data/aifs_bb_ar_graphics"
+    era5_dir = Path(basepath) / "saved_data/era5_ar_graphics"
 
     lead_times_to_plot = [10*24, 7*24, 5*24, 3*24, 24]
     
@@ -80,7 +87,11 @@ if __name__ == "__main__":
             print(my_case.case_id_number)
             my_id = my_case.case_id_number
 
-            era5_ivt, era5_ar_mask = ar_plot_utils.select_ivt_and_maks_era5(era5_graphics[my_id, "ivt"])
+            era5_raw = _load_case(era5_dir, my_id)
+            if era5_raw is None:
+                print(f"Skipping ERA5 (separate) for case {my_id}: no per-case pickle at {era5_dir}/case_{my_id}.pkl")
+                continue
+            era5_ivt, era5_ar_mask = ar_plot_utils.select_ivt_and_maks_era5(era5_raw)
             title = "ERA5"
             ar_plot_utils.plot_ar_mask_single_timestep(ivt_data=era5_ivt, ar_mask=era5_ar_mask, 
                 title=title, colorbar=True, show_axes=True)
@@ -97,24 +108,30 @@ if __name__ == "__main__":
         else:
             row_length = 4
 
+        hres_raw = _load_case(hres_dir, my_id)
+        gc_raw = _load_case(gc_dir, my_id)
+        pang_raw = _load_case(pang_dir, my_id)
+        aifs_raw = _load_case(aifs_dir, my_id)
+        era5_raw = _load_case(era5_dir, my_id)
+
         # make a subplot for each model and ensure it is a cartopy plot
         fig, axs = plt.subplots(row_length, len(lead_times_to_plot) + 1, figsize=(18, 2 * len(lead_times_to_plot)), 
             subplot_kw={'projection': ccrs.PlateCarree()})
 
         if not args.plot_era_separately:
-            if (my_id, "ivt") in era5_graphics:
-                era5_ivt, era5_ar_mask = ar_plot_utils.select_ivt_and_maks_era5(era5_graphics[my_id, "ivt"])
+            if era5_raw is not None:
+                era5_ivt, era5_ar_mask = ar_plot_utils.select_ivt_and_maks_era5(era5_raw)
                 title = "ERA5"
                 ar_plot_utils.plot_ar_mask_single_timestep(ivt_data=era5_ivt, ar_mask=era5_ar_mask, 
                     title=title, ax=axs[0, len(lead_times_to_plot)], colorbar=False, show_axes=False)
                 for i in range(1, row_length):
                     axs[i, len(lead_times_to_plot)].set_visible(False)
             else:
-                print(f"Skipping ERA5 for case {my_id}: missing ivt or ar mask data in graphics object")
+                print(f"Skipping ERA5 for case {my_id}: no per-case pickle at {era5_dir}/case_{my_id}.pkl")
 
-        if (my_id, "ivt") in hres_graphics:
+        if hres_raw is not None:
             for i, lead_time_hours in enumerate(lead_times_to_plot):
-                hres_ivt, hres_ar_mask = ar_plot_utils.select_ivt_and_maks(hres_graphics[my_id, "ivt"], lead_time_hours)
+                hres_ivt, hres_ar_mask = ar_plot_utils.select_ivt_and_maks(hres_raw, lead_time_hours)
                 if hres_ivt is not None and hres_ar_mask is not None:
                     title = f"{lead_time_hours} hours"
                     if (i == 0):
@@ -127,12 +144,12 @@ if __name__ == "__main__":
                     print(f"Skipping HRES for case {my_id}: missing ivt or ar mask data in graphics object")
             
         else:
-            print(f"Skipping HRES for case {my_id}: missing cbss or pph data in graphics object")
+            print(f"Skipping HRES for case {my_id}: no per-case pickle at {hres_dir}/case_{my_id}.pkl")
         
 
-        if (my_id, "ivt") in bb_graphcast_graphics:
+        if gc_raw is not None:
             for i, lead_time_hours in enumerate(lead_times_to_plot):
-                gc_ivt, gc_ar_mask = ar_plot_utils.select_ivt_and_maks(bb_graphcast_graphics[my_id, "ivt"], lead_time_hours)
+                gc_ivt, gc_ar_mask = ar_plot_utils.select_ivt_and_maks(gc_raw, lead_time_hours)
                 if gc_ivt is not None and gc_ar_mask is not None:
                     title = f"{lead_time_hours} hours"
                     if (i == 0):
@@ -144,11 +161,11 @@ if __name__ == "__main__":
                 else:
                     print(f"Skipping GraphCast for case {my_id}: missing ivt or ar mask data in graphics object")
         else:
-            print(f"Skipping GraphCast for case {my_id}: missing ivt data in graphics object")
+            print(f"Skipping GraphCast for case {my_id}: no per-case pickle at {gc_dir}/case_{my_id}.pkl")
         
-        if (my_id, "ivt") in bb_pangu_graphics:
+        if pang_raw is not None:
             for i, lead_time_hours in enumerate(lead_times_to_plot):
-                pang_ivt, pang_ar_mask = ar_plot_utils.select_ivt_and_maks(bb_pangu_graphics[my_id, "ivt"], lead_time_hours)
+                pang_ivt, pang_ar_mask = ar_plot_utils.select_ivt_and_maks(pang_raw, lead_time_hours)
                 if pang_ivt is not None and pang_ar_mask is not None:
                     # title = f"{lead_time_hours} hours"
                     if (i == 0):
@@ -160,11 +177,11 @@ if __name__ == "__main__":
                 else:
                     print(f"Skipping Pangu for case {my_id}: missing ivt or ar mask data in graphics object")
         else:
-            print(f"Skipping Pangu for case {my_id}: missing ivt data in graphics object")
+            print(f"Skipping Pangu for case {my_id}: no per-case pickle at {pang_dir}/case_{my_id}.pkl")
         
-        if (my_id, "ivt") in bb_aifs_graphics:
+        if aifs_raw is not None:
             for i, lead_time_hours in enumerate(lead_times_to_plot):
-                aifs_ivt, aifs_ar_mask = ar_plot_utils.select_ivt_and_maks(bb_aifs_graphics[my_id, "ivt"], lead_time_hours)
+                aifs_ivt, aifs_ar_mask = ar_plot_utils.select_ivt_and_maks(aifs_raw, lead_time_hours)
                 if aifs_ivt is not None and aifs_ar_mask is not None:
                     title = f"{lead_time_hours} hours"
                     if (i == 0):
@@ -176,7 +193,7 @@ if __name__ == "__main__":
                 else:
                     print(f"Skipping AIFS for case {my_id}: missing ivt or ar mask data in graphics object")
         else:
-            print(f"Skipping AIFS for case {my_id}: missing ivt data in graphics object")
+            print(f"Skipping AIFS for case {my_id}: no per-case pickle at {aifs_dir}/case_{my_id}.pkl")
         
         # show the colorbar below the bottom row (row 5)
         # Create a ScalarMappable for the colorbar

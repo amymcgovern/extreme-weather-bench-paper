@@ -80,6 +80,7 @@ BB_MLWP_VARIABLE_MAPPING = {
     "10m_u_component_of_wind": "surface_eastward_wind",
     "10m_v_component_of_wind": "surface_northward_wind",
     "mean_sea_level_pressure": "air_pressure_at_mean_sea_level",
+    "z": "geopotential_height",
 }
 
 # TODO: Change me as needed
