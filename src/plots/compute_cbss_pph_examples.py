@@ -44,6 +44,14 @@ def _process_case(
 
     pph = ewb.evaluate.run_pipeline(case, pph_target)
 
+    # Materialize the derived CBSS/PPH dask graphs to numpy before pickling.
+    # `run_pipeline` returns per-tile dask arrays (cbss chunks=(1, 1, lat, lon)
+    # over lead_time), so a naive `pickle.dump` serializes the graph and blows
+    # the file up to ~70x its logical size on BB models (~106 MB pickle for
+    # ~1.5 MB of data) and makes every downstream `.sel(...)` walk the graph.
+    cbss = cbss.load()
+    pph = pph.load()
+
     out_dir.mkdir(parents=True, exist_ok=True)
     with open(out_path, "wb") as f:
         pickle.dump({"cbss": cbss, "pph": pph}, f)
@@ -181,14 +189,12 @@ if __name__ == "__main__":
     if args.case_ids is not None:
         ewb_cases = [n for n in ewb_cases if n.case_id_number in args.case_ids]
 
-    # compose suffix: matches previous semantics -- "_paper" when subsetting by case_ids,
-    # "_marginal" when using marginal yaml, "_paper_marginal" when both.
-    if args.case_ids is not None:
-        suffix = "_paper"
-    else:
-        suffix = ""
-    if args.run_marginal:
-        suffix = suffix + "_marginal"
+    # Only differentiate output dirs by which YAML the cases came from. Per-case
+    # pickles are keyed by case_id, so subset runs via --case_ids just add or
+    # overwrite files in the same directory as full runs; no separate output
+    # tree is needed for that. Marginal cases come from a distinct YAML and get
+    # their own tree to avoid confusion.
+    suffix = "_marginal" if args.run_marginal else ""
 
     saved_data_root = Path(basepath) / "saved_data"
 

@@ -98,8 +98,22 @@ class AtmosphericRiverForecastSetup:
         else:
             my_variables = [ewb.derived.AtmosphericRiverVariables(output_variables=["atmospheric_river_land_intersection"])]
 
+        # The BB icechunk archives are natively chunked with one pressure
+        # level per chunk (e.g. specific_humidity chunks=(1, 1, 1, 721, 1440)),
+        # while the weatherbench2 HRES zarr stores all levels together
+        # (chunks=(1, 1, 13, 721, 1440)). AtmosphericRiverVariables always
+        # integrates u/v/q across all levels >= 300 hPa, so keeping level split
+        # forces ~13x more chunk reads per (init_time, lead_time) and blows up
+        # the dask graph via blockwise reductions over `level` (the source of
+        # the "Increasing number of chunks by factor of 13" warnings).
+        #
+        # Ask xarray to open the archive with `level` fused into a single dask
+        # chunk (post-hoc `ds.chunk({"level": -1})` also works but has to walk
+        # the ~4.6M-chunk-per-variable native index and takes several minutes
+        # per open). All other dims default to native chunks.
         bb_ar_ds = open_mlwp_archive_icechunk_dataset(
             model=model_name,
+            chunks={"level": -1},
         )
 
         bb_severe_convection_forecast = InMemoryForecast(

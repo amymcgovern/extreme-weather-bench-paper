@@ -27,12 +27,24 @@ def _load_case(model_dir: Path, case_id: int):
     """Load a single case's ``{"cbss": ..., "pph": ...}`` pickle.
 
     Returns None if the file doesn't exist.
+
+    Older pickles produced by `compute_cbss_pph_examples.py` (before the
+    materialize-before-pickle fix) store both `cbss` and `pph` as dask-backed
+    xarray Datasets whose graphs dominate the pickle size (~106 MB on disk
+    for ~1.5 MB of logical data on BB models) and make every downstream
+    `.sel(...)` in the plot loop walk the dask scheduler. Force `.load()`
+    here so we pay the materialization cost exactly once, regardless of
+    pickle vintage. On new (numpy-backed) pickles this is a no-op.
     """
     p = model_dir / f"case_{case_id}.pkl"
     if not p.exists():
         return None
     with open(p, "rb") as f:
-        return pickle.load(f)
+        payload = pickle.load(f)
+    for k, v in list(payload.items()):
+        if hasattr(v, "load"):
+            payload[k] = v.load()
+    return payload
 
 
 def _plot_case(
@@ -295,17 +307,9 @@ if __name__ == "__main__":
         ewb_cases, ewb.defaults.get_brightband_evaluation_objects()
     )
 
-    # uncomment this for debugging and faster plotting
     parser = argparse.ArgumentParser(
             description="Plot all CBSS and PPH cases."
     )
-    parser.add_argument(
-        "--paper",
-        action="store_true",
-        default=False,
-        help="Plot for paper (default: False)",
-    )
-
     parser.add_argument(
         "--marginal",
         action="store_true",
@@ -321,8 +325,7 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    paper = args.paper
-    
+
     if (args.marginal):
         # load the marginal severe cases
         marginal_severe_yaml_path = Path(ewb.__file__).parent / "data" / "marginal_severe_convection_cases.yaml"
@@ -334,9 +337,6 @@ if __name__ == "__main__":
         ewb_cases = marginal_severe_cases
         case_operators = marginal_severe_case_operators
 
-
-    if paper:
-        ewb_cases = [n for n in ewb_cases if n.case_id_number in [316, 269]]
     
     # build out all of the expected data to evalate the case (we need this so we can plot
     # the LSR reports)
@@ -365,13 +365,11 @@ if __name__ == "__main__":
     # the memory as it shuts down the workers
     get_reusable_executor().shutdown(wait=True)
 
-    # pick the suffix that matches how compute_cbss_pph_examples.py wrote the per-case dirs
-    if paper:
-        suffix = "_paper"
-    elif args.marginal:
-        suffix = "_marginal"
-    else:
-        suffix = ""
+    # Match how compute_cbss_pph_examples.py wrote the per-case dirs: only the
+    # marginal-severe YAML uses its own tree. Regular severe runs (paper subsets
+    # or full) all share the same per-case pickle directories -- the plot loop
+    # skips cases whose pickle isn't present via _load_case returning None.
+    suffix = "_marginal" if args.marginal else ""
 
     hres_dir = Path(basepath) / f"saved_data/hres_severe_graphics{suffix}"
     gc_dir   = Path(basepath) / f"saved_data/gc_bb_severe_graphics{suffix}"

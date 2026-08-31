@@ -41,6 +41,14 @@ def _process_case(
     if len(ivt) == 0:
         return f"[{label}] empty case {case_id}"
 
+    # Materialize the derived IVT dask graph into plain numpy before pickling.
+    # `run_pipeline` returns the derived variables as a per-tile dask array
+    # (chunks=(lat, lon, 1, 1)), so a naive `pickle.dump` serializes ~1000
+    # tiny tasks per variable per case. On BB models that inflates the pickle
+    # to ~5x its logical size (~180 MB vs 37 MB) and forces plot_all_ar to
+    # walk the graph on every subplot (~40s per model row vs ~0.2s materialized).
+    ivt = ivt.load()
+
     out_dir.mkdir(parents=True, exist_ok=True)
     with open(out_path, "wb") as f:
         pickle.dump(ivt, f)
@@ -169,11 +177,6 @@ if __name__ == "__main__":
     if args.case_ids is not None:
         ewb_cases = [n for n in ewb_cases if n.case_id_number in args.case_ids]
 
-    if args.case_ids is not None:
-        suffix = "_paper"
-    else:
-        suffix = ""
-
     saved_data_root = Path(basepath) / "saved_data"
 
     # this is a hack to handle only opening icechunk once per model
@@ -196,7 +199,7 @@ if __name__ == "__main__":
             label="hres",
             ewb_cases=ewb_cases,
             forecast=hres_ar_forecast,
-            out_dir=saved_data_root / f"hres_ar_graphics{suffix}",
+            out_dir=saved_data_root / "hres_ar_graphics",
             n_jobs=args.n_jobs,
             overwrite=args.overwrite,
             fallback_forecast=bb_hres_ar_forecast,
@@ -209,7 +212,7 @@ if __name__ == "__main__":
             label="fourv2_cira",
             ewb_cases=ewb_cases,
             forecast=cira_fourv2_ar_forecast,
-            out_dir=saved_data_root / f"fourv2_cira_ar_graphics{suffix}",
+            out_dir=saved_data_root / "fourv2_cira_ar_graphics",
             n_jobs=args.n_jobs,
             overwrite=args.overwrite,
         )
@@ -221,7 +224,7 @@ if __name__ == "__main__":
             label="gc_cira",
             ewb_cases=ewb_cases,
             forecast=gc_ar_forecast,
-            out_dir=saved_data_root / f"gc_cira_ar_graphics{suffix}",
+            out_dir=saved_data_root / "gc_cira_ar_graphics",
             n_jobs=args.n_jobs,
             overwrite=args.overwrite,
         )
@@ -233,7 +236,7 @@ if __name__ == "__main__":
             label="pang_cira",
             ewb_cases=ewb_cases,
             forecast=pang_ar_forecast,
-            out_dir=saved_data_root / f"pang_cira_ar_graphics{suffix}",
+            out_dir=saved_data_root / "pang_cira_ar_graphics",
             n_jobs=args.n_jobs,
             overwrite=args.overwrite,
         )
@@ -245,7 +248,7 @@ if __name__ == "__main__":
             label="gc_bb",
             ewb_cases=ewb_cases,
             forecast=bb_graphcast_ar_forecast,
-            out_dir=saved_data_root / f"gc_bb_ar_graphics{suffix}",
+            out_dir=saved_data_root / "gc_bb_ar_graphics",
             n_jobs=args.n_jobs,
             overwrite=args.overwrite,
         )
@@ -257,7 +260,7 @@ if __name__ == "__main__":
             label="pang_bb",
             ewb_cases=ewb_cases,
             forecast=bb_pangu_ar_forecast,
-            out_dir=saved_data_root / f"pang_bb_ar_graphics{suffix}",
+            out_dir=saved_data_root / "pang_bb_ar_graphics",
             n_jobs=args.n_jobs,
             overwrite=args.overwrite,
         )
@@ -269,7 +272,7 @@ if __name__ == "__main__":
             label="aifs_bb",
             ewb_cases=ewb_cases,
             forecast=bb_aifs_ar_forecast,
-            out_dir=saved_data_root / f"aifs_bb_ar_graphics{suffix}",
+            out_dir=saved_data_root / "aifs_bb_ar_graphics",
             n_jobs=args.n_jobs,
             overwrite=args.overwrite,
         )
@@ -281,7 +284,7 @@ if __name__ == "__main__":
             label="era5",
             ewb_cases=ewb_cases,
             forecast=era5,
-            out_dir=saved_data_root / f"era5_ar_graphics{suffix}",
+            out_dir=saved_data_root / "era5_ar_graphics",
             n_jobs=args.n_jobs,
             overwrite=args.overwrite,
         )

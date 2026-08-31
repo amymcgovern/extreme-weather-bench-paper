@@ -1,91 +1,114 @@
 # setup all the imports
 import argparse
 import pickle
-import sys
 from pathlib import Path
 
-import joblib
-from extremeweatherbench import cases, evaluate, inputs, utils
-from tqdm.dask import TqdmCallback
+from extremeweatherbench import cases, evaluate, inputs
+from joblib import Parallel, delayed
 
 from src.data.tc_forecast_setup import TropicalCycloneForecastSetup
 
-sys.path.append(str(Path.home() / "code" / "extreme-weather-bench-paper"))
 # make the basepath - change this to your local path
-basepath = Path.home() / "code" /"extreme-weather-bench-paper" / ""
+basepath = Path.home() / "extreme-weather-bench-paper" / ""
 basepath = str(basepath) + "/"
 
-# Define IBTrACS target
+# Shared IBTrACS target -- open once at module import so worker processes
+# inherit the setup instead of re-opening the parquet per case per model.
 ibtracs_target = inputs.IBTrACS()
 
 
-def process_case(case, forecast, model_name):
-    """Process a single case for a given forecast model.
+def _maybe_load(obj):
+    """Materialize a dask-backed xarray Dataset/DataArray to numpy, else pass through.
 
-    Args:
-        case: The case metadata object.
-        forecast: The forecast input data source.
-        model_name: The name of the model being processed.
-
-    Returns:
-        Tuple of (case_id, model_name, target_data, forecast_data)
+    `evaluate.run_pipeline` returns dask-backed data for gridded forecasts; a
+    naive `pickle.dump` then serializes the whole task graph, which for BB
+    icechunk models blows up the on-disk pickle to many times its logical size
+    and forces every downstream `.sel(...)` to walk the dask scheduler
+    (same pathology fixed in compute_ar_plot_data.py and compute_cbss_pph_examples.py).
+    Duck-type `.load()` so this is a no-op for already-materialized objects
+    such as IBTrACS DataFrames.
     """
-    with TqdmCallback(
-        desc=f"Running target pipeline for case {case.case_id_number}"
-    ):
-        target_data = evaluate.run_pipeline(
-            case_metadata=case, input_data=ibtracs_target
-        )
-    with TqdmCallback(
-        desc=f"Running {model_name} forecast pipeline for case {case.case_id_number}"
-    ):
+    if hasattr(obj, "load"):
+        return obj.load()
+    return obj
+
+
+def _process_case(
+    case,
+    forecast,
+    out_dir: Path,
+    overwrite: bool,
+    fallback_forecast=None,
+    label: str = "",
+) -> str:
+    """Compute TC target + forecast tracks for a single case and pickle them.
+
+    Writes ``out_dir/case_{cid}.pkl`` as ``{"target": ..., "forecast": ...}``.
+    Returns a short status string for logging.
+    """
+    cid = case.case_id_number
+    out_path = out_dir / f"case_{cid}.pkl"
+    if out_path.exists() and not overwrite:
+        return f"[{label}] skip case {cid} (exists)"
+
+    print(f"Computing TC tracks for {label} case {cid}", flush=True)
+
+    target_data = evaluate.run_pipeline(
+        case_metadata=case, input_data=ibtracs_target,
+    )
+    forecast_data = evaluate.run_pipeline(
+        case_metadata=case, input_data=forecast, _target_dataset=target_data,
+    )
+    if len(forecast_data) == 0 and fallback_forecast is not None:
+        print(f"Fallback forecast for {label} case {cid}", flush=True)
         forecast_data = evaluate.run_pipeline(
-            case_metadata=case, input_data=forecast, _target_dataset=target_data
+            case_metadata=case, input_data=fallback_forecast,
+            _target_dataset=target_data,
         )
-    return case.case_id_number, model_name, target_data, forecast_data
+    if len(forecast_data) == 0:
+        return f"[{label}] empty case {cid}"
+
+    target_data = _maybe_load(target_data)
+    forecast_data = _maybe_load(forecast_data)
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "wb") as f:
+        pickle.dump({"target": target_data, "forecast": forecast_data}, f)
+    return f"[{label}] ok case {cid}"
 
 
-def run_tc_tracker(ewb_cases, forecast, model_name, parallel_config):
-    """Run parallel evaluation for all cases with a given forecast model.
+def _run_model(
+    label: str,
+    ewb_cases,
+    forecast,
+    out_dir: Path,
+    n_jobs: int,
+    overwrite: bool,
+    fallback_forecast=None,
+) -> None:
+    """Dispatch per-case TC-track computation across worker processes for one model.
 
-    Args:
-        ewb_cases: The case collection to evaluate.
-        forecast: The forecast input data source.
-        model_name: The name of the model being evaluated.
-
-    Returns:
-        List of results from process_case.
+    Uses the ``loky`` (process) backend so each worker gets its own numba
+    runtime (the TC track detection has parallel=True kernels with the same
+    thread-safety caveats we hit on CBSS) and its own icechunk/arraylake
+    session -- concurrent reads on a shared session serialize inside the Rust
+    backend, negating threading benefits.
     """
-    with joblib.parallel_config(**parallel_config):
-        results = utils.ParallelTqdm(total_tasks=len(ewb_cases))(
-            joblib.delayed(process_case)(case, forecast, model_name)
-            for case in ewb_cases
+    print(
+        f"Computing TC tracks for {label} ({len(ewb_cases)} cases, "
+        f"n_jobs={n_jobs})",
+        flush=True,
+    )
+    out_dir.mkdir(parents=True, exist_ok=True)
+    results = Parallel(n_jobs=n_jobs, backend="loky")(
+        delayed(_process_case)(
+            c, forecast, out_dir, overwrite,
+            fallback_forecast=fallback_forecast, label=label,
         )
-    return results
-
-
-def update_tc_dict(tc_dict, results, model_name):
-    """Update the nested dictionary with results from a model evaluation.
-
-    Args:
-        tc_dict: The nested dictionary to update.
-        results: List of (case_id, model_name, target_data, forecast_data) tuples.
-        model_name: The name of the model.
-
-    Returns:
-        Updated tc_dict.
-    """
-    for case_id, _, target_data, forecast_data in results:
-        if case_id not in tc_dict:
-            tc_dict[case_id] = {"target_data": None, "forecast_data": {}}
-        # Only update target_data if not already set (same for all models)
-        if tc_dict[case_id]["target_data"] is None:
-            tc_dict[case_id]["target_data"] = target_data
-        tc_dict[case_id]["forecast_data"][model_name] = forecast_data
-
-    # Update the tc_tracks.pkl file   
-    pickle.dump(tc_dict, open(basepath + "saved_data/temp_tc_tracks.pkl", "wb"))
-    return tc_dict
+        for c in ewb_cases
+    )
+    for r in results:
+        print(r, flush=True)
 
 
 if __name__ == "__main__":
@@ -135,24 +158,50 @@ if __name__ == "__main__":
         help="Run BB Pangu evaluation (default: False)",
     )
     parser.add_argument(
+        "--case_ids",
+        nargs="+",
+        default=[],
+        help="Case IDs to run (default: all)",
+    )
+    parser.add_argument(
         "--n_jobs",
         type=int,
-        default=20,
-        help="Number of jobs to run in parallel (default: 20)",
+        default=1,
+        help=(
+            "Number of parallel worker processes per model (loky backend). "
+            "Default: 1 (sequential)."
+        ),
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        default=False,
+        help=(
+            "Recompute cases whose per-case pickle already exists. "
+            "Default: skip existing (resume-friendly)."
+        ),
     )
     args = parser.parse_args()
 
-    # Load in all of the events in the yaml file and filter for tropical cyclones
+    # Case ID parsing matches compute_ar_plot_data.py / compute_cbss_pph_examples.py:
+    # accepts either `--case_ids 1 2 3` or `--case_ids "1,2,3"`.
+    if len(args.case_ids) > 0:
+        args.case_ids = [int(n) for n in args.case_ids[0].split(",")]
+    else:
+        args.case_ids = None
+
+    print(f"Case IDs: {args.case_ids}", flush=True)
+
     ewb_cases = cases.load_ewb_events_yaml_into_case_list()
     ewb_cases = [n for n in ewb_cases if n.event_type == "tropical_cyclone"]
+    if args.case_ids is not None:
+        ewb_cases = [n for n in ewb_cases if n.case_id_number in args.case_ids]
 
-    # Initialize the TC forecast setup class
+    saved_data_root = Path(basepath) / "saved_data"
+
     tc_forecast_setup = TropicalCycloneForecastSetup()
 
-    # Nested dictionary: case_id -> {target_data, forecast_data -> {model: data}}
-    tc_dict = {}
-
-    # Cache forecast objects to avoid re-opening data sources
+    # Cache forecast handles so each source is opened at most once per invocation.
     hres_forecast = None
     bb_hres_forecast = None
     cira_fourv2_forecast = None
@@ -162,96 +211,91 @@ if __name__ == "__main__":
     bb_graphcast_forecast = None
     bb_pangu_forecast = None
 
-    if args.n_jobs:
-        n_jobs = args.n_jobs
-    else:
-        n_jobs = 20
-    parallel_config = {"backend": "loky", "n_jobs": n_jobs}
     if args.run_hres:
-        print("Running HRES TC track evaluation")
         if hres_forecast is None:
             hres_forecast = tc_forecast_setup.get_hres_forecast()
-        results = run_tc_tracker(ewb_cases, hres_forecast, "HRES", parallel_config)
-        # Check if any results are empty and fallback to BB HRES
-        empty_cases = [r for r in results if len(r[3]) == 0]
-        if empty_cases:
-            print("Some cases empty, trying BB HRES for fallback")
-            if bb_hres_forecast is None:
-                bb_hres_forecast = tc_forecast_setup.get_bb_hres_forecast()
-            # Re-run only for empty cases
-            empty_case_ids = [r[0] for r in empty_cases]
-            empty_ewb_cases = [n for n in ewb_cases if n.case_id_number in empty_case_ids]
-            bb_results = run_tc_tracker(
-                empty_ewb_cases, bb_hres_forecast, "HRES", parallel_config
-            )
-            # Merge results
-            results = [r for r in results if len(r[3]) > 0] + bb_results
-        tc_dict = update_tc_dict(tc_dict, results, "HRES")
+        if bb_hres_forecast is None:
+            bb_hres_forecast = tc_forecast_setup.get_bb_hres_forecast()
+        _run_model(
+            label="hres",
+            ewb_cases=ewb_cases,
+            forecast=hres_forecast,
+            out_dir=saved_data_root / "hres_tc_tracks",
+            n_jobs=args.n_jobs,
+            overwrite=args.overwrite,
+            fallback_forecast=bb_hres_forecast,
+        )
 
     if args.run_cira_fourv2:
-        print("Running CIRA FOURv2 TC track evaluation")
         if cira_fourv2_forecast is None:
-            cira_fourv2_forecast = tc_forecast_setup.get_cira_tc_forecast(
-                "Fourv2", "IFS"
-            )
-        results = run_tc_tracker(ewb_cases, cira_fourv2_forecast, "CIRA_FOURv2", parallel_config)
-        tc_dict = update_tc_dict(tc_dict, results, "CIRA_FOURv2")
+            cira_fourv2_forecast = tc_forecast_setup.get_cira_tc_forecast("Fourv2", "IFS")
+        _run_model(
+            label="fourv2_cira",
+            ewb_cases=ewb_cases,
+            forecast=cira_fourv2_forecast,
+            out_dir=saved_data_root / "fourv2_cira_tc_tracks",
+            n_jobs=args.n_jobs,
+            overwrite=args.overwrite,
+        )
 
     if args.run_cira_gc:
-        print("Running CIRA Graphcast TC track evaluation")
         if cira_gc_forecast is None:
-            cira_gc_forecast = tc_forecast_setup.get_cira_tc_forecast(
-                "Graphcast", "GFS"
-            )
-        results = run_tc_tracker(ewb_cases, cira_gc_forecast, "CIRA_Graphcast", parallel_config)
-        tc_dict = update_tc_dict(tc_dict, results, "CIRA_Graphcast")
+            cira_gc_forecast = tc_forecast_setup.get_cira_tc_forecast("Graphcast", "GFS")
+        _run_model(
+            label="gc_cira",
+            ewb_cases=ewb_cases,
+            forecast=cira_gc_forecast,
+            out_dir=saved_data_root / "gc_cira_tc_tracks",
+            n_jobs=args.n_jobs,
+            overwrite=args.overwrite,
+        )
 
     if args.run_cira_pangu:
-        print("Running CIRA Pangu TC track evaluation")
         if cira_pangu_forecast is None:
             cira_pangu_forecast = tc_forecast_setup.get_cira_tc_forecast("Pangu", "IFS")
-        results = run_tc_tracker(ewb_cases, cira_pangu_forecast, "CIRA_Pangu", parallel_config)
-        tc_dict = update_tc_dict(tc_dict, results, "CIRA_Pangu")
+        _run_model(
+            label="pang_cira",
+            ewb_cases=ewb_cases,
+            forecast=cira_pangu_forecast,
+            out_dir=saved_data_root / "pang_cira_tc_tracks",
+            n_jobs=args.n_jobs,
+            overwrite=args.overwrite,
+        )
 
     if args.run_bb_aifs:
-        print("Running BB AIFS TC track evaluation")
         if bb_aifs_forecast is None:
-            bb_aifs_forecast = tc_forecast_setup.get_bb_tc_forecast("AIFS")
-        results = run_tc_tracker(ewb_cases, bb_aifs_forecast, "BB_AIFS", parallel_config)
-        tc_dict = update_tc_dict(tc_dict, results, "BB_AIFS")
+            bb_aifs_forecast = tc_forecast_setup.get_bb_tc_forecast("aifs-single")
+        _run_model(
+            label="aifs_bb",
+            ewb_cases=ewb_cases,
+            forecast=bb_aifs_forecast,
+            out_dir=saved_data_root / "aifs_bb_tc_tracks",
+            n_jobs=args.n_jobs,
+            overwrite=args.overwrite,
+        )
 
     if args.run_bb_graphcast:
-        print("Running BB Graphcast TC track evaluation")
         if bb_graphcast_forecast is None:
-            bb_graphcast_forecast = tc_forecast_setup.get_bb_tc_forecast("Graphcast")
-        results = run_tc_tracker(ewb_cases, bb_graphcast_forecast, "BB_Graphcast", parallel_config)
-        tc_dict = update_tc_dict(tc_dict, results, "BB_Graphcast")
+            bb_graphcast_forecast = tc_forecast_setup.get_bb_tc_forecast("graphcast")
+        _run_model(
+            label="gc_bb",
+            ewb_cases=ewb_cases,
+            forecast=bb_graphcast_forecast,
+            out_dir=saved_data_root / "gc_bb_tc_tracks",
+            n_jobs=args.n_jobs,
+            overwrite=args.overwrite,
+        )
 
     if args.run_bb_pangu:
-        print("Running BB Pangu TC track evaluation")
         if bb_pangu_forecast is None:
-            bb_pangu_forecast = tc_forecast_setup.get_bb_tc_forecast("Pangu")
-        results = run_tc_tracker(ewb_cases, bb_pangu_forecast, "BB_Pangu", parallel_config)
-        tc_dict = update_tc_dict(tc_dict, results, "BB_Pangu")
+            bb_pangu_forecast = tc_forecast_setup.get_bb_tc_forecast("panguweather")
+        _run_model(
+            label="pang_bb",
+            ewb_cases=ewb_cases,
+            forecast=bb_pangu_forecast,
+            out_dir=saved_data_root / "pang_bb_tc_tracks",
+            n_jobs=args.n_jobs,
+            overwrite=args.overwrite,
+        )
 
-    # Save the results
-    print("Saving TC track results")
-    # Create filename based on which models were run
-    filename_parts = []
-    if args.run_hres:
-        filename_parts.append("hres")
-    if args.run_cira_fourv2:
-        filename_parts.append("cira_fourv2")
-    if args.run_cira_gc:
-        filename_parts.append("cira_gc")
-    if args.run_cira_pangu:
-        filename_parts.append("cira_pangu")
-    if args.run_bb_aifs:
-        filename_parts.append("bb_aifs")
-    if args.run_bb_graphcast:
-        filename_parts.append("bb_graphcast")
-    if args.run_bb_pangu:
-        filename_parts.append("bb_pangu")
-    
-    filename_suffix = "_".join(filename_parts) if filename_parts else "none"
-    pickle.dump(tc_dict, open(basepath + f"saved_data/tc_tracks_{filename_suffix}.pkl", "wb"))
+    print("Done", flush=True)
