@@ -8,11 +8,20 @@ markers: stars at the predicted landfall point matched per
 init_time (next-landfall pairing) and X markers at every
 IBTrACS landfall.
 
-Track data is computed inline via ``evaluate.run_pipeline`` and
-cached to a pickle so reruns are fast. The HRES column falls
-back from the WB2 archive (2016-2022) to the BB HRES archive
-when the WB2 source returns no detections, mirroring
-``compute_tc_tracks.py``.
+Track data is loaded from the per-case pickles produced by
+``src/plots/compute_tc_tracks.py`` -- one pickle per (model, case)
+under ``saved_data/<model>_tc_tracks/case_<id>.pkl``, each
+storing ``{"target": ibtracs_ds, "forecast": forecast_ds}`` with
+dask graphs already materialized (see ``_maybe_load`` in the
+compute script). The HRES column transparently inherits the
+HRES WB2 -> BB HRES fallback that ``compute_tc_tracks.py``
+applies at compute time; if HRES WB2 returned no detections for
+a case, the pickle under ``hres_tc_tracks/`` already holds the
+BB HRES result.
+
+If a pickle is missing this script raises rather than silently
+rendering blank panels; the error message names the missing file
+and the ``compute_tc_tracks.py`` invocation that would produce it.
 """
 
 import argparse
@@ -29,7 +38,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import xarray as xr
-from extremeweatherbench import cases, evaluate, inputs
+from extremeweatherbench import cases
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import ListedColormap
 from matplotlib.gridspec import GridSpec
@@ -37,17 +46,17 @@ from matplotlib.lines import Line2D
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-# compute_tc_tracks.py adds the repo root to sys.path so the
-# src.data.* imports resolve when running this file directly. We
-# also add src/data so the bare ``from check_icechunk import ...``
-# inside tc_forecast_setup.py resolves.
+# Keep sys.path aligned with compute_tc_tracks.py so notebooks that import
+# this module keep resolving src.data / src.plots correctly. The bare
+# ``from check_icechunk import ...`` inside tc_forecast_setup.py doesn't
+# matter here anymore (we no longer touch forecast objects), but leaving
+# these on the path is harmless.
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 _SRC_DATA = REPO_ROOT / "src" / "data"
 if str(_SRC_DATA) not in sys.path:
     sys.path.insert(0, str(_SRC_DATA))
 
-from src.data.tc_forecast_setup import TropicalCycloneForecastSetup  # noqa: E402
 from src.plots.plotting_utils import generate_extent  # noqa: E402
 
 DEFAULT_ROWS: list[tuple[int, str]] = [
@@ -68,17 +77,20 @@ MAX_FORECAST_LEAD = np.timedelta64(10, "D")
 # spurious short-track landfall stars.
 MIN_TRACK_POINTS = 10
 
-# (cache_key, display_name, factory_method, fallback_factory_method)
-# fallback is only used when the primary forecast returns no
-# detections for a given case (HRES WB2 -> BB HRES).
-MODEL_COLS: list[tuple[str, str, str, Optional[str]]] = [
-    ("BB_AIFS", "AIFS", "aifs-single", None),
-    ("BB_Pangu", "Pangu", "panguweather", None),
-    ("BB_Graphcast", "GraphCast", "graphcast", None),
-    ("HRES", "IFS HRES", "HRES", "BB_HRES"),
+# (cache_key, display_name, per-case pickle dir, compute_tc_tracks.py flag)
+# The pickle dir names must match the ``out_dir`` values in
+# compute_tc_tracks.py. The HRES entry inherits that script's HRES WB2
+# -> BB HRES fallback (compute writes the fallback result into
+# hres_tc_tracks/ when the primary produces no detections), so no
+# fallback wiring is needed at load time.
+MODEL_COLS: list[tuple[str, str, str, str]] = [
+    ("BB_AIFS", "AIFS", "aifs_bb_tc_tracks", "--run_bb_aifs"),
+    ("BB_Pangu", "Pangu", "pang_bb_tc_tracks", "--run_bb_pangu"),
+    ("BB_Graphcast", "GraphCast", "gc_bb_tc_tracks", "--run_bb_graphcast"),
+    ("HRES", "IFS HRES", "hres_tc_tracks", "--run_hres"),
 ]
 
-CACHE_PATH = REPO_ROOT / "saved_data" / "tc_3x4_panel_tracks.pkl"
+TC_TRACKS_ROOT = REPO_ROOT / "saved_data"
 DEFAULT_OUTPUT = (
     REPO_ROOT / "graphics" / "paper" / "subplots" / "tc_3x4_eta_otis_lan.png"
 )
@@ -128,14 +140,22 @@ def _drop_short_tracks(
     if "latitude" not in forecast_ds.coords:
         return forecast_ds
 
+    lt_vals = forecast_ds.lead_time.values
+    vt_vals = forecast_ds.valid_time.values
+    # Empty forecasts (no TC detections) come back with size-0 coords whose
+    # numpy dtype defaults to float64, which then breaks the timedelta
+    # subtraction below. There's nothing to mask on an empty grid so we can
+    # just return the dataset unchanged and let ``_forecast_has_detections``
+    # downstream flip it to ``None``.
+    if lt_vals.size == 0 or vt_vals.size == 0:
+        return forecast_ds
+
     lat_da = forecast_ds.coords["latitude"].transpose("lead_time", "valid_time")
     lon_da = forecast_ds.coords["longitude"].transpose("lead_time", "valid_time")
     valid = ~np.isnan(lat_da.values)
 
-    lt_vals = forecast_ds.lead_time.values
     if not np.issubdtype(lt_vals.dtype, np.timedelta64):
         lt_vals = lt_vals.astype("timedelta64[h]")
-    vt_vals = forecast_ds.valid_time.values
     init_grid = vt_vals[None, :] - lt_vals[:, None]
 
     unique_inits, inverse = np.unique(init_grid.ravel(), return_inverse=True)
@@ -186,8 +206,6 @@ STORM_LABEL_FONTSIZE = 22
 CBAR_LABEL_FONTSIZE = 12
 CBAR_TICK_FONTSIZE = 10
 
-ibtracs_target = inputs.IBTrACS()
-
 
 def _setup_colormap() -> mcolors.LinearSegmentedColormap:
     """Same cubehelix-style ramp used by figure5_tc_tracks.py."""
@@ -229,115 +247,54 @@ def _load_cases(case_ids: list[int]):
     return [by_id[cid] for cid in case_ids]
 
 
-def _load_cache() -> dict[int, dict[str, Any]]:
-    if CACHE_PATH.exists():
-        with open(CACHE_PATH, "rb") as f:
-            return pickle.load(f)
-    return {}
+def _load_case_pickle(dir_name: str, case_id: int) -> dict[str, Any]:
+    """Read one ``{"target", "forecast"}`` pickle written by compute_tc_tracks.py.
 
-
-def _save_cache(cache: dict[int, dict[str, Any]]) -> None:
-    CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(CACHE_PATH, "wb") as f:
-        pickle.dump(cache, f)
-
-
-def _build_forecast(setup: TropicalCycloneForecastSetup, key: str):
-    """Materialize a forecast object from a ``MODEL_COLS`` key.
-
-    Returns ``None`` if the source can't be opened (e.g. arraylake
-    auth failure for BB HRES); the caller treats this the same as
-    a forecast that returned no detections so the rest of the
-    figure can still render.
+    Raises ``FileNotFoundError`` with an actionable message rather than
+    silently returning None -- a missing pickle would produce a blank panel
+    with no indication of why.
     """
-    try:
-        if key == "HRES":
-            return setup.get_hres_forecast()
-        if key == "BB_HRES":
-            return setup.get_bb_hres_forecast()
-        return setup.get_bb_tc_forecast(key)
-    except Exception as exc:  # noqa: BLE001
-        print(f"  -> failed to open forecast source {key}: {exc!r}")
-        return None
+    pkl = TC_TRACKS_ROOT / dir_name / f"case_{case_id}.pkl"
+    if not pkl.exists():
+        raise FileNotFoundError(
+            f"Missing per-case TC pickle {pkl}. Regenerate it with:\n"
+            f"    python -m src.plots.compute_tc_tracks "
+            f"--case_ids {case_id} <flag for this column>\n"
+            f"where <flag> is one of --run_hres / --run_bb_aifs / "
+            f"--run_bb_graphcast / --run_bb_pangu."
+        )
+    with open(pkl, "rb") as f:
+        return pickle.load(f)
 
 
-def compute_tracks(
-    case_ids: list[int],
-    use_cache: bool = True,
-) -> dict[int, dict[str, Any]]:
-    """Compute (or reuse cached) target + forecast tracks.
+def load_tracks(case_ids: list[int]) -> dict[int, dict[str, Any]]:
+    """Assemble the ``{case_id: {"target", "forecasts": {...}}}`` structure.
 
-    Returns a nested dict ``{case_id: {"target": ds, "forecasts":
-    {model_key: ds_or_None}}}``. ``None`` indicates the model and
-    its fallback both produced no detections for that case.
+    Reads one per-case pickle per (case, model column) from the dirs
+    produced by ``compute_tc_tracks.py``. The IBTrACS target is identical
+    across all model pickles for a given case so we take it from the first
+    successful read. Forecasts that came back without detections at compute
+    time are stored as ``None`` here, matching what ``plot_tc_panel`` expects.
     """
-    cache = _load_cache() if use_cache else {}
-    case_list = _load_cases(case_ids)
-    setup = TropicalCycloneForecastSetup()
-    forecast_objs: dict[str, Any] = {}
+    _load_cases(case_ids)  # surfaces bad case_ids before touching the filesystem
+    result: dict[int, dict[str, Any]] = {}
 
-    for case in case_list:
-        cid = case.case_id_number
-        entry = cache.setdefault(cid, {"target": None, "forecasts": {}})
+    for cid in case_ids:
+        target: Optional[xr.Dataset] = None
+        forecasts: dict[str, Optional[xr.Dataset]] = {}
 
-        if entry.get("target") is None:
-            print(f"[case {cid} {case.title}] computing IBTrACS target")
-            entry["target"] = evaluate.run_pipeline(
-                case_metadata=case, input_data=ibtracs_target,
-            )
-            _save_cache(cache)
+        for cache_key, _display, dir_name, _flag in MODEL_COLS:
+            payload = _load_case_pickle(dir_name, cid)
+            if target is None:
+                target = payload["target"]
+            fc = payload.get("forecast")
+            if not _forecast_has_detections(fc):
+                fc = None
+            forecasts[cache_key] = fc
 
-        target_ds = entry["target"]
+        result[cid] = {"target": target, "forecasts": forecasts}
 
-        for cache_key, display, primary_key, fallback_key in MODEL_COLS:
-            if cache_key in entry["forecasts"]:
-                continue
-            print(
-                f"[case {cid} {case.title}] computing forecast for "
-                f"{display} ({primary_key})"
-            )
-            if primary_key not in forecast_objs:
-                forecast_objs[primary_key] = _build_forecast(setup, primary_key)
-            forecast = forecast_objs[primary_key]
-            forecast_ds = None
-            if forecast is not None:
-                try:
-                    forecast_ds = evaluate.run_pipeline(
-                        case_metadata=case,
-                        input_data=forecast,
-                        _target_dataset=target_ds,
-                    )
-                except Exception as exc:  # noqa: BLE001
-                    print(f"  -> primary {primary_key} failed: {exc!r}")
-                    forecast_ds = None
-
-            if (
-                fallback_key is not None
-                and not _forecast_has_detections(forecast_ds)
-            ):
-                print(f"  -> falling back to {fallback_key}")
-                if fallback_key not in forecast_objs:
-                    forecast_objs[fallback_key] = _build_forecast(
-                        setup, fallback_key,
-                    )
-                fb = forecast_objs[fallback_key]
-                if fb is not None:
-                    try:
-                        forecast_ds = evaluate.run_pipeline(
-                            case_metadata=case,
-                            input_data=fb,
-                            _target_dataset=target_ds,
-                        )
-                    except Exception as exc:  # noqa: BLE001
-                        print(f"  -> fallback {fallback_key} failed: {exc!r}")
-                        forecast_ds = None
-
-            if not _forecast_has_detections(forecast_ds):
-                forecast_ds = None
-            entry["forecasts"][cache_key] = forecast_ds
-            _save_cache(cache)
-
-    return {cid: cache[cid] for cid in case_ids}
+    return result
 
 
 def _track_dataarray_from_forecast(forecast_ds: xr.Dataset) -> xr.DataArray:
@@ -655,11 +612,10 @@ def _add_shared_init_colorbar(fig, axes_grid):
 def build_figure(
     rows: list[tuple[int, str]],
     output_path: Path,
-    use_cache: bool = True,
 ) -> Path:
-    """Compute (or load cached) tracks and render the 3 x 4 figure."""
+    """Load per-case tracks from disk and render the 3 x 4 figure."""
     case_ids = [cid for cid, _ in rows]
-    cache = compute_tracks(case_ids, use_cache=use_cache)
+    cache = load_tracks(case_ids)
 
     for cid in case_ids:
         forecasts = cache[cid]["forecasts"]
@@ -759,10 +715,6 @@ def main() -> None:
         "--output", default=str(DEFAULT_OUTPUT),
         help=f"Output PNG path. Default: {DEFAULT_OUTPUT}",
     )
-    parser.add_argument(
-        "--no-cache", action="store_true", default=False,
-        help="Force recompute even if cache exists.",
-    )
     args = parser.parse_args()
 
     case_list = _load_cases(args.cases)
@@ -771,7 +723,7 @@ def main() -> None:
         (c.case_id_number, label_overrides.get(c.case_id_number, c.title))
         for c in case_list
     ]
-    build_figure(rows, Path(args.output), use_cache=not args.no_cache)
+    build_figure(rows, Path(args.output))
 
 
 if __name__ == "__main__":
