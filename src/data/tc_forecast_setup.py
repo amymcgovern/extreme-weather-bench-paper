@@ -47,7 +47,7 @@ def preprocess_bb_hres_tc_dataset(ds: xr.Dataset) -> xr.Dataset:
 
     # Calculate the geopotential thickness required for tropical cyclone tracks
     ds["geopotential_thickness"] = ewb.calc.geopotential_thickness(
-        ds["geopotential"], top_level=300, bottom_level=500, pressure_dim="isobaricInhPa"
+        ds["geopotential"], top_level=300, bottom_level=500, pressure_dim="level"
     ) / 9.81
     return ds
 
