@@ -1,9 +1,11 @@
 # setup all the imports
 import argparse  # noqa: E402
+import importlib
 from pathlib import Path  # noqa: E402
 
 import pandas as pd  # noqa: E402
 import extremeweatherbench as ewb
+from extremeweatherbench import data
 
 from src.data.severe_forecast_setup import (
     SevereEvaluationSetup,
@@ -60,14 +62,23 @@ if __name__ == "__main__":
         default=False,
         help="Run BB Pangu evaluation (default: False)",
     )
+    parser.add_argument(
+        "--n_jobs",
+        type=int,
+        default=12,
+        help="Number of jobs to run in parallel (default: 12)",
+    )
 
     args = parser.parse_args()
 
-    # load in all of the events in the yaml file
-    ewb_cases = ewb.load_individual_cases_from_yaml(basepath + "non-event-severe-convection-cases.yaml")
+    # load in all of the events in the yaml file (packaged with the ewb library)
+    events_yaml_file = importlib.resources.files(data).joinpath(
+        "marginal_severe_convection_cases.yaml"
+    )
+    ewb_cases = ewb.cases.load_individual_cases_from_yaml(events_yaml_file)
+    ewb_cases = [n for n in ewb_cases if n.event_type == "severe_convection"]
 
-    # setup to run the jobs in parallel
-    parallel_config = {"backend": "loky", "n_jobs": 12}
+    parallel_config = {"backend": "loky", "n_jobs": args.n_jobs}
 
     severe_forecast_setup = SevereForecastSetup()
     severe_evaluation_setup = SevereEvaluationSetup()

@@ -7,7 +7,7 @@ from src.data.aifs_util import (
     DEFAULT_ICECHUNK_BUCKET,
     InMemoryForecast,
 )  # noqa: E402
-from check_icechunk import open_mlwp_archive_icechunk_dataset
+from src.data.check_icechunk import open_mlwp_archive_icechunk_dataset
 
 from src.data.arraylake_utils import ArraylakeForecast  # noqa: E402
 from src.data.model_name_setup import (
@@ -87,7 +87,7 @@ class MarginalTemperatureEvaluationSetup:
         for forecast in forecasts:
             evaluation_objects.append(
                 ewb.inputs.EvaluationObject(
-                    event_type="marginal_temperature",
+                    event_type="heat_wave",
                     metric_list=marginal_temperature_metrics,
                     target=ewb.defaults.ghcn_heatwave_target,
                     forecast=forecast,
@@ -95,7 +95,7 @@ class MarginalTemperatureEvaluationSetup:
             )
             evaluation_objects.append(
                 ewb.inputs.EvaluationObject(
-                    event_type="marginal_temperature",
+                    event_type="heat_wave",
                     metric_list=marginal_temperature_metrics,
                     target=ewb.defaults.era5_heatwave_target,
                     forecast=forecast,

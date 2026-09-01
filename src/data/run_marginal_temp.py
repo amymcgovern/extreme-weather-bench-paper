@@ -19,7 +19,7 @@ warnings.filterwarnings(
 
 if __name__ == "__main__":
     # make the basepath for saving the results - change this to your local path
-    basepath = Path.home() / "code" / "extreme-weather-bench-paper" / ""
+    basepath = Path.home() / "extreme-weather-bench-paper" / ""
     basepath = str(basepath) + "/"
     yaml_path = Path(ewb.__file__).parent / "data" / "marginal_temperature_events.yaml"
 
@@ -95,7 +95,9 @@ if __name__ == "__main__":
 
     # load in the events
     ewb_cases = ewb.cases.load_individual_cases_from_yaml(yaml_path)
-    ewb_cases = [n for n in ewb_cases if n.event_type == "marginal_temperature"]
+    #print(ewb_cases)
+    #print(ewb_cases[0].event_type)
+    ewb_cases = [n for n in ewb_cases if n.event_type == "heat_wave"]
     print(f"Running {len(ewb_cases)} marginal temperature cases")
 
     parallel_config = {"backend": "loky", "n_jobs": args.n_jobs}

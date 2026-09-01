@@ -179,9 +179,10 @@ if __name__ == "__main__":
 
     if args.run_marginal:
         events_yaml_file = importlib.resources.files(data).joinpath(
-            "marginal-severe-convection-cases.yaml"
+            "marginal_severe_convection_cases.yaml"
         )
         ewb_cases = ewb.cases.load_individual_cases_from_yaml(events_yaml_file)
+        ewb_cases = [n for n in ewb_cases if n.event_type == "severe_convection"]
     else:
         ewb_cases = ewb.cases.load_ewb_events_yaml_into_case_list()
         ewb_cases = [n for n in ewb_cases if n.event_type == "severe_convection"]

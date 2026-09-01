@@ -203,26 +203,34 @@ def plot_cbss_pph_panel(cbss, pph, my_case, lsrs, ax=None, title=None, lead_time
         # sparse form -- no need to unstack via ``stack_dataarray_from_dims``,
         # which fails on the plain PandasIndex layout with
         # ``conflicting dimensions for multi-index product variables``.
-        lsrs_sel = lsrs.sel(valid_time=valid_time)
-        if "valid_time" in lsrs_sel.dims:
-            lsrs_sel = lsrs_sel.squeeze("valid_time", drop=True)
-
-        report_type_arr = np.asarray(lsrs_sel["report_type"].values).ravel()
-        lat_arr = np.asarray(lsrs_sel["latitude"].values).ravel()
-        lon_arr = np.asarray(lsrs_sel["longitude"].values).ravel()
-
-        if report_type_arr.size == 0:
+        #
+        # ``lsrs`` can legitimately be None for marginal-severe (non-event) cases
+        # where no LSRs are associated with the case. Treat that as "no reports"
+        # rather than an error so the CBSS/PPH panels still render.
+        if lsrs is None:
             hail_data = pd.DataFrame(columns=["latitude", "longitude"])
             tornado_data = pd.DataFrame(columns=["latitude", "longitude"])
         else:
-            hail_mask = report_type_arr == 2
-            tornado_mask = report_type_arr == 3
-            hail_data = pd.DataFrame(
-                {"latitude": lat_arr[hail_mask], "longitude": lon_arr[hail_mask]}
-            )
-            tornado_data = pd.DataFrame(
-                {"latitude": lat_arr[tornado_mask], "longitude": lon_arr[tornado_mask]}
-            )
+            lsrs_sel = lsrs.sel(valid_time=valid_time)
+            if "valid_time" in lsrs_sel.dims:
+                lsrs_sel = lsrs_sel.squeeze("valid_time", drop=True)
+
+            report_type_arr = np.asarray(lsrs_sel["report_type"].values).ravel()
+            lat_arr = np.asarray(lsrs_sel["latitude"].values).ravel()
+            lon_arr = np.asarray(lsrs_sel["longitude"].values).ravel()
+
+            if report_type_arr.size == 0:
+                hail_data = pd.DataFrame(columns=["latitude", "longitude"])
+                tornado_data = pd.DataFrame(columns=["latitude", "longitude"])
+            else:
+                hail_mask = report_type_arr == 2
+                tornado_mask = report_type_arr == 3
+                hail_data = pd.DataFrame(
+                    {"latitude": lat_arr[hail_mask], "longitude": lon_arr[hail_mask]}
+                )
+                tornado_data = pd.DataFrame(
+                    {"latitude": lat_arr[tornado_mask], "longitude": lon_arr[tornado_mask]}
+                )
 
         ax, mappable = severe_utils.plot_cbss_forecast_panel(
             cbss_data=cbss.craven_brooks_significant_severe.squeeze(),

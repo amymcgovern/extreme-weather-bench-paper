@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import shapely
+import xarray as xr
 from cartopy.mpl.gridliner import LatitudeFormatter, LongitudeFormatter
 from extremeweatherbench import cases, utils
 from matplotlib.patches import Patch
@@ -1177,36 +1178,52 @@ def plot_all_cases_and_obs(
 
             # if it is convective, show the PPH and LSRs
             if indiv_event_type == "severe_convection":
-                # Get the data from my_target_info
+                # Newer ewb returns LSRs in a sparse layout: dims
+                # ``(valid_time, location)`` with ``latitude``/``longitude`` as
+                # non-index coords on ``location`` (each entry is one report)
+                # and ``report_type`` as an integer ``(valid_time, location)``
+                # variable per the ``report_type_mapping`` attr on the Dataset
+                # (``{'wind': 1, 'hail': 2, 'tor': 3}``). The old dense-grid
+                # ``stack_dataarray_from_dims(data['report_type'], ['latitude',
+                # 'longitude'])`` call fails on that layout with
+                # ``conflicting dimensions for multi-index product variables``
+                # so extract the scatter points directly. Broadcast over any
+                # ``valid_time`` dim in case future versions carry more than
+                # one aggregated timestamp per case.
                 data = my_target_info[0]
-                # print(data)
                 try:
-                    data = utils.stack_dataarray_from_dims(
-                        data["report_type"], ["latitude", "longitude"]
-                    )
+                    rt = data["report_type"]
+                    lat = data["latitude"]
+                    lon = data["longitude"]
+                    lat_bcast, lon_bcast, rt_bcast = xr.broadcast(lat, lon, rt)
+                    rt_arr = np.asarray(rt_bcast.values).ravel()
+                    lat_arr = np.asarray(lat_bcast.values).ravel()
+                    lon_arr = np.asarray(lon_bcast.values).ravel()
                 except Exception as e:
                     print(
-                        f"Error stacking sparse data for "
-                        f"{indiv_case.case_id_number} from "
-                        f"dimensions latitude, longitude: {e}. "
+                        f"Error extracting sparse LSR data for "
+                        f"{indiv_case.case_id_number}: {e}. "
                         f"This is likely because the data is not "
                         f"available for this case."
                     )
                     continue
 
-                for my_data in data:
-                    # print(my_data)
-                    hail_reports = my_data[my_data == "hail"]
-                    if len(hail_reports) == 0:
-                        hail_reports = my_data[my_data == 2]
+                if rt_arr.size == 0:
+                    continue
 
-                    severe_report_counts["hail"] += len(hail_reports)
-                    # print(hail_reports)
-                    lat_values = hail_reports.latitude.values
-                    lon_values = hail_reports.longitude.values
+                # Accept either the integer-encoded form (current) or the
+                # legacy string labels; masks are cheap and there's no reason
+                # to blow up on a future schema change.
+                hail_mask = (rt_arr == 2) | (rt_arr == "hail")
+                tor_mask = (rt_arr == 3) | (rt_arr == "tor")
+
+                severe_report_counts["hail"] += int(hail_mask.sum())
+                severe_report_counts["tor"] += int(tor_mask.sum())
+
+                if hail_mask.any():
                     ax.scatter(
-                        lon_values,
-                        lat_values,
+                        lon_arr[hail_mask],
+                        lat_arr[hail_mask],
                         color=lsr_colors["hail"],
                         alpha=0.9,
                         marker="s",
@@ -1215,17 +1232,10 @@ def plot_all_cases_and_obs(
                         s=6,
                     )
 
-                    tor_reports = my_data[my_data == "tor"]
-                    if len(tor_reports) == 0:
-                        tor_reports = my_data[my_data == 3]
-
-                    severe_report_counts["tor"] += len(tor_reports)
-                    # print(tor_reports)
-                    lat_values = tor_reports.latitude.values
-                    lon_values = tor_reports.longitude.values
+                if tor_mask.any():
                     ax.scatter(
-                        lon_values,
-                        lat_values,
+                        lon_arr[tor_mask],
+                        lat_arr[tor_mask],
                         color=lsr_colors["tornado"],
                         marker="^",
                         transform=ccrs.Geodetic(),
