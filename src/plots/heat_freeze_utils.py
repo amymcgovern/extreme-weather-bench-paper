@@ -60,15 +60,32 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 #         "temp_colormap", list(zip(positions, colors))
 #     ), mcolors.Normalize(vmin=lo, vmax=hi)
 
-def celsius_colormap_and_normalize() -> tuple[mcolors.Colormap, mcolors.Normalize]:
+def celsius_colormap_and_normalize(
+    kind: str = "heat",
+) -> tuple[mcolors.Colormap, mcolors.Normalize]:
     """Gets the colormap and normalization for 2m temperature.
-    Uses the managua colormap for temperature in Celsius.
+
+    Args:
+        kind: ``"heat"`` returns an ``inferno`` ramp scaled 0..45 C, the
+            existing default for heatwave plots. ``"freeze"`` returns a
+            reversed ``coolwarm`` ramp scaled -30..15 C so sub-freezing
+            values render as blue on the same axis convention. Any other
+            value raises ``ValueError``.
     Returns:
         A tuple (cmap, norm) for plotting.
     """
-    lo = 0
-    hi = 45
-    cmap = plt.get_cmap("inferno")
+    if kind == "heat":
+        lo, hi = 0, 45
+        cmap = plt.get_cmap("inferno")
+    elif kind == "freeze":
+        # coolwarm puts blue at the low end and red at the high end,
+        # matching meteorological convention (blue = cold, red = warm).
+        lo, hi = -30, 15
+        cmap = plt.get_cmap("coolwarm")
+    else:
+        raise ValueError(
+            f"Unknown celsius colormap kind {kind!r}; expected 'heat' or 'freeze'."
+        )
     return cmap, mcolors.Normalize(vmin=lo, vmax=hi)
 
 def generate_heatwave_dataset(
