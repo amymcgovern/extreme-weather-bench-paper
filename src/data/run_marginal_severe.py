@@ -118,7 +118,7 @@ if __name__ == "__main__":
         hres_results_later = ewb_hres_later.run(parallel_config=parallel_config)
         print("concatenating the results")
         hres_results = pd.concat([hres_results_early, hres_results_later])
-        hres_results.to_pickle(basepath + "saved_data/hres_non_event_severe_results.pkl")
+        hres_results.to_pickle(basepath + "saved_data/hres_marginal_severe_convection_results.pkl")
         print("HRES evaluation complete. Results saved to pickle.")
 
     if args.run_cira_fourv2:
@@ -139,7 +139,7 @@ if __name__ == "__main__":
             ewb_cases, cira_fourv2_severe_evaluation_objects
         )
         fourv2_results = ewb_fourv2.run(parallel_config=parallel_config)
-        fourv2_results.to_pickle(basepath + "saved_data/cira_fourv2_non_event_severe_results.pkl")
+        fourv2_results.to_pickle(basepath + "saved_data/cira_fourv2_marginal_severe_convection_results.pkl")
         print("FOURv2 evaluation complete. Results saved to pickle.")
 
     if args.run_cira_graphcast:
@@ -164,7 +164,7 @@ if __name__ == "__main__":
             ewb_cases, cira_gc_severe_evaluation_objects
         )
         gc_results = ewb_gc.run(parallel_config=parallel_config)
-        gc_results.to_pickle(basepath + "saved_data/cira_graphcast_non_event_severe_results.pkl")
+        gc_results.to_pickle(basepath + "saved_data/cira_graphcast_marginal_severe_convection_results.pkl")
         print("Graphcast evaluation complete. Results saved to pickle.")
 
     if args.run_cira_pangu:
@@ -185,7 +185,7 @@ if __name__ == "__main__":
             ewb_cases, cira_pangu_severe_evaluation_objects
         )
         pang_results = ewb_pang.run(parallel_config=parallel_config)
-        pang_results.to_pickle(basepath + "saved_data/cira_pangu_non_event_severe_results.pkl")
+        pang_results.to_pickle(basepath + "saved_data/cira_pangu_marginal_severe_convection_results.pkl")
         print("PANG evaluation complete. Results saved to pickle.")
 
     if args.run_bb_aifs:
@@ -203,7 +203,7 @@ if __name__ == "__main__":
             ewb_cases, bb_aifs_severe_evaluation_objects
         )
         aifs_results = ewb_aifs.run(parallel_config=parallel_config)
-        aifs_results.to_pickle(basepath + "saved_data/bb_aifs_non_event_severe_results.pkl")
+        aifs_results.to_pickle(basepath + "saved_data/bb_aifs_marginal_severe_convection_results.pkl")
         print("AIFS evaluation complete. Results saved to pickle.")
 
     if args.run_bb_graphcast:
@@ -222,7 +222,7 @@ if __name__ == "__main__":
         )
         graphcast_results = ewb_graphcast.run(parallel_config=parallel_config)
         graphcast_results.to_pickle(
-            basepath + "saved_data/bb_graphcast_non_event_severe_results.pkl"
+            basepath + "saved_data/bb_graphcast_marginal_severe_convection_results.pkl"
         )
         print("Graphcast evaluation complete. Results saved to pickle.")
 
@@ -241,5 +241,5 @@ if __name__ == "__main__":
             ewb_cases, bb_pangu_severe_evaluation_objects
         )
         pangu_results = ewb_pangu.run(parallel_config=parallel_config)
-        pangu_results.to_pickle(basepath + "saved_data/bb_pangu_non_event_severe_results.pkl")
+        pangu_results.to_pickle(basepath + "saved_data/bb_pangu_marginal_severe_convection_results.pkl")
         print("Pangu evaluation complete. Results saved to pickle.")
