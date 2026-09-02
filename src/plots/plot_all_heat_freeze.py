@@ -48,7 +48,10 @@ from joblib import Parallel, delayed
 from matplotlib.cm import ScalarMappable
 from matplotlib.gridspec import GridSpec
 
-from src.plots.heat_freeze_utils import celsius_colormap_and_normalize
+from src.plots.heat_freeze_utils import (
+    celsius_colormap_and_normalize,
+    celsius_diff_colormap_and_normalize,
+)
 
 LEAD_HOURS = [240, 168, 120, 72, 24]
 LEAD_LABELS = ["10 days", "7 days", "5 days", "3 days", "1 day"]
@@ -107,14 +110,31 @@ def _plot_field_panel(
     extent,
     cmap,
     norm,
+    mask_ocean: bool = False,
+    kelvin_to_celsius: bool = True,
 ) -> None:
-    """Render one gridded 2 m T panel (forecast or ERA5) in Celsius."""
-    t_c = da - 273.15
+    """Render one gridded 2 m T panel (forecast or ERA5) in Celsius.
+
+    The BB model archives (AIFS / GraphCast / Pangu / HRES) come pre-masked
+    with NaN over ocean, so ocean pixels render as the axes background.
+    ERA5 has no such mask, so pass ``mask_ocean=True`` to overlay
+    ``cfeature.OCEAN`` on top of the pcolormesh so the ERA5 panel visually
+    matches the model panels.
+
+    ``kelvin_to_celsius`` (default True) subtracts 273.15 before plotting;
+    set False when ``da`` is already in the target units (e.g. a
+    forecast-minus-truth difference in K == diff in C).
+    """
+    values = (da - 273.15).values if kelvin_to_celsius else da.values
     ax.pcolormesh(
-        da["longitude"], da["latitude"], t_c.values,
+        da["longitude"], da["latitude"], values,
         cmap=cmap, norm=norm,
         transform=ccrs.PlateCarree(), shading="auto",
     )
+    if mask_ocean:
+        ax.add_feature(
+            cfeature.OCEAN, facecolor="white", edgecolor="none", zorder=3,
+        )
     _add_basemap(ax)
     if extent is not None:
         ax.set_extent(extent, crs=ccrs.PlateCarree())
@@ -199,13 +219,26 @@ def _plot_case(
     era5_dir: Path,
     ghcn_dir: Path,
     basepath: str,
+    mode: str = "abs",
+    diff_vmax: float = 10.0,
 ) -> str:
-    """Worker: render one per-case figure. Returns a status string."""
+    """Worker: render one per-case figure. Returns a status string.
+
+    ``mode``:
+        - ``"abs"`` (default): each model/lead panel shows absolute 2 m T
+          on the case-appropriate heat/freeze Celsius colormap.
+        - ``"diff"``: each model/lead panel shows (forecast - ERA5) at
+          the anchor timestep, on a diverging RdBu_r ramp saturated at
+          +/- ``diff_vmax`` C. Truth panels (ERA5 gridded + GHCN) stay
+          on the absolute colormap so they remain interpretable as
+          reference.
+    """
     cid = my_case.case_id_number
     event_type = my_case.event_type
 
     print(
-        f"plotting case {cid} ({event_type}, anchor={anchor}): {my_case.title}",
+        f"plotting case {cid} ({event_type}, mode={mode}, anchor={anchor}):"
+        f" {my_case.title}",
         flush=True,
     )
 
@@ -221,14 +254,20 @@ def _plot_case(
     ghcn_ds = _load_case(ghcn_dir, cid)
 
     kind = _kind_for_event(event_type)
-    cmap, norm = celsius_colormap_and_normalize(kind=kind)
+    cmap_abs, norm_abs = celsius_colormap_and_normalize(kind=kind)
+    if mode == "diff":
+        cmap_diff, norm_diff = celsius_diff_colormap_and_normalize(vmax=diff_vmax)
+        era5_ref = era5_ds["surface_air_temperature"]
+    else:
+        cmap_diff, norm_diff = None, None
+        era5_ref = None
 
     fig = plt.figure(figsize=(19, 11))
     n_rows, n_cols = 4, 6  # 5 lead cols + 1 truth col
     gs = GridSpec(
         n_rows, n_cols, figure=fig,
         left=0.045, right=0.99, top=0.90, bottom=0.09,
-        wspace=0.05, hspace=0.10,
+        wspace=0.05, hspace=0.22,
         width_ratios=[1.0] * 5 + [1.05],
     )
     extent = _build_extent(my_case, era5_ds)
@@ -270,17 +309,32 @@ def _plot_case(
             if snap.size == 0:
                 _empty_placeholder(ax, extent, "No data")
                 continue
-            _plot_field_panel(ax, snap, extent, cmap, norm)
+            if mode == "diff":
+                # Align to ERA5 grid by coord labels (some models are
+                # lat-ascending, ERA5 is lat-descending); reindex_like
+                # guarantees ordering matches so pcolormesh renders on
+                # the same footprint.
+                snap_aligned = snap.reindex_like(era5_ref)
+                diff = snap_aligned - era5_ref
+                _plot_field_panel(
+                    ax, diff, extent, cmap_diff, norm_diff,
+                    kelvin_to_celsius=False,
+                )
+            else:
+                _plot_field_panel(ax, snap, extent, cmap_abs, norm_abs)
 
     era5_ax = fig.add_subplot(gs[0, 5], projection=ccrs.PlateCarree())
-    _plot_field_panel(era5_ax, era5_ds["surface_air_temperature"], extent, cmap, norm)
+    _plot_field_panel(
+        era5_ax, era5_ds["surface_air_temperature"], extent, cmap_abs, norm_abs,
+        mask_ocean=True,
+    )
     era5_ax.set_title(
         f"ERA5 ({_anchor_label(anchor)}\n{_fmt_anchor_time(anchor_ts)})",
         fontsize=TRUTH_TITLE_FONTSIZE, pad=6,
     )
 
     ghcn_ax = fig.add_subplot(gs[1, 5], projection=ccrs.PlateCarree())
-    n_stations = _plot_ghcn_panel(ghcn_ax, ghcn_ds, extent, cmap, norm)
+    n_stations = _plot_ghcn_panel(ghcn_ax, ghcn_ds, extent, cmap_abs, norm_abs)
     ghcn_ax.set_title(
         f"GHCN (n={n_stations})",
         fontsize=TRUTH_TITLE_FONTSIZE, pad=6,
@@ -292,23 +346,57 @@ def _plot_case(
         placeholder = fig.add_subplot(gs[r, 5])
         placeholder.set_visible(False)
 
-    sm = ScalarMappable(cmap=cmap, norm=norm)
-    sm.set_array([])
     bottom_row = [ax for ax in axes_lead[-1] if ax is not None]
     if bottom_row:
         pos0 = bottom_row[0].get_position(fig)
-        pos_last = era5_ax.get_position(fig)
+        pos_last_lead = bottom_row[-1].get_position(fig)
+        pos_truth = era5_ax.get_position(fig)
         cbar_y = pos0.y0 - pos0.height * 0.28
         cbar_height = pos0.height * 0.12
-        cbar_ax = fig.add_axes(
-            [pos0.x0, cbar_y, pos_last.x1 - pos0.x0, cbar_height],
-        )
-        cbar = fig.colorbar(sm, cax=cbar_ax, orientation="horizontal")
-        cbar.set_label(
-            "2 m Temperature (\u00b0C)",
-            fontsize=CBAR_LABEL_FONTSIZE, labelpad=2,
-        )
-        cbar.ax.tick_params(labelsize=CBAR_TICK_FONTSIZE)
+
+        if mode == "diff":
+            # Two colorbars: wide diff cbar under lead columns, small abs
+            # cbar under truth column, so both scales stay legible.
+            sm_diff = ScalarMappable(cmap=cmap_diff, norm=norm_diff)
+            sm_diff.set_array([])
+            diff_cbar_ax = fig.add_axes(
+                [pos0.x0, cbar_y, pos_last_lead.x1 - pos0.x0, cbar_height],
+            )
+            diff_cbar = fig.colorbar(
+                sm_diff, cax=diff_cbar_ax, orientation="horizontal",
+                extend="both",
+            )
+            diff_cbar.set_label(
+                "Forecast \u2212 ERA5 (\u00b0C)",
+                fontsize=CBAR_LABEL_FONTSIZE, labelpad=2,
+            )
+            diff_cbar.ax.tick_params(labelsize=CBAR_TICK_FONTSIZE)
+
+            sm_abs = ScalarMappable(cmap=cmap_abs, norm=norm_abs)
+            sm_abs.set_array([])
+            abs_cbar_ax = fig.add_axes(
+                [pos_truth.x0, cbar_y, pos_truth.x1 - pos_truth.x0, cbar_height],
+            )
+            abs_cbar = fig.colorbar(
+                sm_abs, cax=abs_cbar_ax, orientation="horizontal",
+            )
+            abs_cbar.set_label(
+                "ERA5 / GHCN 2 m T (\u00b0C)",
+                fontsize=CBAR_LABEL_FONTSIZE - 4, labelpad=2,
+            )
+            abs_cbar.ax.tick_params(labelsize=CBAR_TICK_FONTSIZE - 2)
+        else:
+            sm = ScalarMappable(cmap=cmap_abs, norm=norm_abs)
+            sm.set_array([])
+            cbar_ax = fig.add_axes(
+                [pos0.x0, cbar_y, pos_truth.x1 - pos0.x0, cbar_height],
+            )
+            cbar = fig.colorbar(sm, cax=cbar_ax, orientation="horizontal")
+            cbar.set_label(
+                "2 m Temperature (\u00b0C)",
+                fontsize=CBAR_LABEL_FONTSIZE, labelpad=2,
+            )
+            cbar.ax.tick_params(labelsize=CBAR_TICK_FONTSIZE)
 
     fig.suptitle(
         f"Case {cid}: {my_case.title} on {my_case.start_date} "
@@ -320,7 +408,8 @@ def _plot_case(
     out_dir.mkdir(parents=True, exist_ok=True)
     prefix = "heat" if event_type == "heat_wave" else "freeze"
     suffix = _anchor_suffix(anchor)
-    out_path = out_dir / f"{prefix}_case_{cid}{suffix}.png"
+    mode_suffix = "_diff" if mode == "diff" else ""
+    out_path = out_dir / f"{prefix}_case_{cid}{suffix}{mode_suffix}.png"
     fig.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
 
@@ -353,6 +442,22 @@ if __name__ == "__main__":
         help=(
             "Anchor timestep used at compute time. max_low is heat-only."
         ),
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["abs", "diff"],
+        default="abs",
+        help=(
+            "abs (default): plot absolute 2 m T on the heat/freeze"
+            " colormap. diff: plot forecast - ERA5 on a diverging RdBu_r"
+            " colormap; truth panels stay on the absolute colormap."
+        ),
+    )
+    parser.add_argument(
+        "--diff_vmax",
+        type=float,
+        default=10.0,
+        help="Saturation (deg C) for the diff colormap. Default: 10.",
     )
     args = parser.parse_args()
 
@@ -388,7 +493,7 @@ if __name__ == "__main__":
 
     print(
         f"Plotting {len(ewb_cases)} cases with anchor={args.anchor}"
-        f" n_jobs={args.n_jobs}",
+        f" mode={args.mode} n_jobs={args.n_jobs}",
         flush=True,
     )
 
@@ -396,6 +501,7 @@ if __name__ == "__main__":
     Parallel(n_jobs=args.n_jobs, backend="loky")(
         delayed(_plot_case)(
             c, args.anchor, model_dirs, era5_dir, ghcn_dir, basepath,
+            mode=args.mode, diff_vmax=args.diff_vmax,
         )
         for c in ewb_cases
     )

@@ -88,6 +88,24 @@ def celsius_colormap_and_normalize(
         )
     return cmap, mcolors.Normalize(vmin=lo, vmax=hi)
 
+
+def celsius_diff_colormap_and_normalize(
+    vmax: float = 10.0,
+) -> tuple[mcolors.Colormap, mcolors.Normalize]:
+    """Diverging colormap for forecast-minus-truth temperature errors.
+
+    Uses ``RdBu_r`` centered on 0 so warm biases render red and cold
+    biases blue, symmetric about zero. The default ``vmax=10`` C is the
+    saturation used in the heat/freeze diff mode; pass a larger value if
+    a particular case has larger errors that need to remain visible.
+
+    Returns:
+        A tuple ``(cmap, norm)`` where ``norm`` spans ``(-vmax, +vmax)``.
+    """
+    if vmax <= 0:
+        raise ValueError(f"vmax must be positive, got {vmax!r}")
+    return plt.get_cmap("RdBu_r"), mcolors.Normalize(vmin=-vmax, vmax=vmax)
+
 def generate_heatwave_dataset(
     era5: xr.Dataset,
     climatology: xr.Dataset,
