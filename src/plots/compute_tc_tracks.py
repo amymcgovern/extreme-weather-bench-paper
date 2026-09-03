@@ -112,6 +112,12 @@ def _run_model(
 
 
 if __name__ == "__main__":
+    # Bump NOFILE before joblib spawns workers so they don't inherit the
+    # Linux default 1024 and crash mid-run with "Too many open files"
+    # against the arraylake/icechunk backends.
+    from src.data.fd_limit import raise_fd_soft_limit
+    raise_fd_soft_limit()
+
     parser = argparse.ArgumentParser(
         description="Run tropical cyclone track evaluation against EWB cases."
     )
