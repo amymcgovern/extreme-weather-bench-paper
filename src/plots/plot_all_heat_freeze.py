@@ -57,11 +57,14 @@ LEAD_HOURS = [240, 168, 120, 72, 24]
 LEAD_LABELS = ["10 days", "7 days", "5 days", "3 days", "1 day"]
 
 # (label, subdirectory basename) -- suffix "_maxlow" appended when anchor=max_low.
+# Row order matches the shared paper convention used by plot_all_ar.py
+# and plot_all_cbss_pph.py: HRES first, then GraphCast, Pangu, AIFS.
+# (plot_all_tc.py intentionally uses its own order.)
 MODEL_ROWS: list[tuple[str, str]] = [
-    ("AIFS", "aifs_bb_heat_freeze_graphics"),
+    ("HRES", "hres_heat_freeze_graphics"),
     ("Graphcast", "gc_bb_heat_freeze_graphics"),
     ("Pangu", "pang_bb_heat_freeze_graphics"),
-    ("HRES", "hres_heat_freeze_graphics"),
+    ("AIFS", "aifs_bb_heat_freeze_graphics"),
 ]
 
 TRUTH_ERA5_DIR = "era5_heat_freeze_graphics"
