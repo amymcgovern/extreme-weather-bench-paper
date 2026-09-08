@@ -83,11 +83,15 @@ MIN_TRACK_POINTS = 10
 # -> BB HRES fallback (compute writes the fallback result into
 # hres_tc_tracks/ when the primary produces no detections), so no
 # fallback wiring is needed at load time.
+#
+# Column order matches the shared paper convention used by plot_all_ar.py,
+# plot_all_cbss_pph.py, and plot_all_heat_freeze.py: HRES first, then
+# GraphCast, Pangu, AIFS (applied as columns here rather than rows).
 MODEL_COLS: list[tuple[str, str, str, str]] = [
-    ("BB_AIFS", "AIFS", "aifs_bb_tc_tracks", "--run_bb_aifs"),
-    ("BB_Pangu", "Pangu", "pang_bb_tc_tracks", "--run_bb_pangu"),
-    ("BB_Graphcast", "GraphCast", "gc_bb_tc_tracks", "--run_bb_graphcast"),
     ("HRES", "IFS HRES", "hres_tc_tracks", "--run_hres"),
+    ("BB_Graphcast", "GraphCast", "gc_bb_tc_tracks", "--run_bb_graphcast"),
+    ("BB_Pangu", "Pangu", "pang_bb_tc_tracks", "--run_bb_pangu"),
+    ("BB_AIFS", "AIFS", "aifs_bb_tc_tracks", "--run_bb_aifs"),
 ]
 
 TC_TRACKS_ROOT = REPO_ROOT / "saved_data"

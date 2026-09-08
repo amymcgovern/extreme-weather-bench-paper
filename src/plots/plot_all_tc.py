@@ -122,10 +122,13 @@ def _plot_case(my_case, basepath: str) -> str:
     extent = _get_shared_extent(cid, case_data)
 
     n_cols = len(MODEL_COLS)
-    fig = plt.figure(figsize=(4 * n_cols, 5.0))
+    # Slightly taller figure + smaller top region so the fontsize-22 suptitle
+    # has clear headroom above the fontsize-22 per-column titles (previously
+    # top=0.86 put the two title bands on top of each other).
+    fig = plt.figure(figsize=(4 * n_cols, 5.4))
     gs = GridSpec(
         1, n_cols, figure=fig,
-        left=0.04, right=0.98, top=0.86, bottom=0.16,
+        left=0.04, right=0.98, top=0.80, bottom=0.15,
         wspace=0.05,
     )
 
@@ -146,6 +149,7 @@ def _plot_case(my_case, basepath: str) -> str:
     fig.suptitle(
         f"Case {cid}: {my_case.title} on {my_case.start_date}",
         fontsize=22,
+        y=0.97,
     )
     fig.legend(
         handles=_landfall_legend_handles(),
