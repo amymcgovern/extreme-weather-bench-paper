@@ -207,8 +207,34 @@ CELL_ASPECT = (4, 4.5)
 
 TITLE_FONTSIZE = 22
 STORM_LABEL_FONTSIZE = 22
-CBAR_LABEL_FONTSIZE = 12
-CBAR_TICK_FONTSIZE = 10
+CBAR_LABEL_FONTSIZE = 18
+CBAR_TICK_FONTSIZE = 14
+
+
+def landfall_legend_handles() -> list[Line2D]:
+    """Return the three ``Line2D`` handles for the shared TC landfall legend.
+
+    Public helper (not underscore-prefixed) so notebooks can import it
+    without pulling in ``plot_all_tc``, which forces ``matplotlib.use("Agg")``
+    at module import time and would break the notebook inline backend.
+    """
+    return [
+        Line2D(
+            [0], [0], marker="*", color="w",
+            markerfacecolor="lightgray", markeredgecolor="black",
+            markersize=14, label="Forecast landfall (per init)",
+        ),
+        Line2D(
+            [0], [0], marker="X", color="w",
+            markerfacecolor="black", markeredgecolor="white",
+            markersize=12, label="IBTrACS landfall",
+        ),
+        Line2D(
+            [0], [0], marker="o", color="black",
+            markerfacecolor="black", markeredgecolor="white",
+            markersize=6, linewidth=2.5, label="IBTrACS track",
+        ),
+    ]
 
 
 def _setup_colormap() -> mcolors.LinearSegmentedColormap:
@@ -538,7 +564,10 @@ def plot_tc_panel(
             "Init Date", fontsize=CBAR_LABEL_FONTSIZE, labelpad=2,
         )
         all_labels = [dt.strftime("%m/%d") for dt in init_datetimes]
-        max_ticks = 5
+        # Cap ticks at 3 (first / middle / last) so the CBAR_TICK_FONTSIZE=14
+        # "MM/DD" labels fit inside a single panel's colorbar without
+        # colliding, even on the narrowest 4-panel per-case figure.
+        max_ticks = 3
         if n_times <= max_ticks:
             indices = list(range(n_times))
         else:
@@ -668,25 +697,8 @@ def build_figure(
 
     _add_shared_init_colorbar(fig, axes_grid)
 
-    legend_handles = [
-        Line2D(
-            [0], [0], marker="*", color="w",
-            markerfacecolor="lightgray", markeredgecolor="black",
-            markersize=14, label="Forecast landfall (per init)",
-        ),
-        Line2D(
-            [0], [0], marker="X", color="w",
-            markerfacecolor="black", markeredgecolor="white",
-            markersize=12, label="IBTrACS landfall",
-        ),
-        Line2D(
-            [0], [0], marker="o", color="black",
-            markerfacecolor="black", markeredgecolor="white",
-            markersize=6, linewidth=2.5, label="IBTrACS track",
-        ),
-    ]
     fig.legend(
-        handles=legend_handles, loc="lower center",
+        handles=landfall_legend_handles(), loc="lower center",
         ncol=3, frameon=False, fontsize=11,
         bbox_to_anchor=(0.5, 0.0),
     )

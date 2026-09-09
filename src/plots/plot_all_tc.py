@@ -41,7 +41,6 @@ import xarray as xr
 from extremeweatherbench import cases
 from joblib import Parallel, delayed
 from matplotlib.gridspec import GridSpec
-from matplotlib.lines import Line2D
 
 from src.plots.tc_3x4_panel import (
     EXTENT_CRS,
@@ -51,8 +50,16 @@ from src.plots.tc_3x4_panel import (
     _drop_short_tracks,
     _forecast_has_detections,
     _get_shared_extent,
+    landfall_legend_handles,
     plot_tc_panel,
 )
+
+
+# Back-compat alias so external callers importing the underscore-prefixed
+# name still work. New code should import ``landfall_legend_handles`` from
+# ``tc_3x4_panel`` directly to avoid pulling in this module's ``Agg``
+# backend side effect.
+_landfall_legend_handles = landfall_legend_handles
 
 
 def _load_one(dir_name: str, case_id: int) -> Optional[dict[str, Any]]:
@@ -67,27 +74,6 @@ def _load_one(dir_name: str, case_id: int) -> Optional[dict[str, Any]]:
         return None
     with open(pkl, "rb") as f:
         return pickle.load(f)
-
-
-def _landfall_legend_handles() -> list[Line2D]:
-    """Same three-element legend used by tc_3x4_panel.build_figure."""
-    return [
-        Line2D(
-            [0], [0], marker="*", color="w",
-            markerfacecolor="lightgray", markeredgecolor="black",
-            markersize=14, label="Forecast landfall (per init)",
-        ),
-        Line2D(
-            [0], [0], marker="X", color="w",
-            markerfacecolor="black", markeredgecolor="white",
-            markersize=12, label="IBTrACS landfall",
-        ),
-        Line2D(
-            [0], [0], marker="o", color="black",
-            markerfacecolor="black", markeredgecolor="white",
-            markersize=6, linewidth=2.5, label="IBTrACS track",
-        ),
-    ]
 
 
 def _plot_case(my_case, basepath: str) -> str:

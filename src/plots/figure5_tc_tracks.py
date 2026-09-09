@@ -3,13 +3,14 @@
 2 rows (storms) x 4 columns (models) of Cartopy forecast-track maps.
 Row 1: TC Beryl (case 155)
 Row 2: TC Yagi  (case 162)
-Columns: AIFS, Pangu, GraphCast, HRES IFS
+Columns follow the shared paper convention: HRES IFS, GraphCast, Pangu, AIFS.
 
 Usage:
     python src/plots/figure5_tc_tracks.py
 """
 
 import pathlib
+import pickle
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
@@ -26,19 +27,23 @@ from src.plots.plotting_utils import generate_extent
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
-# Change this to the directory where the TC track data is stored
-TC_DATA_DIR = (
-    pathlib.Path.home() / "code" / "ewb_tc_track_mapper" / "data" / "a2130f5"
-)
+# Per-case pickle roots written by ``src/plots/compute_tc_tracks.py`` (one
+# ``case_{id}.pkl`` per case containing ``{"forecast": ds, "target": ds}``).
+# The old ``.nc`` format under ``~/code/ewb_tc_track_mapper/data/`` is no
+# longer produced but ``_load_nc`` remains available as a fallback.
+TC_DATA_DIR = REPO_ROOT / "saved_data"
 
 # Change this to the directory where the output will be saved
 OUTPUT_DIR = REPO_ROOT / "graphics" / "paper"
 
+# Columns follow the shared paper ordering: HRES IFS first, then GraphCast,
+# Pangu, AIFS.  Directory names are the per-case-pickle output dirs written
+# by ``compute_tc_tracks.py``.
 MODEL_COLS = [
-    ("aifs-single", "AIFS"),
-    ("panguweather", "Pangu"),
-    ("graphcast", "GraphCast"),
-    ("HRES", "HRES IFS"),
+    ("hres_tc_tracks", "HRES IFS"),
+    ("gc_bb_tc_tracks", "GraphCast"),
+    ("pang_bb_tc_tracks", "Pangu"),
+    ("aifs_bb_tc_tracks", "AIFS"),
 ]
 
 STORM_ROWS = [
@@ -51,8 +56,8 @@ N_COLS = len(MODEL_COLS)
 
 TITLE_FONTSIZE = 24
 TICK_FONTSIZE = 14
-CBAR_LABEL_FONTSIZE = 14
-CBAR_TICK_FONTSIZE = 12
+CBAR_LABEL_FONTSIZE = 22
+CBAR_TICK_FONTSIZE = 18
 STORM_LABEL_FONTSIZE = 24
 
 
@@ -102,6 +107,110 @@ def _load_nc(nc_path):
     return track_data, analysis_track_data
 
 
+def _load_pkl(pkl_path):
+    """Load a per-case TC track pickle produced by ``compute_tc_tracks.py``.
+
+    The pickle contains ``{"forecast": ds, "target": ds}`` where ``forecast``
+    is a ``(lead_time, valid_time)`` grid with ``latitude``/``longitude`` as
+    non-index coords (NaN outside the detected track), and ``target`` is a
+    1-D ``valid_time`` IBTrACS track. Reshape into the same ``(track_data,
+    analysis_track_data)`` schema as :func:`_load_nc` so the rest of the
+    module (``plot_tc_panel``, ``_get_shared_extent``) works unchanged.
+
+    Returns
+    -------
+    tuple
+        ``(track_data, analysis_track_data, forecast_ds, target_ds)``. The
+        first two mirror the :func:`_load_nc` return shape (used by the line
+        plotting); the raw datasets are passed through so downstream callers
+        (e.g. ``plot_tc_panel``) can compute landfall markers with
+        ``tc_3x4_panel._compute_landfalls``.
+    """
+    with open(pkl_path, "rb") as f:
+        d = pickle.load(f)
+    forecast = d["forecast"]
+    target = d["target"]
+
+    lead_time = np.asarray(forecast["lead_time"].values)
+    valid_time = np.asarray(forecast["valid_time"].values)
+    lat_2d = np.asarray(forecast["latitude"].values)
+    lon_2d = np.asarray(forecast["longitude"].values)
+
+    # Broadcast so init_time = valid_time - lead_time gives one init per
+    # (lead, valid) cell. plot_tc_panel groups by init_time and draws one
+    # line per group, so we want each init's points in valid_time order
+    # (equivalently: ascending lead_time). Sort accordingly after masking
+    # NaN detections.
+    lead_grid, valid_grid = np.meshgrid(
+        lead_time, valid_time, indexing="ij",
+    )
+    init_grid = valid_grid - lead_grid
+
+    mask = ~np.isnan(lat_2d)
+    lat_flat = lat_2d[mask]
+    lon_flat = _wrap_lon(lon_2d[mask])
+    init_flat = init_grid[mask]
+    valid_flat = valid_grid[mask]
+
+    # Primary sort key = init_time, secondary = valid_time.
+    order = np.lexsort((valid_flat, init_flat))
+    lat_flat = lat_flat[order]
+    lon_flat = lon_flat[order]
+    init_flat = init_flat[order]
+
+    track_data = xr.Dataset(
+        {
+            "latitude": ("detection", lat_flat),
+            "longitude": ("detection", lon_flat),
+        }
+    ).assign_coords(init_time=("detection", init_flat))
+
+    obs_lat = np.asarray(target["latitude"].values)
+    obs_lon = _wrap_lon(np.asarray(target["longitude"].values))
+    tc_name_arr = np.asarray(target["tc_name"].values)
+    case_title = (
+        str(tc_name_arr[0]) if tc_name_arr.size else "Unknown"
+    )
+    analysis_track_data = xr.Dataset(
+        {
+            "latitude": ("obs_time", obs_lat),
+            "longitude": ("obs_time", obs_lon),
+            "tc_name": (
+                "obs_time",
+                np.full(len(obs_lat), case_title),
+            ),
+        }
+    )
+    return track_data, analysis_track_data, forecast, target
+
+
+def _case_pkl_path(model_dir, case_id):
+    """Path to the per-case pickle under ``TC_DATA_DIR``."""
+    return TC_DATA_DIR / model_dir / f"case_{case_id}.pkl"
+
+
+def _load_case(model_dir, case_id):
+    """Load one (model, case) tuple, preferring the new per-case pickle.
+
+    Returns a 4-tuple ``(track_data, analysis_track_data, forecast_ds,
+    target_ds)``. The first two power the line/scatter plotting; the raw
+    datasets support landfall marker computation via
+    ``tc_3x4_panel._compute_landfalls``. When only a legacy zero-padded
+    ``.nc`` file exists the forecast/target slots are ``None`` (that path
+    predates landfall markers), so callers must skip landfall drawing
+    gracefully. Returns ``None`` when no data is present so callers can
+    render a "Data not yet generated" placeholder.
+    """
+    pkl_path = _case_pkl_path(model_dir, case_id)
+    if pkl_path.exists():
+        return _load_pkl(pkl_path)
+    nc_path = TC_DATA_DIR / model_dir / f"case_{case_id:03d}.nc"
+    if nc_path.exists():
+        td, ad = _load_nc(nc_path)
+        return td, ad, None, None
+    return None
+
+
 EXTENT_CRS = ccrs.Mercator()
 
 
@@ -117,18 +226,12 @@ def _get_shared_extent(storm_case_id, cell_aspect=(4, 3)):
     """
     all_lons, all_lats = [], []
     for model_dir, _ in MODEL_COLS:
-        nc = (
-            TC_DATA_DIR / model_dir
-            / f"case_{storm_case_id:03d}.nc"
-        )
-        if nc.exists():
-            _, analysis = _load_nc(nc)
-            all_lons.extend(
-                analysis.longitude.values.tolist()
-            )
-            all_lats.extend(
-                analysis.latitude.values.tolist()
-            )
+        loaded = _load_case(model_dir, storm_case_id)
+        if loaded is None:
+            continue
+        _, analysis, _, _ = loaded
+        all_lons.extend(analysis.longitude.values.tolist())
+        all_lats.extend(analysis.latitude.values.tolist())
     if not all_lons:
         return None
 
@@ -174,8 +277,22 @@ def plot_tc_panel(
     show_col_title=False,
     storm_label=None,
     add_colorbar: bool = True,
+    forecast_ds=None,
+    target_ds=None,
 ):
     """Plot a single TC track panel.
+
+    When ``forecast_ds`` and ``target_ds`` are supplied (the raw per-case
+    pickle datasets), landfall markers are overlaid to match the standalone
+    per-case figures generated by ``tc_3x4_panel.py`` / ``plot_all_tc.py``:
+
+    * Star (``*``) at each init's first predicted landfall, colored to match
+      that init's forecast line.
+    * Black ``X`` at every IBTrACS landfall on the case.
+
+    If either dataset is ``None`` (e.g. loaded from a legacy ``.nc`` fixture
+    or when landfall computation fails) the panel silently falls back to the
+    line-only rendering.
 
     Returns
     -------
@@ -217,6 +334,50 @@ def plot_tc_panel(
         linewidth=4, markersize=6,
         markeredgecolor="white", markeredgewidth=0.3,
     )
+
+    # -- landfall markers --------------------------------------------------
+    # Reuse the tc_3x4_panel implementation so the composite matches the
+    # per-case figures. Import lazily to avoid a hard dependency at module
+    # import time (tc_3x4_panel pulls in ewb.calc which is heavy).
+    if forecast_ds is not None and target_ds is not None:
+        try:
+            from src.plots.tc_3x4_panel import _compute_landfalls
+        except Exception as exc:  # noqa: BLE001
+            print(
+                f"[figure5_tc_tracks] could not import _compute_landfalls: "
+                f"{exc!r}; skipping landfall markers",
+                flush=True,
+            )
+        else:
+            try:
+                matched_landfalls, target_landfall_points = (
+                    _compute_landfalls(forecast_ds, target_ds)
+                )
+            except Exception as exc:  # noqa: BLE001
+                print(
+                    f"[figure5_tc_tracks] landfall computation failed: "
+                    f"{exc!r}; skipping landfall markers",
+                    flush=True,
+                )
+                matched_landfalls, target_landfall_points = {}, []
+
+            init_to_color = {
+                np.datetime64(it): colors[i]
+                for i, it in enumerate(valid_init_times)
+            }
+            for it, (lon, lat) in matched_landfalls.items():
+                color = init_to_color.get(np.datetime64(it), "magenta")
+                ax.scatter(
+                    lon, lat, marker="*", s=220,
+                    facecolor=color, edgecolor="black", linewidth=0.9,
+                    transform=ccrs.PlateCarree(), zorder=6,
+                )
+            for lon, lat in target_landfall_points:
+                ax.scatter(
+                    lon, lat, marker="X", s=160,
+                    facecolor="black", edgecolor="white", linewidth=0.9,
+                    transform=ccrs.PlateCarree(), zorder=7,
+                )
 
     if extent is not None:
         ax.set_extent(extent, crs=EXTENT_CRS)
@@ -307,16 +468,13 @@ def main():
         for col_idx, (model_dir, display_name) in enumerate(
             MODEL_COLS
         ):
-            nc_path = (
-                TC_DATA_DIR / model_dir
-                / f"case_{case_id:03d}.nc"
-            )
+            loaded = _load_case(model_dir, case_id)
             ax = fig.add_subplot(
                 gs[row_idx, col_idx],
                 projection=ccrs.PlateCarree(),
             )
 
-            if not nc_path.exists():
+            if loaded is None:
                 _add_basemap(ax)
                 if extent is not None:
                     ax.set_extent(
@@ -345,7 +503,7 @@ def main():
                     )
                 continue
 
-            track_data, analysis_data = _load_nc(nc_path)
+            track_data, analysis_data, forecast_ds, target_ds = loaded
             plot_tc_panel(
                 track_data, analysis_data, display_name,
                 ax=ax, fig=fig, extent=extent,
@@ -353,6 +511,8 @@ def main():
                 storm_label=(
                     storm_label if col_idx == 0 else None
                 ),
+                forecast_ds=forecast_ds,
+                target_ds=target_ds,
             )
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
