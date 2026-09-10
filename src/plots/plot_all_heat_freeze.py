@@ -348,6 +348,59 @@ def _plot_field_panel(
         ax.set_extent(extent, crs=ccrs.PlateCarree())
 
 
+def _ghcn_stations(
+    ghcn_ds: Optional[xr.Dataset],
+) -> Optional[tuple[np.ndarray, np.ndarray, np.ndarray]]:
+    """Return ``(lon, lat, t_k)`` for finite GHCN stations, or ``None``."""
+    if ghcn_ds is None or "surface_air_temperature" not in ghcn_ds:
+        return None
+    if ghcn_ds["surface_air_temperature"].size == 0:
+        return None
+    lat = np.asarray(ghcn_ds["latitude"].values).ravel()
+    lon = np.asarray(ghcn_ds["longitude"].values).ravel()
+    t_k = np.asarray(ghcn_ds["surface_air_temperature"].values).ravel()
+    good = ~(np.isnan(lat) | np.isnan(lon) | np.isnan(t_k))
+    if not good.any():
+        return None
+    return lon[good], lat[good], t_k[good]
+
+
+def _scatter_ghcn_circles(
+    ax,
+    lon: np.ndarray,
+    lat: np.ndarray,
+    values: np.ndarray,
+    cmap,
+    norm,
+    kelvin_to_celsius: bool = True,
+) -> None:
+    """Scatter GHCN-style station circles on an existing map axes."""
+    t = (values - 273.15) if kelvin_to_celsius else values
+    good = np.isfinite(lon) & np.isfinite(lat) & np.isfinite(t)
+    if not good.any():
+        return
+    ax.scatter(
+        lon[good], lat[good], c=t[good],
+        cmap=cmap, norm=norm, s=25,
+        edgecolor="black", linewidth=0.3,
+        transform=ccrs.Geodetic(), zorder=5,
+    )
+
+
+def _sample_field_at_stations(
+    da: xr.DataArray,
+    lat: np.ndarray,
+    lon: np.ndarray,
+) -> np.ndarray:
+    """Nearest-neighbor sample of a 2D lat/lon field at station points."""
+    sampled = da.sel(
+        latitude=xr.DataArray(lat, dims="station"),
+        longitude=xr.DataArray(lon, dims="station"),
+        method="nearest",
+    )
+    return np.asarray(sampled.values)
+
+
 def _plot_ghcn_panel(
     ax,
     ghcn_ds: Optional[xr.Dataset],
@@ -359,31 +412,17 @@ def _plot_ghcn_panel(
     _add_basemap(ax)
     if extent is not None:
         ax.set_extent(extent, crs=ccrs.PlateCarree())
-    if ghcn_ds is None or ghcn_ds["surface_air_temperature"].size == 0:
+    stations = _ghcn_stations(ghcn_ds)
+    if stations is None:
         ax.text(
             0.5, 0.5, "No GHCN stations",
             transform=ax.transAxes, ha="center", va="center",
             fontsize=11, color="gray", style="italic",
         )
         return 0
-    lat = np.asarray(ghcn_ds["latitude"].values).ravel()
-    lon = np.asarray(ghcn_ds["longitude"].values).ravel()
-    t_c = np.asarray(ghcn_ds["surface_air_temperature"].values).ravel() - 273.15
-    good = ~(np.isnan(lat) | np.isnan(lon) | np.isnan(t_c))
-    if not good.any():
-        ax.text(
-            0.5, 0.5, "No GHCN stations",
-            transform=ax.transAxes, ha="center", va="center",
-            fontsize=11, color="gray", style="italic",
-        )
-        return 0
-    ax.scatter(
-        lon[good], lat[good], c=t_c[good],
-        cmap=cmap, norm=norm, s=25,
-        edgecolor="black", linewidth=0.3,
-        transform=ccrs.Geodetic(), zorder=5,
-    )
-    return int(good.sum())
+    lon, lat, t_k = stations
+    _scatter_ghcn_circles(ax, lon, lat, t_k, cmap, norm, kelvin_to_celsius=True)
+    return int(lon.size)
 
 
 def _vertical_colorbar(
@@ -454,6 +493,7 @@ def _plot_case(
     mode: str = "abs",
     diff_vmax: float = 10.0,
     marginal: bool = False,
+    overlay_ghcn: bool = False,
 ) -> str:
     """Worker: render one per-case figure. Returns a status string.
 
@@ -465,12 +505,18 @@ def _plot_case(
           +/- ``diff_vmax`` C. Truth panels (ERA5 gridded + GHCN) stay
           on the absolute colormap so they remain interpretable as
           reference.
+
+    ``overlay_ghcn``: scatter GHCN station circles on forecast and ERA5
+    panels, matching the GHCN truth-panel styling. In ``abs`` mode the
+    circles are GHCN observed 2 m T; in ``diff`` mode they are
+    forecast-minus-GHCN at each station.
     """
     cid = my_case.case_id_number
     event_type = my_case.event_type
 
     print(
-        f"plotting case {cid} ({event_type}, mode={mode}, anchor={anchor}):"
+        f"plotting case {cid} ({event_type}, mode={mode}, anchor={anchor}"
+        f"{', ghcn overlay' if overlay_ghcn else ''}):"
         f" {my_case.title}",
         flush=True,
     )
@@ -511,6 +557,8 @@ def _plot_case(
     else:
         cmap_diff, norm_diff = None, None
         era5_ref = None
+
+    stations = _ghcn_stations(ghcn_ds) if overlay_ghcn else None
 
     # Extra width + a right margin so the vertical ERA5/GHCN and
     # climatology colorbars sit outside the truth column instead of
@@ -573,14 +621,33 @@ def _plot_case(
                     ax, diff, extent, cmap_diff, norm_diff,
                     kelvin_to_celsius=False,
                 )
+                if stations is not None:
+                    lon_s, lat_s, t_obs = stations
+                    fcst_at_stn = _sample_field_at_stations(
+                        snap, lat_s, lon_s,
+                    )
+                    _scatter_ghcn_circles(
+                        ax, lon_s, lat_s, fcst_at_stn - t_obs,
+                        cmap_diff, norm_diff, kelvin_to_celsius=False,
+                    )
             else:
                 _plot_field_panel(ax, snap, extent, cmap_abs, norm_abs)
+                if stations is not None:
+                    lon_s, lat_s, t_obs = stations
+                    _scatter_ghcn_circles(
+                        ax, lon_s, lat_s, t_obs, cmap_abs, norm_abs,
+                    )
 
     era5_ax = fig.add_subplot(gs[0, 5], projection=ccrs.PlateCarree())
     _plot_field_panel(
         era5_ax, era5_ds["surface_air_temperature"], extent, cmap_abs, norm_abs,
         mask_ocean=True,
     )
+    if stations is not None:
+        lon_s, lat_s, t_obs = stations
+        _scatter_ghcn_circles(
+            era5_ax, lon_s, lat_s, t_obs, cmap_abs, norm_abs,
+        )
     era5_ax.set_title(
         f"ERA5 ({_anchor_label(anchor)}\n{_fmt_anchor_time(anchor_ts)})",
         fontsize=TRUTH_TITLE_FONTSIZE, pad=6,
@@ -697,7 +764,8 @@ def _plot_case(
     out_dir.mkdir(parents=True, exist_ok=True)
     suffix = _anchor_suffix(anchor)
     mode_suffix = "_diff" if mode == "diff" else ""
-    out_path = out_dir / f"{prefix}_case_{cid}{suffix}{mode_suffix}.png"
+    ghcn_suffix = "_ghcn" if overlay_ghcn else ""
+    out_path = out_dir / f"{prefix}_case_{cid}{suffix}{mode_suffix}{ghcn_suffix}.png"
     fig.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
 
@@ -746,6 +814,18 @@ if __name__ == "__main__":
         type=float,
         default=10.0,
         help="Saturation (deg C) for the diff colormap. Default: 10.",
+    )
+    parser.add_argument(
+        "--ghcn",
+        action="store_true",
+        default=False,
+        help=(
+            "Overlay GHCN station observations as circles on the forecast"
+            " and ERA5 panels, matching the GHCN truth-panel styling. In"
+            " --mode diff the circles show forecast minus GHCN at each"
+            " station. Writes ``*_ghcn.png`` so the un-overlaid figures"
+            " are not overwritten."
+        ),
     )
     parser.add_argument(
         "--marginal",
@@ -813,7 +893,8 @@ if __name__ == "__main__":
 
     print(
         f"Plotting {len(ewb_cases)} cases with anchor={args.anchor}"
-        f" marginal={args.marginal} mode={args.mode} n_jobs={args.n_jobs}",
+        f" marginal={args.marginal} mode={args.mode} ghcn={args.ghcn}"
+        f" n_jobs={args.n_jobs}",
         flush=True,
     )
 
@@ -822,7 +903,7 @@ if __name__ == "__main__":
         delayed(_plot_case)(
             c, args.anchor, model_dirs, era5_dir, ghcn_dir, basepath,
             mode=args.mode, diff_vmax=args.diff_vmax,
-            marginal=args.marginal,
+            marginal=args.marginal, overlay_ghcn=args.ghcn,
         )
         for c in ewb_cases
     )
