@@ -84,9 +84,17 @@ def _plot_era_only(
         return (f"[era-only] skip case {my_id}: no per-case pickle at "
                 f"{era5_dir}/case_{my_id}.pkl")
 
-    print(f"Plotting ERA5 for case {my_id}: {my_case.title} on {my_case.start_date}", flush=True)
+    anchor = ar_plot_utils.resolve_ar_anchor_valid_time(era5_raw)
+    anchor = ar_plot_utils.snap_ar_anchor_to_synoptic(anchor)
+    anchor_str = pd.to_datetime(anchor).strftime("%Y-%m-%d %HZ")
+    print(
+        f"Plotting ERA5 for case {my_id}: {my_case.title} valid {anchor_str}",
+        flush=True,
+    )
 
-    era5_ivt, era5_ar_mask = ar_plot_utils.select_ivt_and_maks_era5(era5_raw)
+    era5_ivt, era5_ar_mask = ar_plot_utils.select_ivt_and_maks_era5(
+        era5_raw, valid_time=anchor,
+    )
     fig, ax = plt.subplots(
         figsize=(5, 5),
         subplot_kw={"projection": ccrs.PlateCarree()},
@@ -100,7 +108,7 @@ def _plot_era_only(
         show_axes=True,
     )
     ax.set_title(
-        f"ERA5 for case {my_id}: {my_case.title} on {my_case.start_date}",
+        f"ERA5 for case {my_id}: {my_case.title}, valid {anchor_str}",
         fontsize=32,
     )
     out_path = Path(basepath) / f"graphics/atmospheric_river/era5_case_{my_id}.png"
@@ -140,6 +148,16 @@ def _plot_case(
             f"(all None after _load_case guards)"
         )
 
+    # Shared snapshot time for every panel, analogous to heat/freeze peak_day.
+    # Prefer ERA5 so all models are verified against the same observed peak;
+    # fall back to the first available forecast pickle if ERA5 is missing.
+    anchor_src = next(
+        r for r in (era5_raw, hres_raw, gc_raw, pang_raw, aifs_raw) if r is not None
+    )
+    anchor = ar_plot_utils.resolve_ar_anchor_valid_time(anchor_src)
+    anchor = ar_plot_utils.snap_ar_anchor_to_synoptic(anchor)
+    anchor_str = pd.to_datetime(anchor).strftime("%Y-%m-%d %HZ")
+
     row_length = 5 if plot_era_separately else 4
     fig, axs = plt.subplots(
         row_length, len(lead_times_to_plot) + 1,
@@ -149,11 +167,16 @@ def _plot_case(
 
     skip_msgs = []
 
-    print(f"Plotting case {my_id}: {my_case.title} on {my_case.start_date}", flush=True)
+    print(
+        f"Plotting case {my_id}: {my_case.title} valid {anchor_str}",
+        flush=True,
+    )
 
     if not plot_era_separately:
         if era5_raw is not None:
-            era5_ivt, era5_ar_mask = ar_plot_utils.select_ivt_and_maks_era5(era5_raw)
+            era5_ivt, era5_ar_mask = ar_plot_utils.select_ivt_and_maks_era5(
+                era5_raw, valid_time=anchor,
+            )
             ar_plot_utils.plot_ar_mask_single_timestep(
                 ivt_data=era5_ivt, ar_mask=era5_ar_mask,
                 title="ERA5",
@@ -176,7 +199,9 @@ def _plot_case(
             )
             return
         for i, lead_time_hours in enumerate(lead_times_to_plot):
-            ivt, ar_mask = ar_plot_utils.select_ivt_and_maks(raw, lead_time_hours)
+            ivt, ar_mask = ar_plot_utils.select_ivt_and_maks(
+                raw, lead_time_hours, valid_time=anchor,
+            )
             if ivt is None or ar_mask is None:
                 skip_msgs.append(
                     f"Skipping {model_label} for case {my_id}: missing ivt or "
@@ -210,7 +235,10 @@ def _plot_case(
     cbar.set_label(r"Integrated Vapor Transport (kg m$^{-1}$ s$^{-1}$)", size=32)
     cbar.ax.tick_params(labelsize=24)
 
-    fig.suptitle(f"Case {my_id}: {my_case.title} on {my_case.start_date}", fontsize=32)
+    fig.suptitle(
+        f"Case {my_id}: {my_case.title}, valid {anchor_str}",
+        fontsize=32,
+    )
     out_path = Path(basepath) / f"graphics/atmospheric_river/ar_case_{my_id}.png"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=300, bbox_inches="tight")
@@ -245,14 +273,21 @@ if __name__ == "__main__":
             "(loky backend, since matplotlib is not thread-safe). Default: 1."
         ),
     )
+    parser.add_argument(
+        "--case_ids",
+        type=int,
+        nargs="*",
+        default=None,
+        help="Optional case_id_number filter. Default: every atmospheric_river case.",
+    )
     args = parser.parse_args()
 
     # load in all of the events in the yaml file
     ewb_cases = cases.load_ewb_events_yaml_into_case_list()
     ewb_cases = [n for n in ewb_cases if n.event_type == "atmospheric_river"]
-
-    # for debugging, only look at one case (that happens to be lovely)
-    # ewb_cases = [n for n in ewb_cases if n.case_id_number == 95]
+    if args.case_ids:
+        wanted = set(args.case_ids)
+        ewb_cases = [n for n in ewb_cases if n.case_id_number in wanted]
 
     # build out all of the expected data to evalate the case (we need this so we can plot
     # the LSR reports)

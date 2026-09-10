@@ -16,17 +16,119 @@ import src.plots.plotting_utils as plotting
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-def select_ivt_and_maks(graphics_obect, lead_time_hours):
-    # select the right lead time
-    try:
-        lead_time_td = pd.Timedelta(hours=lead_time_hours)
-        ivt = graphics_obect["integrated_vapor_transport"].sel(lead_time=lead_time_td, method="nearest")
-        ar_mask = graphics_obect["atmospheric_river_mask"].sel(lead_time=lead_time_td, method="nearest")
 
-        # select the right valid time (hack for now to always select the first valid time)
-        valid_time = graphics_obect["integrated_vapor_transport"].valid_time[0]
-        ivt2 = ivt.sel(valid_time=valid_time, method="nearest")
-        ar_mask2 = ar_mask.sel(valid_time=valid_time, method="nearest")
+def _drop_non_spatial_except_valid_time(da: xr.DataArray) -> xr.DataArray:
+    """Keep latitude/longitude/valid_time; collapse any other dims.
+
+    Forecast pickles have a ``lead_time`` dim. When resolving an ERA5-style
+    peak from a forecast (ERA5 pickle missing), use the shortest lead so the
+    snapshot is as close to analysis as possible.
+    """
+    if "lead_time" in da.dims:
+        da = da.sel(lead_time=pd.Timedelta(0), method="nearest")
+    extra = [d for d in da.dims if d not in ("latitude", "longitude", "valid_time")]
+    if extra:
+        da = da.isel({d: 0 for d in extra})
+    return da
+
+
+def _lonlat_only(da: xr.DataArray) -> xr.DataArray:
+    """Reduce to latitude/longitude so pcolormesh gets a 2-D field."""
+    extra = [d for d in da.dims if d not in ("latitude", "longitude")]
+    if extra:
+        da = da.isel({d: 0 for d in extra})
+    return da
+
+
+def snap_ar_anchor_to_synoptic(anchor, hours=(0, 12)) -> np.datetime64:
+    """Snap an hourly ERA5 peak to 00/12Z so 00/12-init models have data.
+
+    HRES (and similarly cadenced forecasts) only populate even synoptic
+    hours. A 15Z ERA5 peak nearest-neighbors onto 18Z, which is all-NaN
+    at 24/72/120/168/240 h leads. 00/12Z is the coarsest grid shared by
+    every model in these figures.
+    """
+    ts = pd.Timestamp(anchor)
+    midnight = ts.normalize()
+    candidates = [
+        midnight + pd.Timedelta(days=day_off, hours=h)
+        for day_off in (-1, 0, 1)
+        for h in hours
+    ]
+    return np.datetime64(min(candidates, key=lambda c: abs(c - ts)))
+
+
+def _nearest_finite_valid_time(da: xr.DataArray, valid_time) -> np.datetime64:
+    """Return the valid_time closest to ``valid_time`` that has any finite data.
+
+    Used after snapping so a leftover all-NaN slice (wrong init cadence)
+    still falls back to a neighboring populated time rather than a blank
+    panel.
+    """
+    if "valid_time" not in da.dims:
+        return np.datetime64(pd.Timestamp(valid_time))
+    vts = pd.to_datetime(np.atleast_1d(da.valid_time.values))
+    target = pd.Timestamp(valid_time)
+    ranked = sorted(
+        range(len(vts)),
+        key=lambda i: abs(vts[i] - target),
+    )
+    for i in ranked:
+        sl = da.isel(valid_time=i)
+        if np.isfinite(np.asarray(sl.values)).any():
+            return np.datetime64(vts[i])
+    return np.datetime64(vts[ranked[0]]) if len(ranked) else np.datetime64(target)
+
+
+def resolve_ar_anchor_valid_time(ds) -> np.datetime64:
+    """Return the valid_time of maximum AR-mask area inside the case window.
+
+    Mirrors the heat/freeze ``peak_day`` anchor: one shared snapshot time so
+    every model panel is valid at the same moment. The previous plotter
+    always used ``valid_time[0]`` (the yaml ``start_date``), which is often
+    hours to weeks before the AR arrives — e.g. case 103 (Feb 2024
+    California) peaks ~36 h after start, and case 108 (April 2023 Middle
+    East) is a 30-day window with no AR on April 1.
+
+    Prefers AR-mask area (the field drawn as the black contour). If the mask
+    is identically zero, fall back to the timestep of maximum IVT.
+    """
+    mask = _drop_non_spatial_except_valid_time(ds["atmospheric_river_mask"])
+    if "valid_time" not in mask.dims:
+        vt = ds["integrated_vapor_transport"].valid_time.values
+        return np.datetime64(np.asarray(vt).reshape(-1)[0])
+
+    area = mask.sum(dim=("latitude", "longitude"))
+    if float(np.nanmax(area.values)) > 0:
+        idx = int(area.argmax("valid_time").values)
+        return np.datetime64(area.valid_time.values[idx])
+
+    ivt = _drop_non_spatial_except_valid_time(ds["integrated_vapor_transport"])
+    ivt_max = ivt.max(dim=("latitude", "longitude"))
+    idx = int(ivt_max.argmax("valid_time").values)
+    return np.datetime64(ivt_max.valid_time.values[idx])
+
+
+def select_ivt_and_maks(graphics_obect, lead_time_hours, valid_time=None):
+    """Select IVT and AR mask for one forecast lead, valid at ``valid_time``.
+
+    ``valid_time`` should be the shared case anchor (ERA5 peak AR-mask
+    time). If omitted, the peak is resolved from ``graphics_obect`` itself.
+    Forecast grids are coarser than ERA5, so selection uses nearest.
+    """
+    try:
+        if valid_time is None:
+            valid_time = resolve_ar_anchor_valid_time(graphics_obect)
+        lead_time_td = pd.Timedelta(hours=lead_time_hours)
+        ivt = graphics_obect["integrated_vapor_transport"].sel(
+            lead_time=lead_time_td, method="nearest"
+        )
+        ar_mask = graphics_obect["atmospheric_river_mask"].sel(
+            lead_time=lead_time_td, method="nearest"
+        )
+        vt = _nearest_finite_valid_time(ivt, valid_time)
+        ivt2 = _lonlat_only(ivt.sel(valid_time=vt, method="nearest"))
+        ar_mask2 = _lonlat_only(ar_mask.sel(valid_time=vt, method="nearest"))
         return ivt2, ar_mask2
     except (KeyError, AttributeError) as e:
         case_id = getattr(graphics_obect, 'case_id_number', 'unknown')
@@ -37,14 +139,14 @@ def select_ivt_and_maks(graphics_obect, lead_time_hours):
         print(f"Skipping {lead_time_hours} hours for case {case_id}: missing data. Error: {e}")
         return None, None
 
-def select_ivt_and_maks_era5(graphics_obect):
+def select_ivt_and_maks_era5(graphics_obect, valid_time=None):
+    """Select ERA5 IVT and AR mask at the shared case anchor valid_time."""
+    if valid_time is None:
+        valid_time = resolve_ar_anchor_valid_time(graphics_obect)
     ivt = graphics_obect["integrated_vapor_transport"]
     ar_mask = graphics_obect["atmospheric_river_mask"]
-
-    # select the right valid time (hack for now to always select the first valid time)
-    valid_time = graphics_obect["integrated_vapor_transport"].valid_time[0]
-    ivt = ivt.sel(valid_time=valid_time, method="nearest")
-    ar_mask = ar_mask.sel(valid_time=valid_time, method="nearest")
+    ivt = _lonlat_only(ivt.sel(valid_time=valid_time, method="nearest"))
+    ar_mask = _lonlat_only(ar_mask.sel(valid_time=valid_time, method="nearest"))
     return ivt, ar_mask
     
 def setup_atmospheric_river_colormap_and_levels() -> Tuple[

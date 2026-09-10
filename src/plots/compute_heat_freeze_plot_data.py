@@ -143,18 +143,34 @@ def _slice_era5_case_t2(
     )
 
 
+FREEZE_THRESHOLD_K = 273.15  # 0 C in Kelvin, used by the freeze peak_day rule.
+
+
 def _resolve_anchor(
-    spatial_mean: xr.DataArray,
+    t2: xr.DataArray,
     anchor: str,
     event_type: str,
 ) -> np.datetime64:
-    """Compute the anchor valid_time for one case's spatial-mean 2 m T.
+    """Compute the anchor valid_time for one case's ERA5 2 m T field.
 
-    ``spatial_mean`` must be a 1D DataArray on ``valid_time`` (already
-    ``.mean(["latitude","longitude"])``).
+    ``t2`` is a 3D DataArray on ``(valid_time, latitude, longitude)``.
+    A 1D spatial mean is derived internally where the anchor rule
+    needs it.
 
-    * ``anchor="peak_day"``: max (heat) or min (freeze) of the spatial
-      mean over the case window.
+    * ``anchor="peak_day"``:
+        - ``event_type="heat_wave"``: timestep of the max spatial-mean
+          (classic heat-dome behavior: peak is broadly distributed).
+        - ``event_type="freeze"``: timestep with the largest fraction of
+          the case bbox below 0 C. Freeze events -- especially in
+          shoulder-season crop freezes like April 2024 Europe (case 92)
+          -- are often *localized* frost events buried inside an
+          otherwise warm domain, so the classic spatial-mean idxmin can
+          land on a timestep that looks broadly warm (its mean is
+          simply the least-warm one). Picking max sub-zero coverage
+          surfaces the moment when the freeze character is strongest.
+          If no timestep in the window has any sub-zero coverage, fall
+          back to the spatial-mean idxmin so we still get *some* anchor
+          instead of dropping the case.
     * ``anchor="max_low"`` (heat only): timestamp of the warmest daily
       minimum, computed with the same helper stack the
       ``MaximumLowestMeanAbsoluteError`` metric uses in
@@ -163,12 +179,25 @@ def _resolve_anchor(
       resolution, then ``.max()``, then
       ``utils.maybe_get_closest_timestamp_to_center_of_valid_times``).
     """
+    spatial_mean = t2.mean(["latitude", "longitude"])
+
     if anchor == "peak_day":
-        idx_time = (
-            spatial_mean.idxmax()
-            if event_type == "heat_wave"
-            else spatial_mean.idxmin()
+        if event_type == "heat_wave":
+            idx_time = spatial_mean.idxmax()
+            return np.datetime64(idx_time.values)
+
+        # freeze branch: max sub-zero coverage per timestep.
+        sub_zero_frac = (t2 < FREEZE_THRESHOLD_K).mean(
+            ["latitude", "longitude"]
         )
+        max_frac = float(sub_zero_frac.max())
+        if max_frac > 0:
+            idx_time = sub_zero_frac.idxmax()
+            return np.datetime64(idx_time.values)
+        # No timestep dipped below 0 C anywhere in the bbox -- fall
+        # back to the coldest spatial mean so downstream plots still
+        # render.
+        idx_time = spatial_mean.idxmin()
         return np.datetime64(idx_time.values)
 
     if anchor == "max_low":
@@ -497,8 +526,11 @@ def _resolve_all_anchors(
                 raise ValueError(
                     "empty ERA5 slice for case bbox/date window"
                 )
-            sm = t2.mean(["latitude", "longitude"]).compute()
-            anchors[c.case_id_number] = _resolve_anchor(sm, anchor, c.event_type)
+            # Materialize once; the freeze branch needs the full field to
+            # compute per-timestep sub-zero coverage, and the heat/max_low
+            # branches derive their spatial-mean from it internally.
+            t2 = t2.compute()
+            anchors[c.case_id_number] = _resolve_anchor(t2, anchor, c.event_type)
             print(
                 f"[anchor] case {c.case_id_number} ({c.event_type}) "
                 f"{anchor} -> {anchors[c.case_id_number]}",
