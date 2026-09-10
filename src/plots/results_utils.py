@@ -30,6 +30,16 @@ def _snap_lead_time_to_bins(
     target_hours = np.array([d * 24 for d in bin_days])
     if pd.api.types.is_timedelta64_dtype(lead_col):
         hours = lead_col.dt.total_seconds() / 3600.0
+    elif lead_col.dtype == object:
+        # Object-dtype Series can hold Python ``pd.Timedelta`` (e.g. many of
+        # our results pickles) or already-numeric hours mixed with NaN.
+        # ``pd.to_timedelta`` accepts either shape and gives back a proper
+        # timedelta64 Series we can convert cleanly.
+        coerced = pd.to_timedelta(lead_col, errors="coerce")
+        if coerced.notna().any():
+            hours = coerced.dt.total_seconds() / 3600.0
+        else:
+            hours = pd.to_numeric(lead_col, errors="coerce").astype(float)
     else:
         hours = lead_col.astype(float)
 

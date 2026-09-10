@@ -14,6 +14,25 @@ from matplotlib.patches import Patch
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
+def _case_lon_bounds_180(single_case: cases.IndividualCase) -> tuple[float, float]:
+    """Return the case bbox longitudes folded independently into [-180, 180].
+
+    ``events.yaml`` and the marginal yamls mix 0..360 (e.g. 296.5..324.75 for
+    the western North Atlantic) and -180..180 (e.g. -136.75..-105.75 for
+    the 2021 Pacific Northwest) conventions. Sliced datasets are folded to
+    -180..180 at load time; the case bbox has to match or ``.sel`` silently
+    returns an empty longitude axis. Mirrors ``plotting_utils.convert_bbox
+    _longitude`` and ``compute_heat_freeze_plot_data._case_lon_bounds``.
+    """
+    lmin = single_case.location.longitude_min
+    lmax = single_case.location.longitude_max
+    if lmin > 180:
+        lmin -= 360
+    if lmax > 180:
+        lmax -= 360
+    return lmin, lmax
+
+
 # def celsius_colormap_and_normalize() -> tuple[mcolors.Colormap, mcolors.Normalize]:
 #     """Gets the colormap and normalization for 2m temperature.
 
@@ -134,21 +153,20 @@ def generate_heatwave_dataset(
         ],
         join="inner",
     )
-    if (
-        single_case.location.longitude_min < 0
-        or single_case.location.longitude_min > 180
-    ) and (
-        single_case.location.longitude_max > 0
-        and single_case.location.longitude_max < 180
-    ):
-        merged_dataset = utils.convert_longitude_to_180(merged_dataset)
+    # Unconditionally normalize longitudes to [-180, 180] on both the data
+    # and the case bbox so the .sel below can't silently return an empty
+    # slice from a convention mismatch. ERA5 native lon is 0..360; case
+    # bboxes in ``events.yaml`` can be either convention (e.g. case 1's
+    # 2021 Pacific Northwest is -136.75..-105.75, while several marginal
+    # cases sit in 296..325). ``convert_longitude_to_180`` is a no-op on
+    # data already in [-180, 180], so this is idempotent.
+    merged_dataset = utils.convert_longitude_to_180(merged_dataset)
+    lon_min, lon_max = _case_lon_bounds_180(single_case)
     merged_dataset = merged_dataset.sel(
         latitude=slice(
             single_case.location.latitude_max, single_case.location.latitude_min
         ),
-        longitude=slice(
-            single_case.location.longitude_min, single_case.location.longitude_max
-        ),
+        longitude=slice(lon_min, lon_max),
     )
     return merged_dataset
 
@@ -419,21 +437,17 @@ def generate_freeze_dataset(
         ],
         join="inner",
     )
-    if (
-        single_case.location.longitude_min < 0
-        or single_case.location.longitude_min > 180
-    ) and (
-        single_case.location.longitude_max > 0
-        and single_case.location.longitude_max < 180
-    ):
-        merged_dataset = utils.convert_longitude_to_180(merged_dataset)
+    # See ``generate_heatwave_dataset`` for the rationale on the two-step
+    # normalization: always fold both data and case bbox to [-180, 180]
+    # so the slice below never silently empties from a lon convention
+    # mismatch.
+    merged_dataset = utils.convert_longitude_to_180(merged_dataset)
+    lon_min, lon_max = _case_lon_bounds_180(single_case)
     merged_dataset = merged_dataset.sel(
         latitude=slice(
             single_case.location.latitude_max, single_case.location.latitude_min
         ),
-        longitude=slice(
-            single_case.location.longitude_min, single_case.location.longitude_max
-        ),
+        longitude=slice(lon_min, lon_max),
     )
     return merged_dataset
 

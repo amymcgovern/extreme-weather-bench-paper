@@ -39,6 +39,7 @@ matplotlib.use("Agg")
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -84,12 +85,111 @@ def _anchor_suffix(anchor: str) -> str:
     return "" if anchor == "peak_day" else "_maxlow"
 
 
+def _output_suffix(anchor: str, marginal: bool) -> str:
+    """Combine ``--marginal`` + ``--anchor`` into a compute-side dir suffix.
+
+    Must stay in sync with ``compute_heat_freeze_plot_data._output_suffix``
+    so ``plot_all_heat_freeze`` reads exactly what the compute stage wrote.
+    """
+    return ("_marginal" if marginal else "") + _anchor_suffix(anchor)
+
+
 def _anchor_label(anchor: str) -> str:
     return "peak day" if anchor == "peak_day" else "warmest daily min"
 
 
 def _kind_for_event(event_type: str) -> str:
     return "heat" if event_type == "heat_wave" else "freeze"
+
+
+def _round_to(x: float, step: float, mode: str) -> float:
+    """Round ``x`` to the nearest multiple of ``step`` in the requested direction."""
+    if mode == "down":
+        return float(np.floor(x / step) * step)
+    if mode == "up":
+        return float(np.ceil(x / step) * step)
+    raise ValueError(f"mode must be 'up' or 'down', got {mode!r}")
+
+
+def _infer_abs_norm(
+    era5_ds: xr.Dataset,
+    ghcn_ds: Optional[xr.Dataset],
+    model_datasets: list[Optional[xr.Dataset]],
+    kind: str,
+) -> tuple[mcolors.Colormap, mcolors.Normalize]:
+    """Return an absolute-temperature colormap sized to the case's data.
+
+    The fixed 0..45 C heat ramp (and -30..15 freeze ramp) from
+    ``celsius_colormap_and_normalize`` bakes in the assumption that a
+    heat_wave case lives in a hot climate. Marginal-temperature cases
+    break that assumption -- many marginal ``heat_wave`` events run in
+    boreal winter with temps well below 0 C, and the truth panels on
+    the diff plot collapse to near-black because the inferno colormap
+    saturates at its dark end.
+
+    Strategy:
+      * Gather every 2 m temperature value from the ERA5 grid, GHCN
+        stations, and all model / lead panels for this case.
+      * Take the 1st and 99th percentiles as robust min/max (guards
+        against a single bad pixel spraying the range wide).
+      * Pad by 2 C and snap to the nearest 5 C so the colorbar labels
+        stay tidy.
+      * Pick ``coolwarm`` centered on 0 C when the range crosses zero
+        (visually intuitive: blue = cold, red = warm), otherwise fall
+        back to the existing ``inferno`` / ``coolwarm`` ramps from
+        ``celsius_colormap_and_normalize(kind)``.
+    """
+    values: list[np.ndarray] = []
+    def _push(da_or_ds):
+        if da_or_ds is None:
+            return
+        if isinstance(da_or_ds, xr.Dataset):
+            if "surface_air_temperature" not in da_or_ds:
+                return
+            arr = da_or_ds["surface_air_temperature"].values
+        else:
+            arr = np.asarray(da_or_ds.values)
+        finite = arr[np.isfinite(arr)]
+        if finite.size:
+            values.append(finite)
+
+    _push(era5_ds)
+    _push(ghcn_ds)
+    for m in model_datasets:
+        _push(m)
+
+    if not values:
+        # No data at all -- fall back to the fixed ramp so we don't crash.
+        return celsius_colormap_and_normalize(kind=kind)
+
+    all_vals_k = np.concatenate(values)
+    all_vals_c = all_vals_k - 273.15
+    lo = float(np.percentile(all_vals_c, 1))
+    hi = float(np.percentile(all_vals_c, 99))
+    if not np.isfinite(lo) or not np.isfinite(hi) or lo >= hi:
+        return celsius_colormap_and_normalize(kind=kind)
+
+    # Pad + snap for tidy colorbar ticks.
+    vmin = _round_to(lo - 2, 5.0, "down")
+    vmax = _round_to(hi + 2, 5.0, "up")
+
+    # Diverging when the case straddles freezing, sequential otherwise.
+    if vmin < 0 < vmax:
+        # coolwarm center at 0 keeps sub-freezing blue and warm red so
+        # the truth panels stay meteorologically intuitive.
+        span = max(abs(vmin), abs(vmax))
+        return plt.get_cmap("coolwarm"), mcolors.TwoSlopeNorm(
+            vmin=vmin, vcenter=0.0, vmax=vmax
+        ) if abs(vmin) != abs(vmax) else mcolors.Normalize(
+            vmin=-span, vmax=span
+        )
+    # Entirely hot or entirely cold -- reuse the paper's default ramps
+    # but with the inferred range so we don't waste the colormap.
+    if vmax <= 0:
+        cmap = plt.get_cmap("coolwarm")
+    else:
+        cmap = plt.get_cmap("inferno")
+    return cmap, mcolors.Normalize(vmin=vmin, vmax=vmax)
 
 
 def _load_case(directory: Path, case_id: int) -> Optional[xr.Dataset]:
@@ -224,6 +324,7 @@ def _plot_case(
     basepath: str,
     mode: str = "abs",
     diff_vmax: float = 10.0,
+    marginal: bool = False,
 ) -> str:
     """Worker: render one per-case figure. Returns a status string.
 
@@ -257,7 +358,24 @@ def _plot_case(
     ghcn_ds = _load_case(ghcn_dir, cid)
 
     kind = _kind_for_event(event_type)
-    cmap_abs, norm_abs = celsius_colormap_and_normalize(kind=kind)
+    # Preload every model's per-case pickle once; the row loop below reads
+    # from this list instead of re-opening each pickle. Marginal cases also
+    # feed the datasets into ``_infer_abs_norm`` to size the
+    # absolute-temperature colormap dynamically.
+    preloaded_models: list[Optional[xr.Dataset]] = [
+        _load_case(Path(model_dir), cid) for _, model_dir in model_dirs
+    ]
+    if marginal:
+        # Marginal ``heat_wave`` cases include boreal-winter events whose
+        # temps run well below the fixed 0..45 C ramp -- infer per-case so
+        # the truth panels stay legible. Regular curated heat/freeze cases
+        # deliberately keep the fixed ramps so cross-case comparison in
+        # the paper stays consistent.
+        cmap_abs, norm_abs = _infer_abs_norm(
+            era5_ds, ghcn_ds, preloaded_models, kind
+        )
+    else:
+        cmap_abs, norm_abs = celsius_colormap_and_normalize(kind=kind)
     if mode == "diff":
         cmap_diff, norm_diff = celsius_diff_colormap_and_normalize(vmax=diff_vmax)
         era5_ref = era5_ds["surface_air_temperature"]
@@ -281,7 +399,7 @@ def _plot_case(
 
     skip_msgs: list[str] = []
     for row_idx, (row_label, model_dir) in enumerate(model_dirs):
-        model_ds = _load_case(Path(model_dir), cid)
+        model_ds = preloaded_models[row_idx]
         if model_ds is None:
             skip_msgs.append(f"missing model dir {model_dir}")
         for col_idx, lead_h in enumerate(LEAD_HOURS):
@@ -407,9 +525,16 @@ def _plot_case(
         fontsize=TITLE_FONTSIZE, y=0.965,
     )
 
-    out_dir = Path(basepath) / f"graphics/{event_type}"
+    if marginal:
+        # Marginal cases are always heat_wave event_type (see marginal
+        # _temperature_events.yaml). Route them to a distinct directory /
+        # filename prefix so they never collide with regular heat cases.
+        out_dir = Path(basepath) / "graphics/marginal_temperature"
+        prefix = "marginal"
+    else:
+        out_dir = Path(basepath) / f"graphics/{event_type}"
+        prefix = "heat" if event_type == "heat_wave" else "freeze"
     out_dir.mkdir(parents=True, exist_ok=True)
-    prefix = "heat" if event_type == "heat_wave" else "freeze"
     suffix = _anchor_suffix(anchor)
     mode_suffix = "_diff" if mode == "diff" else ""
     out_path = out_dir / f"{prefix}_case_{cid}{suffix}{mode_suffix}.png"
@@ -462,11 +587,24 @@ if __name__ == "__main__":
         default=10.0,
         help="Saturation (deg C) for the diff colormap. Default: 10.",
     )
+    parser.add_argument(
+        "--marginal",
+        action="store_true",
+        default=False,
+        help=(
+            "Plot the marginal-temperature cases produced by"
+            " ``compute_heat_freeze_plot_data.py --marginal`` from"
+            " ``marginal_temperature_events.yaml``. Reads pickles from"
+            " ``*_heat_freeze_graphics_marginal[_maxlow]/`` and saves PNGs"
+            " under ``graphics/marginal_temperature/marginal_case_<id>[...].png``"
+            " so regular heat/freeze outputs are never overwritten."
+        ),
+    )
     args = parser.parse_args()
 
     basepath = str(Path.home() / "extreme-weather-bench-paper") + "/"
     saved_data_root = Path(basepath) / "saved_data"
-    suffix = _anchor_suffix(args.anchor)
+    suffix = _output_suffix(args.anchor, args.marginal)
     model_dirs = [
         (label, saved_data_root / f"{name}{suffix}")
         for label, name in MODEL_ROWS
@@ -474,11 +612,30 @@ if __name__ == "__main__":
     era5_dir = saved_data_root / f"{TRUTH_ERA5_DIR}{suffix}"
     ghcn_dir = saved_data_root / f"{TRUTH_GHCN_DIR}{suffix}"
 
-    ewb_cases = cases.load_ewb_events_yaml_into_case_list()
-    ewb_cases = [
-        c for c in ewb_cases
-        if c.event_type in {"heat_wave", "freeze"}
-    ]
+    if args.marginal:
+        # Mirror compute_heat_freeze_plot_data.py: marginal cases live in
+        # a distinct EWB YAML with only ``heat_wave`` event_type entries.
+        import importlib.resources
+        from extremeweatherbench import data as _ewb_data
+        yaml_path = importlib.resources.files(_ewb_data).joinpath(
+            "marginal_temperature_events.yaml"
+        )
+        ewb_cases = cases.load_individual_cases_from_yaml(yaml_path)
+        ewb_cases = [
+            c for c in ewb_cases
+            if c.event_type in {"heat_wave", "freeze"}
+        ]
+        print(
+            f"[marginal] loaded {len(ewb_cases)} cases from"
+            f" {yaml_path.name}",
+            flush=True,
+        )
+    else:
+        ewb_cases = cases.load_ewb_events_yaml_into_case_list()
+        ewb_cases = [
+            c for c in ewb_cases
+            if c.event_type in {"heat_wave", "freeze"}
+        ]
     if args.case_ids:
         wanted = set(args.case_ids)
         ewb_cases = [c for c in ewb_cases if c.case_id_number in wanted]
@@ -496,7 +653,7 @@ if __name__ == "__main__":
 
     print(
         f"Plotting {len(ewb_cases)} cases with anchor={args.anchor}"
-        f" mode={args.mode} n_jobs={args.n_jobs}",
+        f" marginal={args.marginal} mode={args.mode} n_jobs={args.n_jobs}",
         flush=True,
     )
 
@@ -505,6 +662,7 @@ if __name__ == "__main__":
         delayed(_plot_case)(
             c, args.anchor, model_dirs, era5_dir, ghcn_dir, basepath,
             mode=args.mode, diff_vmax=args.diff_vmax,
+            marginal=args.marginal,
         )
         for c in ewb_cases
     )

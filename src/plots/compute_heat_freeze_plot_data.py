@@ -109,17 +109,37 @@ def _open_forecast_for_plotting(forecast) -> xr.Dataset:
     return ds
 
 
+def _case_lon_bounds(case) -> tuple[float, float]:
+    """Return case bbox longitudes normalized to ``[-180, 180]``.
+
+    A large fraction of the marginal-temperature cases (and a handful of
+    other yaml sources) store their bbox in 0..360 convention (e.g.
+    296.5..324.75 for the western North Atlantic). Both ERA5 and the BB
+    forecast archives are folded to -180..180 at load time via
+    ``utils.convert_longitude_to_180``, so slicing with the raw case
+    longitudes returns an empty selection for anything with
+    ``longitude_max > 180``. Fold each endpoint independently, matching
+    ``plotting_utils.convert_bbox_longitude``.
+    """
+    lmin = case.location.longitude_min
+    lmax = case.location.longitude_max
+    if lmin > 180:
+        lmin -= 360
+    if lmax > 180:
+        lmax -= 360
+    return lmin, lmax
+
+
 def _slice_era5_case_t2(
     era5: xr.Dataset,
     case,
 ) -> xr.DataArray:
     """Return ``2m_temperature`` on (valid_time, latitude, longitude) for one case."""
+    lon_min, lon_max = _case_lon_bounds(case)
     return era5["2m_temperature"].sel(
         valid_time=slice(case.start_date, case.end_date),
         latitude=slice(case.location.latitude_max, case.location.latitude_min),
-        longitude=slice(
-            case.location.longitude_min, case.location.longitude_max
-        ),
+        longitude=slice(lon_min, lon_max),
     )
 
 
@@ -190,11 +210,10 @@ def _slice_bbox(
         if lat_desc
         else slice(case.location.latitude_min, case.location.latitude_max)
     )
+    lon_min, lon_max = _case_lon_bounds(case)
     return da.sel(
         latitude=lat_slice,
-        longitude=slice(
-            case.location.longitude_min, case.location.longitude_max
-        ),
+        longitude=slice(lon_min, lon_max),
     )
 
 
@@ -461,12 +480,23 @@ def _resolve_all_anchors(
     ewb_cases: list,
     anchor: str,
 ) -> dict[int, np.datetime64]:
-    """Compute anchor times for every case up front (single ERA5 open)."""
+    """Compute anchor times for every case up front (single ERA5 open).
+
+    If ERA5-based anchor resolution fails (empty slice, missing valid_time
+    window, etc.) we fall back to ``case.start_date``. That happens most
+    often on marginal-temperature cases where a genuine "peak day" is not
+    well defined; using the first case-window timestep keeps the case in
+    the run rather than silently dropping it downstream.
+    """
     era5 = _load_era5_full()
     anchors: dict[int, np.datetime64] = {}
     for c in ewb_cases:
         try:
             t2 = _slice_era5_case_t2(era5, c)
+            if t2.size == 0:
+                raise ValueError(
+                    "empty ERA5 slice for case bbox/date window"
+                )
             sm = t2.mean(["latitude", "longitude"]).compute()
             anchors[c.case_id_number] = _resolve_anchor(sm, anchor, c.event_type)
             print(
@@ -475,8 +505,11 @@ def _resolve_all_anchors(
                 flush=True,
             )
         except Exception as exc:  # noqa: BLE001
+            fallback = np.datetime64(c.start_date)
+            anchors[c.case_id_number] = fallback
             print(
-                f"[anchor] error case {c.case_id_number}: {exc!r}",
+                f"[anchor] case {c.case_id_number}: {exc!r};"
+                f" falling back to case.start_date -> {fallback}",
                 flush=True,
             )
     return anchors
@@ -484,6 +517,18 @@ def _resolve_all_anchors(
 
 def _anchor_suffix(anchor: str) -> str:
     return "" if anchor == "peak_day" else "_maxlow"
+
+
+def _output_suffix(anchor: str, marginal: bool) -> str:
+    """Combine ``--marginal`` and ``--anchor`` into a single directory suffix.
+
+    Ordering is ``_marginal`` then ``_maxlow`` so peak_day marginal runs land
+    in ``*_heat_freeze_graphics_marginal/`` (no anchor suffix) and max_low
+    marginal runs land in ``*_heat_freeze_graphics_marginal_maxlow/``. Regular
+    (non-marginal) runs keep the existing ``*_heat_freeze_graphics[_maxlow]``
+    naming so previously-computed pickles remain valid.
+    """
+    return ("_marginal" if marginal else "") + _anchor_suffix(anchor)
 
 
 if __name__ == "__main__":
@@ -522,6 +567,20 @@ if __name__ == "__main__":
         default=[],
         help="Case IDs to run (default: all heat + freeze cases).",
     )
+    parser.add_argument(
+        "--marginal",
+        action="store_true",
+        default=False,
+        help=(
+            "Use the marginal-temperature YAML "
+            "(``marginal_temperature_events.yaml`` inside the EWB package)"
+            " instead of the primary ``events.yaml``. Pickles land in"
+            " ``*_heat_freeze_graphics_marginal[_maxlow]/`` so marginal and"
+            " regular runs never overwrite each other. All marginal-temp"
+            " cases are ``heat_wave`` event_type -- freeze marginal cases"
+            " don't currently exist in the YAML."
+        ),
+    )
     parser.add_argument("--n_jobs", type=int, default=1)
     parser.add_argument("--overwrite", action="store_true", default=False)
     args = parser.parse_args()
@@ -534,10 +593,26 @@ if __name__ == "__main__":
     else:
         args.case_ids = None
 
-    ewb_cases = cases.load_ewb_events_yaml_into_case_list()
-    ewb_cases = [
-        c for c in ewb_cases if c.event_type in {"heat_wave", "freeze"}
-    ]
+    if args.marginal:
+        import importlib.resources
+        from extremeweatherbench import data as _ewb_data
+        yaml_path = importlib.resources.files(_ewb_data).joinpath(
+            "marginal_temperature_events.yaml"
+        )
+        ewb_cases = cases.load_individual_cases_from_yaml(yaml_path)
+        ewb_cases = [
+            c for c in ewb_cases if c.event_type in {"heat_wave", "freeze"}
+        ]
+        print(
+            f"[marginal] loaded {len(ewb_cases)} cases from"
+            f" {yaml_path.name}",
+            flush=True,
+        )
+    else:
+        ewb_cases = cases.load_ewb_events_yaml_into_case_list()
+        ewb_cases = [
+            c for c in ewb_cases if c.event_type in {"heat_wave", "freeze"}
+        ]
     if args.case_ids is not None:
         ewb_cases = [c for c in ewb_cases if c.case_id_number in args.case_ids]
 
@@ -556,9 +631,10 @@ if __name__ == "__main__":
         print("No cases to process.", flush=True)
         sys.exit(0)
 
-    suffix = _anchor_suffix(args.anchor)
+    suffix = _output_suffix(args.anchor, args.marginal)
     print(
-        f"Resolving anchors ({args.anchor}) for {len(ewb_cases)} cases...",
+        f"Resolving anchors ({args.anchor}, marginal={args.marginal})"
+        f" for {len(ewb_cases)} cases...",
         flush=True,
     )
     anchor_times = _resolve_all_anchors(ewb_cases, args.anchor)
