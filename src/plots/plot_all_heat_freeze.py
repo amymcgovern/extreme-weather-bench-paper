@@ -102,6 +102,13 @@ def _kind_for_event(event_type: str) -> str:
     return "heat" if event_type == "heat_wave" else "freeze"
 
 
+def _case_type_label(event_type: str, marginal: bool) -> str:
+    """Human-readable type for figure titles: Heat / Freeze / Marginal."""
+    if marginal:
+        return "Marginal"
+    return "Heat" if event_type == "heat_wave" else "Freeze"
+
+
 def _round_to(x: float, step: float, mode: str) -> float:
     """Round ``x`` to the nearest multiple of ``step`` in the requested direction."""
     if mode == "down":
@@ -520,7 +527,8 @@ def _plot_case(
             cbar.ax.tick_params(labelsize=CBAR_TICK_FONTSIZE)
 
     fig.suptitle(
-        f"Case {cid}: {my_case.title} on {my_case.start_date} "
+        f"{_case_type_label(event_type, marginal)} case {cid}: "
+        f"{my_case.title} on {my_case.start_date} "
         f"({_anchor_label(anchor)} {_fmt_anchor_time(anchor_ts)})",
         fontsize=TITLE_FONTSIZE, y=0.965,
     )

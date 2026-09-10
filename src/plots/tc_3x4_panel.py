@@ -28,7 +28,7 @@ import argparse
 import pickle
 import sys
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, NamedTuple, Optional
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
@@ -56,8 +56,6 @@ if str(REPO_ROOT) not in sys.path:
 _SRC_DATA = REPO_ROOT / "src" / "data"
 if str(_SRC_DATA) not in sys.path:
     sys.path.insert(0, str(_SRC_DATA))
-
-from src.plots.plotting_utils import generate_extent  # noqa: E402
 
 DEFAULT_ROWS: list[tuple[int, str]] = [
     (173, "TC Lee"),
@@ -204,11 +202,26 @@ def _forecast_has_detections(ds: Optional[xr.Dataset]) -> bool:
 EXTENT_CRS = ccrs.Mercator()
 PADDING_DEG = 5.0
 CELL_ASPECT = (4, 4.5)
+# Matches plotting_utils.generate_extent: half-width of the map in
+# degrees is ``2 * zoom``.
+_ZOOM_COEFFICIENT = 2.0
 
 TITLE_FONTSIZE = 22
 STORM_LABEL_FONTSIZE = 22
 CBAR_LABEL_FONTSIZE = 18
 CBAR_TICK_FONTSIZE = 14
+
+
+class TrackMapExtent(NamedTuple):
+    """Shared map window for one TC case.
+
+    ``bounds`` are in ``crs`` units (storm-centered Mercator meters).
+    Axes must be created with ``projection=crs`` so dateline-crossing
+    storms aren't plotted on a prime-meridian Mercator.
+    """
+
+    bounds: tuple[float, float, float, float]
+    crs: ccrs.CRS
 
 
 def landfall_legend_handles() -> list[Line2D]:
@@ -249,9 +262,88 @@ def _setup_colormap() -> mcolors.LinearSegmentedColormap:
     )
 
 
-def _wrap_lon(arr: np.ndarray) -> np.ndarray:
-    """Normalize longitudes to [-180, 180] for Cartopy ax.plot."""
+def _to_lon360(arr: np.ndarray) -> np.ndarray:
+    return np.mod(np.asarray(arr, dtype=float), 360.0)
+
+
+def _to_lon180(arr: np.ndarray) -> np.ndarray:
     return ((np.asarray(arr, dtype=float) + 180.0) % 360.0) - 180.0
+
+
+def _lon_span(arr: np.ndarray) -> float:
+    finite = np.asarray(arr, dtype=float)
+    finite = finite[np.isfinite(finite)]
+    if finite.size == 0:
+        return np.inf
+    return float(np.max(finite) - np.min(finite))
+
+
+def _lons_compact_frame(arr: np.ndarray) -> np.ndarray:
+    """Shift longitudes into the 360° frame with the smaller span.
+
+    Same idea as EWB's ``PeriodicBoundaryIndex``: wrap labels onto the
+    native longitude period so a dateline-crossing set (e.g. TC Harold
+    155E–209E) stays a ~50° arc instead of wrapping to [-180, 180] and
+    spanning 359°. Atlantic storms (261E–322E in 0-360 yaml) land in
+    [-180, 180] where that frame is tighter or tied.
+    """
+    arr = np.asarray(arr, dtype=float)
+    lon360 = _to_lon360(arr)
+    lon180 = _to_lon180(arr)
+    span360 = _lon_span(lon360)
+    span180 = _lon_span(lon180)
+    if span360 < span180 - 1e-6:
+        return lon360
+    if span180 < span360 - 1e-6:
+        return lon180
+    # Tie: prefer [-180, 180] unless the points sit near the dateline.
+    finite360 = lon360[np.isfinite(lon360)]
+    if finite360.size and np.max(np.abs(finite360 - 180.0)) < 90.0:
+        return lon360
+    return lon180
+
+
+def _unwrap_lons(arr: np.ndarray) -> np.ndarray:
+    """Remove 360° jumps along a track so matplotlib doesn't draw a globe-crossing segment."""
+    arr = np.asarray(arr, dtype=float)
+    out = arr.copy()
+    finite = np.isfinite(arr)
+    if finite.sum() >= 2:
+        out[finite] = np.rad2deg(np.unwrap(np.deg2rad(arr[finite])))
+    return out
+
+
+def _wrap_lon(arr: np.ndarray) -> np.ndarray:
+    """Normalize longitudes for Cartopy so dateline-crossing tracks stay intact."""
+    return _unwrap_lons(_lons_compact_frame(arr))
+
+
+def _extent_in_storm_mercator(
+    center_lon: float,
+    center_lat: float,
+    zoom: float,
+    aspect_ratio: tuple[float, float],
+):
+    """Mercator extent centered on the storm, not on the prime meridian.
+
+    Default ``ccrs.Mercator()`` (central_longitude=0) wraps 182E to the
+    opposite side of the projection, which is why Harold's map became
+    global. A storm-centered Mercator keeps 155E–209E as a continuous
+    patch of x-coordinates.
+    """
+    proj = ccrs.Mercator(central_longitude=float(center_lon))
+    lon_min = center_lon - _ZOOM_COEFFICIENT * zoom
+    lon_max = center_lon + _ZOOM_COEFFICIENT * zoom
+    cx, cy = proj.transform_point(center_lon, center_lat, src_crs=ccrs.PlateCarree())
+    x0 = proj.transform_point(lon_min, center_lat, src_crs=ccrs.PlateCarree())[0]
+    x1 = proj.transform_point(lon_max, center_lat, src_crs=ccrs.PlateCarree())[0]
+    if x1 < x0:
+        x0, x1 = x1, x0
+    lon_distance = x1 - x0
+    lat_distance = lon_distance * aspect_ratio[1] / aspect_ratio[0]
+    y_max = cy + lat_distance / 2
+    y_min = cy - lat_distance / 2
+    return (x0, x1, y_min, y_max), proj
 
 
 def _add_basemap(ax) -> None:
@@ -423,39 +515,51 @@ def _compute_landfalls(
 def _get_shared_extent(
     case_id: int,
     case_data: dict[str, Any],
-):
-    """Build a Mercator extent that contains all available tracks.
+) -> Optional[TrackMapExtent]:
+    """Build a storm-centered Mercator extent that contains all tracks.
 
     Includes the IBTrACS analysis track and every model forecast
-    we have detections for, plus a small lat/lon padding.
+    we have detections for, plus a small lat/lon padding. Longitudes
+    are shifted into the compact 360° frame first so a dateline-
+    crossing storm (TC Harold, case 171) is a ~50° Pacific window
+    rather than a global map.
     """
     target_ds = case_data["target"]
-    all_lons = list(_wrap_lon(target_ds.coords["longitude"].values))
-    all_lats = list(target_ds.coords["latitude"].values)
+    raw_lons = list(np.asarray(target_ds.coords["longitude"].values, dtype=float))
+    all_lats = list(np.asarray(target_ds.coords["latitude"].values, dtype=float))
 
     for forecast_ds in case_data["forecasts"].values():
         if not _forecast_has_detections(forecast_ds):
             continue
         lat_coord = forecast_ds.coords["latitude"].values.ravel()
-        lon_coord = _wrap_lon(forecast_ds.coords["longitude"].values.ravel())
+        lon_coord = np.asarray(
+            forecast_ds.coords["longitude"].values, dtype=float
+        ).ravel()
         mask = ~(np.isnan(lat_coord) | np.isnan(lon_coord))
-        all_lons.extend(lon_coord[mask].tolist())
+        raw_lons.extend(lon_coord[mask].tolist())
         all_lats.extend(lat_coord[mask].tolist())
 
-    if not all_lons:
+    raw_lons_arr = np.asarray(raw_lons, dtype=float)
+    all_lats_arr = np.asarray(all_lats, dtype=float)
+    finite = np.isfinite(raw_lons_arr) & np.isfinite(all_lats_arr)
+    if not finite.any():
         return None
 
-    center_lon = (min(all_lons) + max(all_lons)) / 2
-    center_lat = (min(all_lats) + max(all_lats)) / 2
-    lon_span = max(all_lons) - min(all_lons) + 2 * PADDING_DEG
-    lat_span = max(all_lats) - min(all_lats) + 2 * PADDING_DEG
+    all_lons = _lons_compact_frame(raw_lons_arr[finite])
+    all_lats = all_lats_arr[finite]
+
+    center_lon = (float(np.min(all_lons)) + float(np.max(all_lons))) / 2
+    center_lat = (float(np.min(all_lats)) + float(np.max(all_lats))) / 2
+    lon_span = float(np.max(all_lons) - np.min(all_lons)) + 2 * PADDING_DEG
+    lat_span = float(np.max(all_lats) - np.min(all_lats)) + 2 * PADDING_DEG
 
     zoom_lon = lon_span / 4
     zoom_lat = lat_span * CELL_ASPECT[0] / CELL_ASPECT[1] / 4
     zoom = max(zoom_lon, zoom_lat)
-    return generate_extent(
-        (center_lon, center_lat), zoom, CELL_ASPECT,
+    bounds, proj = _extent_in_storm_mercator(
+        center_lon, center_lat, zoom, CELL_ASPECT,
     )
+    return TrackMapExtent(bounds=bounds, crs=proj)
 
 
 def plot_tc_panel(
@@ -473,7 +577,10 @@ def plot_tc_panel(
     """Render one (storm, model) panel with landfall markers."""
     _add_basemap(ax)
     if extent is not None:
-        ax.set_extent(extent, crs=EXTENT_CRS)
+        if isinstance(extent, TrackMapExtent):
+            ax.set_extent(extent.bounds, crs=extent.crs)
+        else:
+            ax.set_extent(extent, crs=EXTENT_CRS)
 
     valid_groups: list[tuple[Any, np.ndarray, np.ndarray]] = []
     if _forecast_has_detections(forecast_ds):
@@ -677,10 +784,11 @@ def build_figure(
     for row_idx, (case_id, storm_label) in enumerate(rows):
         extent = row_extents[case_id]
         target_ds = cache[case_id]["target"]
+        proj = extent.crs if isinstance(extent, TrackMapExtent) else EXTENT_CRS
         for col_idx, (cache_key, display_name, _, _) in enumerate(MODEL_COLS):
             forecast_ds = cache[case_id]["forecasts"].get(cache_key)
             ax = fig.add_subplot(
-                gs[row_idx, col_idx], projection=EXTENT_CRS,
+                gs[row_idx, col_idx], projection=proj,
             )
             axes_grid[row_idx][col_idx] = ax
             plot_tc_panel(

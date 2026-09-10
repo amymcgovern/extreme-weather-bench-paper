@@ -46,6 +46,7 @@ from src.plots.tc_3x4_panel import (
     EXTENT_CRS,
     MODEL_COLS,
     TC_TRACKS_ROOT,
+    TrackMapExtent,
     _apply_lead_time_cap,
     _drop_short_tracks,
     _forecast_has_detections,
@@ -106,6 +107,7 @@ def _plot_case(my_case, basepath: str) -> str:
 
     case_data = {"target": target, "forecasts": forecasts}
     extent = _get_shared_extent(cid, case_data)
+    proj = extent.crs if isinstance(extent, TrackMapExtent) else EXTENT_CRS
 
     n_cols = len(MODEL_COLS)
     # Slightly taller figure + smaller top region so the fontsize-22 suptitle
@@ -119,7 +121,7 @@ def _plot_case(my_case, basepath: str) -> str:
     )
 
     for col_idx, (cache_key, display_name, _, _) in enumerate(MODEL_COLS):
-        ax = fig.add_subplot(gs[0, col_idx], projection=EXTENT_CRS)
+        ax = fig.add_subplot(gs[0, col_idx], projection=proj)
         plot_tc_panel(
             forecast_ds=forecasts[cache_key],
             target_ds=target,
