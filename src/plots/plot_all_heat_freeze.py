@@ -4,9 +4,11 @@ Iterates every ``event_type in {"heat_wave", "freeze"}`` case in
 ``events.yaml`` and, for each case, produces one PNG showing 4 model
 rows (AIFS / GraphCast / Pangu / HRES) x 5 lead-time columns (10, 7, 5,
 3, 1 days) of 2 m temperature valid at the case's anchor timestep, plus
-two stacked truth panels on the right column: ERA5 gridded truth (row 0)
-and GHCN station scatter (row 1). All panels share the same Celsius
-colormap so forecast vs. truth is a direct visual comparison.
+three stacked truth panels on the right column: ERA5 gridded truth
+(row 0), GHCN station scatter (row 1), and ERA5 temperature anomaly
+versus the 1990-2019 median climatology (row 2). Forecast and ERA5/GHCN
+panels share the same Celsius colormap; the anomaly panel uses a
+diverging scale centered on 0.
 
 Anchors are set at compute time (see ``compute_heat_freeze_plot_data``)
 and re-selected at plot time via ``--anchor {peak_day, max_low}``:
@@ -44,7 +46,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import xarray as xr
-from extremeweatherbench import cases
+from extremeweatherbench import cases, utils
 from joblib import Parallel, delayed
 from matplotlib.cm import ScalarMappable
 from matplotlib.gridspec import GridSpec
@@ -71,6 +73,19 @@ MODEL_ROWS: list[tuple[str, str]] = [
 TRUTH_ERA5_DIR = "era5_heat_freeze_graphics"
 TRUTH_GHCN_DIR = "ghcn_heat_freeze_graphics"
 
+# 1990-2019 ERA5 2 m T quantile climatology (same store as heat_freeze_6panel
+# / ewb.defaults.get_climatology). Quantile 0.5 is the median used for the
+# right-column anomaly panel (ERA5 minus climatology).
+CLIMATOLOGY_URI = (
+    "gs://extremeweatherbench/datasets/"
+    "surface_air_temperature_1990_2019_climatology.zarr/"
+)
+CLIMATOLOGY_HOURS = (0, 6, 12, 18)
+
+# Lazy-opened median climatology, cached per process so joblib loky
+# workers pay the GCS zarr open once rather than once per case.
+_CLIM_MEDIAN: Optional[xr.DataArray] = None
+
 TITLE_FONTSIZE = 22
 ROW_LABEL_FONTSIZE = 18
 COL_TITLE_FONTSIZE = 16
@@ -79,6 +94,10 @@ CBAR_LABEL_FONTSIZE = 20
 CBAR_TICK_FONTSIZE = 14
 
 PADDING_DEG = 1.0
+# Vertical colorbars sit just right of the truth-column panels. Gap and
+# width are figure-fraction, matching heat_freeze_6panel's snug colorbars.
+COLORBAR_GAP_FRAC = 0.006
+COLORBAR_WIDTH_FRAC = 0.012
 
 
 def _anchor_suffix(anchor: str) -> str:
@@ -100,6 +119,85 @@ def _anchor_label(anchor: str) -> str:
 
 def _kind_for_event(event_type: str) -> str:
     return "heat" if event_type == "heat_wave" else "freeze"
+
+
+def _get_climatology_median() -> xr.DataArray:
+    """Return the 1990-2019 median 2 m T climatology (lazy, process-cached)."""
+    global _CLIM_MEDIAN
+    if _CLIM_MEDIAN is None:
+        _CLIM_MEDIAN = xr.open_zarr(
+            CLIMATOLOGY_URI, storage_options={"anon": True},
+        )["2m_temperature"].sel(quantile=0.5)
+    return _CLIM_MEDIAN
+
+
+def _clim_doy_hour(ts: pd.Timestamp) -> tuple[int, int]:
+    """Map an anchor timestamp onto the climatology's dayofyear + 6-hourly hour.
+
+    The climatology is stored on ``hour in {0, 6, 12, 18}``. Anchors can
+    land on odd hours (peak_day / max_low), so we take the nearest of those
+    four, wrapping across midnight and bumping dayofyear when 21-23Z snaps
+    forward to 00Z.
+    """
+    hour = int(ts.hour)
+    clim_hour = min(
+        CLIMATOLOGY_HOURS,
+        key=lambda h: min((hour - h) % 24, (h - hour) % 24),
+    )
+    doy = int(ts.dayofyear)
+    if clim_hour == 0 and hour >= 18:
+        doy = min(doy + 1, 366)
+    return doy, clim_hour
+
+
+def _era5_anomaly_vs_climo(era5_ds: xr.Dataset) -> Optional[xr.DataArray]:
+    """ERA5 2 m T minus the 1990-2019 median climatology at the anchor.
+
+    Difference is in Kelvin, which equals Celsius, so the returned field
+    can be plotted with ``kelvin_to_celsius=False``. Returns ``None`` if
+    the climatology slice is empty or the GCS open fails.
+    """
+    if "surface_air_temperature" not in era5_ds:
+        return None
+    t2 = era5_ds["surface_air_temperature"]
+    ts = pd.Timestamp(era5_ds["anchor_valid_time"].values)
+    doy, clim_hour = _clim_doy_hour(ts)
+    try:
+        clim = _get_climatology_median()
+        snap = clim.sel(dayofyear=doy, hour=clim_hour)
+        snap = utils.convert_longitude_to_180(snap)
+        clim_aligned = snap.sel(
+            latitude=t2["latitude"],
+            longitude=t2["longitude"],
+            method="nearest",
+        )
+        anom = (t2 - clim_aligned).load()
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[climo] anomaly failed for anchor={ts}: {exc!r}",
+            flush=True,
+        )
+        return None
+    if anom.size == 0 or not np.isfinite(np.asarray(anom.values)).any():
+        return None
+    return anom
+
+
+def _infer_anom_norm(
+    anom: xr.DataArray,
+) -> tuple[mcolors.Colormap, mcolors.Normalize]:
+    """Symmetric diverging colormap sized to one case's ERA5-minus-climo field."""
+    finite = np.asarray(anom.values)
+    finite = finite[np.isfinite(finite)]
+    if finite.size == 0:
+        return celsius_diff_colormap_and_normalize(vmax=10.0)
+    span = float(
+        max(abs(np.percentile(finite, 1)), abs(np.percentile(finite, 99)))
+    )
+    if not np.isfinite(span) or span <= 0:
+        return celsius_diff_colormap_and_normalize(vmax=10.0)
+    vmax = max(_round_to(span + 1, 5.0, "up"), 5.0)
+    return celsius_diff_colormap_and_normalize(vmax=vmax)
 
 
 def _case_type_label(event_type: str, marginal: bool) -> str:
@@ -288,6 +386,30 @@ def _plot_ghcn_panel(
     return int(good.sum())
 
 
+def _vertical_colorbar(
+    fig,
+    sm,
+    x,
+    y,
+    height,
+    label: str,
+    extend: Optional[str] = None,
+) -> None:
+    """Draw a vertical colorbar at figure-fraction ``(x, y, width, height)``."""
+    cax = fig.add_axes([x, y, COLORBAR_WIDTH_FRAC, height])
+    kwargs = {"cax": cax, "orientation": "vertical"}
+    if extend is not None:
+        kwargs["extend"] = extend
+    cbar = fig.colorbar(sm, **kwargs)
+    cbar.set_label(
+        label,
+        fontsize=CBAR_LABEL_FONTSIZE - 4,
+        rotation=270,
+        labelpad=16,
+    )
+    cbar.ax.tick_params(labelsize=CBAR_TICK_FONTSIZE - 2)
+
+
 def _empty_placeholder(ax, extent, text: str) -> None:
     _add_basemap(ax)
     if extent is not None:
@@ -390,11 +512,14 @@ def _plot_case(
         cmap_diff, norm_diff = None, None
         era5_ref = None
 
-    fig = plt.figure(figsize=(19, 11))
+    # Extra width + a right margin so the vertical ERA5/GHCN and
+    # climatology colorbars sit outside the truth column instead of
+    # overlapping the unused AIFS-row cell.
+    fig = plt.figure(figsize=(20.5, 11))
     n_rows, n_cols = 4, 6  # 5 lead cols + 1 truth col
     gs = GridSpec(
         n_rows, n_cols, figure=fig,
-        left=0.045, right=0.99, top=0.90, bottom=0.09,
+        left=0.045, right=0.90, top=0.90, bottom=0.09,
         wspace=0.05, hspace=0.22,
         width_ratios=[1.0] * 5 + [1.05],
     )
@@ -468,23 +593,42 @@ def _plot_case(
         fontsize=TRUTH_TITLE_FONTSIZE, pad=6,
     )
 
-    # Hide the two unused truth-column cells so their axes lines don't
-    # print underneath the shared colorbar below.
-    for r in (2, 3):
-        placeholder = fig.add_subplot(gs[r, 5])
-        placeholder.set_visible(False)
+    anom = _era5_anomaly_vs_climo(era5_ds)
+    anom_ax = fig.add_subplot(gs[2, 5], projection=ccrs.PlateCarree())
+    if anom is None:
+        _empty_placeholder(anom_ax, extent, "No climatology")
+        cmap_anom, norm_anom = None, None
+    else:
+        cmap_anom, norm_anom = _infer_anom_norm(anom)
+        _plot_field_panel(
+            anom_ax, anom, extent, cmap_anom, norm_anom,
+            mask_ocean=True, kelvin_to_celsius=False,
+        )
+    anom_ax.set_title(
+        "ERA5 Climatology",
+        fontsize=TRUTH_TITLE_FONTSIZE, pad=6,
+    )
+
+    # Hide the leftover truth-column cell so its axes lines don't print
+    # underneath the shared colorbar below.
+    placeholder = fig.add_subplot(gs[3, 5])
+    placeholder.set_visible(False)
 
     bottom_row = [ax for ax in axes_lead[-1] if ax is not None]
     if bottom_row:
         pos0 = bottom_row[0].get_position(fig)
         pos_last_lead = bottom_row[-1].get_position(fig)
-        pos_truth = era5_ax.get_position(fig)
+        pos_era5 = era5_ax.get_position(fig)
+        pos_ghcn = ghcn_ax.get_position(fig)
+        pos_anom = anom_ax.get_position(fig)
         cbar_y = pos0.y0 - pos0.height * 0.28
         cbar_height = pos0.height * 0.12
 
+        # Forecast colorbar under the 5 lead columns only. Truth-column
+        # scales live in vertical bars to the right of those panels so
+        # ERA5/GHCN (abs T) and climatology (anomaly) don't share a
+        # colorbar with each other or with AIFS.
         if mode == "diff":
-            # Two colorbars: wide diff cbar under lead columns, small abs
-            # cbar under truth column, so both scales stay legible.
             sm_diff = ScalarMappable(cmap=cmap_diff, norm=norm_diff)
             sm_diff.set_array([])
             diff_cbar_ax = fig.add_axes(
@@ -499,25 +643,11 @@ def _plot_case(
                 fontsize=CBAR_LABEL_FONTSIZE, labelpad=2,
             )
             diff_cbar.ax.tick_params(labelsize=CBAR_TICK_FONTSIZE)
-
-            sm_abs = ScalarMappable(cmap=cmap_abs, norm=norm_abs)
-            sm_abs.set_array([])
-            abs_cbar_ax = fig.add_axes(
-                [pos_truth.x0, cbar_y, pos_truth.x1 - pos_truth.x0, cbar_height],
-            )
-            abs_cbar = fig.colorbar(
-                sm_abs, cax=abs_cbar_ax, orientation="horizontal",
-            )
-            abs_cbar.set_label(
-                "ERA5 / GHCN 2 m T (\u00b0C)",
-                fontsize=CBAR_LABEL_FONTSIZE - 4, labelpad=2,
-            )
-            abs_cbar.ax.tick_params(labelsize=CBAR_TICK_FONTSIZE - 2)
         else:
             sm = ScalarMappable(cmap=cmap_abs, norm=norm_abs)
             sm.set_array([])
             cbar_ax = fig.add_axes(
-                [pos0.x0, cbar_y, pos_truth.x1 - pos0.x0, cbar_height],
+                [pos0.x0, cbar_y, pos_last_lead.x1 - pos0.x0, cbar_height],
             )
             cbar = fig.colorbar(sm, cax=cbar_ax, orientation="horizontal")
             cbar.set_label(
@@ -525,6 +655,28 @@ def _plot_case(
                 fontsize=CBAR_LABEL_FONTSIZE, labelpad=2,
             )
             cbar.ax.tick_params(labelsize=CBAR_TICK_FONTSIZE)
+
+        sm_abs = ScalarMappable(cmap=cmap_abs, norm=norm_abs)
+        sm_abs.set_array([])
+        _vertical_colorbar(
+            fig, sm_abs,
+            pos_era5.x1 + COLORBAR_GAP_FRAC,
+            pos_ghcn.y0,
+            pos_era5.y1 - pos_ghcn.y0,
+            "2 m T (\u00b0C)",
+        )
+
+        if cmap_anom is not None:
+            sm_anom = ScalarMappable(cmap=cmap_anom, norm=norm_anom)
+            sm_anom.set_array([])
+            _vertical_colorbar(
+                fig, sm_anom,
+                pos_anom.x1 + COLORBAR_GAP_FRAC,
+                pos_anom.y0,
+                pos_anom.height,
+                "T anomaly (\u00b0C)",
+                extend="both",
+            )
 
     fig.suptitle(
         f"{_case_type_label(event_type, marginal)} case {cid}: "
@@ -560,7 +712,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description=(
             "Plot every heat/freeze case as a 4x5 model-vs-lead figure with"
-            " ERA5 and GHCN truth panels."
+            " ERA5, GHCN, and ERA5-minus-climatology truth panels."
         )
     )
     parser.add_argument("--n_jobs", type=int, default=1)
