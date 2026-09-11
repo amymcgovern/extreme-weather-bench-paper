@@ -40,6 +40,54 @@ def _lonlat_only(da: xr.DataArray) -> xr.DataArray:
     return da
 
 
+def _contiguous_longitude(da: xr.DataArray) -> xr.DataArray:
+    """Reorder a wrapping longitude coord into one increasing, gap-free sequence.
+
+    Prime-meridian cases (yaml ``lon_min > lon_max``, e.g. 125 Norway/Sweden
+    and 143 Western Alps) are stored on a 0-360 axis as
+    ``[0 .. lon_max, lon_min .. 359.75]`` after the EWB region mask. The
+    grid is the correct regional subset (tens of longitudes, not 1440), but
+    ``lon.max() - lon.min()`` is still ~360. ``generate_plot_extent_bounds``
+    then auto-zooms a global box forever, and pcolormesh draws one cell
+    across the 300-degree hole. Shift the short arc onto a monotonic coord
+    (Europe lands near 0, not 360) so extent and mesh see the real domain.
+    """
+    if "longitude" not in da.dims:
+        return da
+    lon = np.asarray(da["longitude"].values, dtype=float)
+    if lon.size < 2:
+        return da
+    lon360 = np.mod(lon, 360.0)
+    order = np.argsort(lon360, kind="mergesort")
+    lon_s = lon360[order]
+    gap_internal = np.diff(lon_s)
+    if gap_internal.size == 0:
+        return da
+    wrap_gap = lon_s[0] + 360.0 - lon_s[-1]
+    internal_max = float(gap_internal.max())
+    grid = float(np.median(gap_internal))
+    gap_tol = max(2.0 * grid, 1.0)
+    # Wrapping 0°: the 0/360 seam is ~one grid step and a large hole sits
+    # inside the sorted coord. A normal regional box is the opposite
+    # (tiny internal steps, huge wrap-around gap) and must be left alone.
+    if wrap_gap > gap_tol or internal_max <= gap_tol:
+        return da
+    gaps = np.concatenate([gap_internal, [wrap_gap]])
+    start = int(np.argmax(gaps) + 1) % lon_s.size
+    rolled = np.roll(order, -start)
+    unwrapped = np.rad2deg(
+        np.unwrap(np.deg2rad(lon360[rolled]), period=2 * np.pi)
+    )
+    mean = float(unwrapped.mean())
+    if mean > 180.0:
+        unwrapped = unwrapped - 360.0
+    elif mean < -180.0:
+        unwrapped = unwrapped + 360.0
+    return da.isel(longitude=rolled).assign_coords(
+        longitude=("longitude", unwrapped)
+    )
+
+
 def snap_ar_anchor_to_synoptic(anchor, hours=(0, 12)) -> np.datetime64:
     """Snap an hourly ERA5 peak to 00/12Z so 00/12-init models have data.
 
@@ -214,6 +262,10 @@ def plot_ar_mask_single_timestep(
 
     if "longitude" not in ar_mask.dims or "latitude" not in ar_mask.dims:
         raise ValueError("AR mask data must have longitude and latitude dimensions.")
+
+    ivt_data = _contiguous_longitude(ivt_data)
+    ar_mask = _contiguous_longitude(ar_mask)
+
     if ax is None:
         fig = plt.figure(figsize=(16, 9))
         # Adjust subplot parameters to center plot and minimize whitespace

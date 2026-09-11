@@ -21,24 +21,10 @@ from matplotlib.cm import ScalarMappable
 import src.plots.atmospheric_river_utils as ar_plot_utils
 
 
-# Maximum acceptable longitude span for a per-case pickle, in degrees.
-# Antimeridian- / prime-meridian-crossing cases (e.g. events.yaml cases 125
-# Norway/Sweden and 143 Western Alps, both defined with lon_min > lon_max)
-# currently round-trip through compute_ar_plot_data.py as full-globe grids
-# ([0, 359.75]) because the upstream slice silently expands. Rendering 20
-# pcolormesh panels of a 360-degree PlateCarree extent then pegs a worker
-# for many minutes and, when the plot does finish, shows the AR nowhere on
-# a global map. Treat these pickles as unusable until the compute side is
-# fixed for meridian-crossing bounds.
-MAX_LON_SPAN_DEG = 180.0
-
-
 def _load_case(model_dir: Path, case_id: int):
     """Load a single case's IVT pickle from a per-case model directory.
 
-    Returns None if the file doesn't exist, or if the pickled dataset has
-    a longitude span > ``MAX_LON_SPAN_DEG`` (indicating the meridian-
-    crossing compute bug documented above).
+    Returns None if the file doesn't exist.
 
     Older pickles produced by `compute_ar_plot_data.py` (before the
     materialize-before-pickle fix) store `integrated_vapor_transport` as a
@@ -55,20 +41,6 @@ def _load_case(model_dir: Path, case_id: int):
         raw = pickle.load(f)
     if hasattr(raw, "load"):
         raw = raw.load()
-    try:
-        lon = raw["longitude"].values
-        span = float(lon.max() - lon.min())
-    except Exception:  # noqa: BLE001 -- defensive: never let the guard crash a worker
-        span = 0.0
-    if span > MAX_LON_SPAN_DEG:
-        print(
-            f"[plot_all_ar] skipping case_id={case_id} pickle at {p}: "
-            f"longitude span is {span:.1f} degrees (threshold "
-            f"{MAX_LON_SPAN_DEG:.0f} deg), likely a meridian-crossing "
-            "case whose upstream slice fell back to the full globe",
-            flush=True,
-        )
-        return None
     return raw
 
 
@@ -139,13 +111,10 @@ def _plot_case(
     era5_raw = _load_case(era5_dir, my_id)
 
     if all(r is None for r in (hres_raw, gc_raw, pang_raw, aifs_raw, era5_raw)):
-        # All per-case pickles either missing or rejected by the guard in
-        # _load_case (e.g. meridian-crossing cases 125 / 143). Skip writing a
-        # blank figure so a stale but useful PNG isn't clobbered by an empty
-        # one.
+        # All per-case pickles missing. Skip writing a blank figure so a
+        # stale but useful PNG isn't clobbered by an empty one.
         return (
-            f"[plot_all_ar] skip case {my_id}: no usable per-case pickles "
-            f"(all None after _load_case guards)"
+            f"[plot_all_ar] skip case {my_id}: no usable per-case pickles"
         )
 
     # Shared snapshot time for every panel, analogous to heat/freeze peak_day.

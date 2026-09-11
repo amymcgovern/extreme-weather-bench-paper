@@ -403,7 +403,12 @@ def generate_plot_extent_bounds(min_lon, max_lon, min_lat, max_lat, zoom, aspect
     # 
     min_lon, max_lon, min_lat, max_lat = build_mercator_bounds(min_lon, max_lon, min_lat, max_lat, zoom_val, aspect_ratio, out_crs)
     if zoom == 'auto':
-        while init_lat_range > (max_lat - min_lat) or init_lon_range > (max_lon - min_lon):
+        # Cap the search: a wrapping 0-360 lon coord (min=0, max=359.75)
+        # makes init_lon_range ~360, so this loop never converges and
+        # PROJ is asked to transform ever-huger Mercator coordinates.
+        for _ in range(50):
+            if not (init_lat_range > (max_lat - min_lat) or init_lon_range > (max_lon - min_lon)):
+                break
             zoom_val += 1
             min_lon, max_lon, min_lat, max_lat = build_mercator_bounds(min_lon, max_lon, min_lat, max_lat, zoom_val, aspect_ratio, out_crs)
     return min_lon, max_lon, min_lat, max_lat
