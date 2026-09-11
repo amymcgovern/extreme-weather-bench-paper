@@ -143,7 +143,7 @@ def plot_pph_contours(
 def plot_cbss_forecast_panel(
     cbss_data: xr.DataArray,
     target_date: pd.Timestamp,
-    lead_time_hours: int,
+    lead_time_hours: Optional[int],
     bbox: Dict[str, float],
     pph_data: Optional[xr.DataArray] = None,
     tornado_reports: Optional[pd.DataFrame] = None,
@@ -155,13 +155,18 @@ def plot_cbss_forecast_panel(
     geographic_features_kwargs: Dict[str, Any] = {},
     gridlines_kwargs: Dict[str, Any] = {},
     left_label: Optional[str] = None,
-) -> Tuple[plt.Figure, plt.Axes, plt.cm.ScalarMappable]:
+) -> Tuple[plt.Axes, plt.cm.ScalarMappable, List[plt.Line2D]]:
     """Plot a single CBSS forecast panel.
 
     Args:
-        cbss_data: CBSS data array with lead_time dimension.
+        cbss_data: CBSS data array. Pass a lead_time-indexed array together
+            with ``lead_time_hours`` to select a single lead time (the usual
+            per-model/per-lead panel case), or pass an already-2D (lat, lon)
+            slice with ``lead_time_hours=None`` to skip selection entirely
+            (e.g. an ERA5 "truth" panel, which has no lead_time dimension).
         target_date: Forecast initialization time.
-        lead_time_hours: Lead time in hours to plot.
+        lead_time_hours: Lead time in hours to select from ``cbss_data``, or
+            ``None`` if ``cbss_data`` is already a 2D (lat, lon) slice.
         bbox: Bounding box dictionary with lat/lon min/max.
         pph_data: Optional PPH data for contours.
         tornado_reports: Optional tornado report DataFrame.
@@ -174,7 +179,7 @@ def plot_cbss_forecast_panel(
         gridlines_kwargs: Optional keyword arguments for the gridlines.
 
     Returns:
-        Tuple of (axis, contour_mappable) for further customization.
+        Tuple of (axis, contour_mappable, storm_report_legend_elements).
     """
     # Setup colormap and levels
     cmap_custom, norm, levels = setup_cbss_colormap_and_levels()
@@ -187,9 +192,13 @@ def plot_cbss_forecast_panel(
     else:
         fig = ax.figure
 
-    # Select data for this lead time
-    lead_time_td = pd.Timedelta(hours=lead_time_hours)
-    cbss_lt = cbss_data.sel(lead_time=lead_time_td, method="nearest")
+    # Select data for this lead time, unless cbss_data is already a 2D
+    # (lat, lon) slice (e.g. an ERA5 truth panel, which has no lead_time dim).
+    if lead_time_hours is None:
+        cbss_lt = cbss_data
+    else:
+        lead_time_td = pd.Timedelta(hours=lead_time_hours)
+        cbss_lt = cbss_data.sel(lead_time=lead_time_td, method="nearest")
 
     # Convert longitude for plotting
     lon_data = plotting.convert_longitude_for_plotting(cbss_lt.longitude.values)
@@ -228,7 +237,7 @@ def plot_cbss_forecast_panel(
     plotting.add_geographic_features(ax, **geographic_features_kwargs)
 
     # Plot storm reports
-    plot_storm_reports(ax, tornado_reports, hail_reports)
+    legend_elements = plot_storm_reports(ax, tornado_reports, hail_reports)
 
     # Set extent
     lon_min, lon_max = plotting.convert_bbox_longitude(bbox)
@@ -252,8 +261,9 @@ def plot_cbss_forecast_panel(
         # )
         title_str = title
     else:
+        lead_str = "" if lead_time_hours is None else f" +{lead_time_hours}h"
         title_str = (
-            f"CBSS +{lead_time_hours}h\n"
+            f"CBSS{lead_str}\n"
             + f"Valid: {valid_time.strftime('%Y-%m-%d %H:%M')} UTC"
         )
 
@@ -261,10 +271,10 @@ def plot_cbss_forecast_panel(
 
     if left_label is not None:
         ax_pos = ax.get_position(fig)
-        fig.text(ax_pos.x0 - 0.01, ax_pos.y0 + ax_pos.height * 0.5, left_label, 
+        fig.text(ax_pos.x0 - 0.01, ax_pos.y0 + ax_pos.height * 0.5, left_label,
             fontsize="xx-large", ha='right', va='center')
 
-    return ax, im
+    return ax, im, legend_elements
 
 
 def plot_cbss_forecast_multipanel(

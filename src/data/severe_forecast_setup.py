@@ -98,6 +98,17 @@ class SevereForecastSetup:
         )
         return bb_severe_convection_forecast
 
+    def get_era5_severe_convection_forecast(self):
+        # ewb.inputs.ERA5 is a TargetBase, but run_pipeline only calls
+        # polymorphic methods on it, so it works as a drop-in "forecast" here
+        # too -- same pattern as AtmosphericRiverForecastSetup.get_era5() in
+        # src/data/ar_forecast_setup.py. The default ERA5_metadata_variable_mapping
+        # already covers every raw field CravenBrooksSignificantSevere needs.
+        era5_severe_convection_forecast = ewb.inputs.ERA5(
+            variables=[ewb.derived.CravenBrooksSignificantSevere()],
+        )
+        return era5_severe_convection_forecast
+
 
 class SevereEvaluationSetup:
     def __init__(self):

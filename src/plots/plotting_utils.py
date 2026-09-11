@@ -489,6 +489,9 @@ def create_storm_report_legend_elements(
     """
     legend_elements = []
 
+    # Colors/markers here must match plot_storm_reports_on_axis exactly (both
+    # draw from the same lsr_colors dict) -- otherwise the legend swatch
+    # doesn't match what's actually plotted on the map.
     if tornado_reports is not None and len(tornado_reports) > 0:
         legend_elements.append(
             plt.Line2D(
@@ -496,9 +499,9 @@ def create_storm_report_legend_elements(
                 [0],
                 marker="^",
                 color="w",
-                markerfacecolor="k",
+                markerfacecolor=lsr_colors["tornado"],
                 markersize=8,
-                markeredgecolor="k",
+                markeredgecolor=lsr_colors["tornado"],
                 label="Tornado Reports",
             )
         )
@@ -510,9 +513,9 @@ def create_storm_report_legend_elements(
                 [0],
                 marker="s",
                 color="w",
-                markerfacecolor="green",
+                markerfacecolor=lsr_colors["hail"],
                 markersize=8,
-                markeredgecolor="darkgreen",
+                markeredgecolor=lsr_colors["hail"],
                 label="Hail Reports",
             )
         )
@@ -524,9 +527,9 @@ def create_storm_report_legend_elements(
                 [0],
                 marker="o",
                 color="w",
-                markerfacecolor="blue",
+                markerfacecolor=lsr_colors["wind"],
                 markersize=8,
-                markeredgecolor="darkblue",
+                markeredgecolor=lsr_colors["wind"],
                 label="Wind Reports",
             )
         )

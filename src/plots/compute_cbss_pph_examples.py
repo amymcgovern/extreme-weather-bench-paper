@@ -133,6 +133,12 @@ if __name__ == "__main__":
         help="Run AIFS evaluation (default: False)",
     )
     parser.add_argument(
+        "--run_era5",
+        action="store_true",
+        default=False,
+        help="Run ERA5 evaluation, for the truth/reference CBSS panel (default: False)",
+    )
+    parser.add_argument(
         "--run_bb_graphcast",
         action="store_true",
         default=False,
@@ -220,6 +226,7 @@ if __name__ == "__main__":
     bb_graphcast_severe_forecast = None
     bb_pangu_severe_forecast = None
     bb_aifs_severe_forecast = None
+    era5_severe_forecast = None
 
     if args.run_hres:
         if hres_severe_forecast is None:
@@ -310,6 +317,19 @@ if __name__ == "__main__":
             ewb_cases=ewb_cases,
             forecast=bb_aifs_severe_forecast,
             out_dir=saved_data_root / f"aifs_bb_severe_graphics{suffix}",
+            n_jobs=args.n_jobs,
+            overwrite=args.overwrite,
+            pph_target=pph_target,
+        )
+
+    if args.run_era5:
+        if era5_severe_forecast is None:
+            era5_severe_forecast = severe_forecast_setup.get_era5_severe_convection_forecast()
+        _run_model(
+            label="era5",
+            ewb_cases=ewb_cases,
+            forecast=era5_severe_forecast,
+            out_dir=saved_data_root / f"era5_severe_graphics{suffix}",
             n_jobs=args.n_jobs,
             overwrite=args.overwrite,
             pph_target=pph_target,
