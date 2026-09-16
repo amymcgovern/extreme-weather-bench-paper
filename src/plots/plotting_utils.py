@@ -32,6 +32,13 @@ logger = logging.getLogger(__name__)
 
 # Boundary levels for scorecard heatmaps and matching colorbars (see plot_heatmap)
 SCORECARD_CB_LEVELS = [-50, -20, -10, -5, -2, -1, 1, 2, 5, 10, 20, 50]
+# Directional labels for scorecard colorbars: blue/negative = lower error
+# than IFS HRES (better); red/positive = higher error (worse).
+SCORECARD_CB_LABEL_HORIZONTAL = "← Better       % difference vs IFS HRES       Worse →"
+# Note: this label is rendered with rotation=-90 (see add_scorecard_colorbar_right),
+# which rotates the arrow glyphs too, so the pre-rotation characters are swapped
+# (→ renders as ↓, ← renders as ↑) so they appear as vertical arrows once drawn.
+SCORECARD_CB_LABEL_VERTICAL = "← Worse       % difference vs IFS HRES       Better →"
 
 
 lsr_colors = {
@@ -1717,7 +1724,7 @@ def add_scorecard_colorbar_right(
     label_text = (
         label
         if label is not None
-        else "% difference vs IFS HRES"
+        else SCORECARD_CB_LABEL_VERTICAL
     )
 
     boxes = [ax.get_position() for ax in axes_list]
@@ -1738,7 +1745,24 @@ def add_scorecard_colorbar_right(
     if label_fontsize is None:
         label_fontsize = 18
     cb.ax.tick_params(axis="y", labelsize=14)
-    cb.ax.set_ylabel(label_text, rotation=-90, labelpad=12, fontsize=label_fontsize)
+    label_artist = cb.ax.set_ylabel(
+        label_text, rotation=-90, labelpad=12, fontsize=label_fontsize
+    )
+
+    # The rotated label's rendered length scales with its character count, but
+    # cbar_height (and thus the physical colorbar height in inches) varies a
+    # lot across callers (e.g. figure2's freeze panel is ~9in tall vs heat's
+    # ~16in, for the same fixed label_fontsize). On a short colorbar a long
+    # label can run past the boundary tick labels, so shrink the font just
+    # enough to fit within the colorbar's actual height.
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    label_height = label_artist.get_window_extent(renderer=renderer).height
+    cax_height = cax.get_window_extent(renderer=renderer).height
+    max_label_height = cax_height * 0.7
+    if label_height > max_label_height > 0:
+        label_artist.set_fontsize(label_fontsize * max_label_height / label_height)
+
     return cb
 
 
@@ -2047,7 +2071,7 @@ def plot_heatmap(
         cbar_fontsize = label_size_numeric * 1.2
         cb.ax.tick_params(labelsize=cbar_fontsize)
         cb.ax.set_xlabel(
-            "% difference vs IFS HRES", fontsize=cbar_fontsize
+            SCORECARD_CB_LABEL_HORIZONTAL, fontsize=cbar_fontsize
         )
     elif show_colorbar:
         # make the colorbar take up 90% of the width of the figure and center it on the bottom of the figure
@@ -2062,7 +2086,7 @@ def plot_heatmap(
         label_size_numeric = base_size * font_scalings.get(label_fontsize, 1.0)
         cbar_fontsize = label_size_numeric * 1.2
         cb.ax.set_xlabel(
-            "% difference vs IFS HRES", fontsize=cbar_fontsize
+            SCORECARD_CB_LABEL_HORIZONTAL, fontsize=cbar_fontsize
         )
 
     if title is not None:
