@@ -316,6 +316,43 @@ def subset_results_to_xarray_by_init_time_tropical_cyclone(
 
     
 
+def _bootstrap_mean_and_ci(
+    values: xr.DataArray,
+    bootstrap_samples: int,
+    ci_level: float = 0.95,
+    rng: np.random.Generator | None = None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Bootstrap resample ``values`` (dims: lead_time, case_id_number).
+
+    Resamples case ids with replacement, independently for each draw,
+    and computes the mean across cases for each lead time.
+    parameters:
+        values: DataArray with dims (lead_time, case_id_number).
+        bootstrap_samples: number of bootstrap draws.
+        ci_level: confidence level for the percentile interval
+            (e.g. 0.95 for a 95% CI).
+        rng: optional numpy Generator for reproducibility.
+    returns:
+        (boot_dist, ci_lower, ci_upper): boot_dist has shape
+            (bootstrap_samples, n_lead_time); ci_lower/ci_upper are the
+            ci_level percentile interval of the mean at each lead time.
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+
+    arr = values.transpose("lead_time", "case_id_number").values.astype(float)
+    n_cases = arr.shape[1]
+    boot_dist = np.empty((bootstrap_samples, arr.shape[0]))
+    for i in range(bootstrap_samples):
+        idx = rng.integers(0, n_cases, size=n_cases)
+        boot_dist[i] = np.nanmean(arr[:, idx], axis=1)
+
+    alpha = 1 - ci_level
+    ci_lower = np.nanpercentile(boot_dist, 100 * alpha / 2, axis=0)
+    ci_upper = np.nanpercentile(boot_dist, 100 * (1 - alpha / 2), axis=0)
+    return boot_dist, ci_lower, ci_upper
+
+
 def compute_mean_by_lead_time(
     ewb_cases,
     results_df,
@@ -327,6 +364,9 @@ def compute_mean_by_lead_time(
     target_variable=None,
     snap_lead_times=False,
     snap_tolerance_hours=6,
+    bootstrap_samples=0,
+    ci_level=0.95,
+    rng=None,
 ):
     """Computes the mean of the results by lead time.
     parameters:
@@ -342,10 +382,17 @@ def compute_mean_by_lead_time(
         snap_tolerance_hours: passed to _snap_lead_time_to_bins.
             use 6 for a fixed +-6 h window (6-hourly models).
             ignored when snap_lead_times is False.
+        bootstrap_samples: number of bootstrap samples to use for
+            computing the mean and relative error (optional)
+        ci_level: confidence level for the bootstrap interval, used only
+            when bootstrap_samples > 0 (default 0.95).
+        rng: optional numpy Generator for reproducible bootstrap draws.
     returns:
         my_mean: numpy array containing the mean of the results by lead time
+        (only when bootstrap_samples > 0) also returns ci_lower, ci_upper
+            (the ci_level bootstrap interval of the mean) and boot_dist
+            (the raw per-draw bootstrap means), as a 4-tuple.
     """
-
 
     if 'DurationMeanError' in metric:
         print("don't call subset_results_to_xarray for tropical cyclones or duration metrics")   
@@ -362,8 +409,16 @@ def compute_mean_by_lead_time(
             snap_lead_times=snap_lead_times,
             snap_tolerance_hours=snap_tolerance_hours,
         )
-    my_mean = subset["value"].mean("case_id_number")
-    return my_mean
+
+        my_mean = subset["value"].mean("case_id_number")
+
+        if bootstrap_samples > 0:
+            boot_dist, ci_lower, ci_upper = _bootstrap_mean_and_ci(
+                subset["value"], bootstrap_samples, ci_level, rng
+            )
+            return my_mean, ci_lower, ci_upper, boot_dist
+
+        return my_mean
 
 
 def compute_relative_error(
@@ -380,6 +435,10 @@ def compute_relative_error(
     target_variable=None,
     snap_lead_times=False,
     snap_tolerance_hours=6,
+    bootstrap_samples=0,
+    ci_level=0.95,
+    return_ci=False,
+    rng=None,
 ):
     """Computes the relative error of the results by lead time Error
     is defined as relative to the comparison results.
@@ -406,35 +465,90 @@ def compute_relative_error(
         snap_tolerance_hours: passed to _snap_lead_time_to_bins.
             use 6 for a fixed +-6 h window (6-hourly models).
             ignored when snap_lead_times is False.
+        bootstrap_samples: number of bootstrap samples to use for
+            computing a confidence interval for the relative error
+            (optional; the point-estimate mean/relative error is
+            unaffected by this).
+        ci_level: confidence level for the bootstrap interval, used only
+            when bootstrap_samples > 0 (default 0.95).
+        return_ci: if True (and bootstrap_samples > 0), also return
+            ci_lower, ci_upper, and a boolean significance mask for the
+            relative error. Defaults to False so existing callers keep
+            getting a plain (my_mean, my_relative_error) 2-tuple.
+        rng: optional numpy Generator for reproducible bootstrap draws.
     returns:
+        my_mean: numpy array containing the mean of the results by lead time
         my_relative_error: numpy array containing the relative error of
             the results by lead time
+        (only when bootstrap_samples > 0 and return_ci=True) also returns
+            ci_lower, ci_upper (the ci_level interval of the relative
+            error) and significant (True where that interval excludes 0).
     """
 
-    my_mean = compute_mean_by_lead_time(    
-        ewb_cases,
-        results_df,
-        forecast_source,
-        target_source,
-        metric,
-        lead_time_days,
-        case_ids=case_ids,
-        target_variable=target_variable,
-        snap_lead_times=snap_lead_times,
-        snap_tolerance_hours=snap_tolerance_hours,
-    )
-    comparison_mean = compute_mean_by_lead_time(
-        ewb_cases,
-        comparison_results_df,
-        comparison_forecast_source,
-        target_source,
-        metric,
-        lead_time_days,
-        case_ids=case_ids,
-        target_variable=target_variable,
-        snap_lead_times=snap_lead_times,
-        snap_tolerance_hours=snap_tolerance_hours,
-    )
+    if bootstrap_samples > 0:
+        my_mean, _, _, my_boot_dist = compute_mean_by_lead_time(
+            ewb_cases,
+            results_df,
+            forecast_source,
+            target_source,
+            metric,
+            lead_time_days,
+            case_ids=case_ids,
+            target_variable=target_variable,
+            snap_lead_times=snap_lead_times,
+            snap_tolerance_hours=snap_tolerance_hours,
+            bootstrap_samples=bootstrap_samples,
+            ci_level=ci_level,
+            rng=rng,
+        )
+        comparison_mean, _, _, comparison_boot_dist = compute_mean_by_lead_time(
+            ewb_cases,
+            comparison_results_df,
+            comparison_forecast_source,
+            target_source,
+            metric,
+            lead_time_days,
+            case_ids=case_ids,
+            target_variable=target_variable,
+            snap_lead_times=snap_lead_times,
+            snap_tolerance_hours=snap_tolerance_hours,
+            bootstrap_samples=bootstrap_samples,
+            ci_level=ci_level,
+            rng=rng,
+        )
+    else:
+        my_mean = compute_mean_by_lead_time(
+            ewb_cases,
+            results_df,
+            forecast_source,
+            target_source,
+            metric,
+            lead_time_days,
+            case_ids=case_ids,
+            target_variable=target_variable,
+            snap_lead_times=snap_lead_times,
+            snap_tolerance_hours=snap_tolerance_hours,
+        )
+        comparison_mean = compute_mean_by_lead_time(
+            ewb_cases,
+            comparison_results_df,
+            comparison_forecast_source,
+            target_source,
+            metric,
+            lead_time_days,
+            case_ids=case_ids,
+            target_variable=target_variable,
+            snap_lead_times=snap_lead_times,
+            snap_tolerance_hours=snap_tolerance_hours,
+        )
+
+    if bootstrap_samples > 0 and return_ci:
+        # lead-time coords matching my_boot_dist/comparison_boot_dist, captured
+        # before my_mean/comparison_mean get reindexed to the full requested
+        # grid below (that reindex can add lead times the bootstrap draws
+        # don't have, which would otherwise create a shape mismatch)
+        my_boot_lead_times = my_mean.lead_time.values
+        comparison_boot_lead_times = comparison_mean.lead_time.values
 
     if higher_is_better:
         my_relative_error = (comparison_mean - my_mean) / comparison_mean * 100
@@ -455,6 +569,34 @@ def compute_relative_error(
     my_mean_arr = np.nan_to_num(my_mean)
     my_mean_arr[mean_missing] = np.nan
     my_relative_error_arr[rel_missing] = np.nan
+
+    if bootstrap_samples > 0 and return_ci:
+        # per-draw relative error distribution, aligned to the requested lead-time grid,
+        # to derive a CI for the relative error itself (not just the two input means)
+        my_boot_da = xr.DataArray(
+            my_boot_dist,
+            dims=("bootstrap", "lead_time"),
+            coords={"lead_time": my_boot_lead_times},
+        )
+        comparison_boot_da = xr.DataArray(
+            comparison_boot_dist,
+            dims=("bootstrap", "lead_time"),
+            coords={"lead_time": comparison_boot_lead_times},
+        )
+        my_boot_da = my_boot_da.reindex(lead_time=all_lead_times)
+        comparison_boot_da = comparison_boot_da.reindex(lead_time=all_lead_times)
+
+        if higher_is_better:
+            rel_error_dist = (comparison_boot_da - my_boot_da) / comparison_boot_da * 100
+        else:
+            rel_error_dist = (my_boot_da - comparison_boot_da) / comparison_boot_da * 100
+
+        alpha = 1 - ci_level
+        ci_lower = rel_error_dist.quantile(alpha / 2, dim="bootstrap").values
+        ci_upper = rel_error_dist.quantile(1 - alpha / 2, dim="bootstrap").values
+        significant = (ci_lower > 0) | (ci_upper < 0)
+        return my_mean_arr, my_relative_error_arr, ci_lower, ci_upper, significant
+
     return (my_mean_arr, my_relative_error_arr)
 
 def compute_relative_error_tropical_cyclone(

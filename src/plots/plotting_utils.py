@@ -1862,6 +1862,8 @@ def plot_heatmap(
     label_fontsize=None,
     tick_fontsize=None,
     annot_fontsize=None,
+    significance_array=None,
+    cell_size=5,
 ):
     """
     Plots a heatmap of the relative error of the models versus the IFS HRES
@@ -1884,15 +1886,27 @@ def plot_heatmap(
             grey background color (no red/blue coloring) while annotation text
             is still displayed. Can also be a list of bools (one per metric
             subplot) to control coloring individually per column.
-            
+        significance_array: optional dict keyed the same way as error_array,
+            with boolean arrays (same shape as each metric's error array)
+            marking which cells are statistically significant (e.g. from
+            ``results_utils.compute_relative_error(..., return_ci=True)``).
+            Significant cells are rendered in bold (annotation text is
+            otherwise unchanged).
+            None (default) disables significance markers.
+        cell_size: inches allotted per metric subplot (only used when
+            ``ax`` is None, i.e. this call creates its own standalone
+            figure). Increase this if bold/starred annotations from
+            ``significance_array`` are being clipped by their cell
+            (e.g. with a larger ``annot_fontsize``); the default of 5
+            matches the previous hardcoded figure size.
     """
     n_rows = 1
     n_cols = len(settings["metric_str"])
     col_space = 0.5
     row_space = 0.5
     figsize = (
-        5 * n_cols + col_space * (n_cols - 1),
-        5 * n_rows + row_space * (n_rows - 1),
+        cell_size * n_cols + col_space * (n_cols - 1),
+        cell_size * n_rows + row_space * (n_rows - 1),
     )
 
     reds = sns.color_palette("Reds", 6)
@@ -2002,6 +2016,13 @@ def plot_heatmap(
             if not _color_this
             else relative_error_array[metric]
         )
+
+        sig_data = (
+            significance_array.get(metric) if significance_array is not None else None
+        )
+        if sig_data is not None:
+            sig_data = np.asarray(sig_data)
+
         ax = sns.heatmap(
             color_data,
             annot=error_array[metric],
@@ -2017,6 +2038,14 @@ def plot_heatmap(
             ax=ax,
             annot_kws={"size": annot_fontsize} if annot_fontsize else {},
         )
+
+        if sig_data is not None:
+            # sns.heatmap creates annotation Text objects in row-major order matching the data
+            for text_obj, is_sig in zip(ax.texts, sig_data.flatten()):
+                if is_sig:
+                    text_obj.set_fontweight("bold")
+                    text_obj.set_fontstyle("italic")
+
 
         if is_subplot and i == 0 or not is_subplot:
             ax.set_yticklabels(
