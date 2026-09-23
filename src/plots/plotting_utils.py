@@ -978,7 +978,7 @@ def plot_all_cases(
             for continent in CONTINENT_ORDER
         )
         ax.text(
-            0.15, 0.42, continent_text,
+            0.10, 0.42, continent_text,
             transform=ax.transAxes,
             fontsize=6.5, va="center", ha="center",
             zorder=15,
