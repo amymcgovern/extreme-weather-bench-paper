@@ -5,12 +5,17 @@ different types of weather plots including atmospheric rivers, severe
 convection, tropical cyclones, etc.
 """
 
+import functools
 import logging
+import warnings
+from collections import Counter
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
+import cartopy.io.shapereader as shpreader
 import cartopy.mpl.ticker
+import geopandas as gpd
 import matplotlib.colors as colors
 
 # setup all the imports
@@ -640,6 +645,56 @@ def plot_polygon(
     ax.add_patch(patch)
 
 
+CONTINENT_ORDER = [
+    "North America",
+    "South America",
+    "Europe",
+    "Africa",
+    "Asia",
+    "Oceania",
+    "Antarctica",
+]
+
+CONTINENT_LABELS = {
+    "North America": "NA",
+    "South America": "SA",
+    "Europe": "EU",
+    "Africa": "AF",
+    "Asia": "AS",
+    "Oceania": "OC",
+    "Antarctica": "AN",
+}
+
+
+@functools.lru_cache(maxsize=1)
+def _load_continent_polygons() -> gpd.GeoDataFrame:
+    """Load Natural Earth country polygons with their continent labels."""
+    path = shpreader.natural_earth(
+        resolution="110m", category="cultural", name="admin_0_countries"
+    )
+    return gpd.read_file(path)[["CONTINENT", "geometry"]]
+
+
+def _continent_for_case(indiv_case) -> str:
+    """Classify an IndividualCase's centroid to a continent name.
+
+    Cases are small (typically 5-degree) bounding boxes, so their centroid
+    is a reasonable stand-in for the case's location. Offshore centroids
+    (common for tropical_cyclone/atmospheric_river cases) fall back to the
+    nearest country's continent.
+    """
+    countries = _load_continent_polygons()
+    centroid = indiv_case.location.as_geopandas().geometry.iloc[0].centroid
+    match = countries[countries.contains(centroid)]
+    if match.empty:
+        with warnings.catch_warnings():
+            # distance() on geographic-CRS geometries warns about accuracy;
+            # we only need the nearest polygon, not a precise distance.
+            warnings.simplefilter("ignore")
+            match = countries.iloc[[countries.distance(centroid).idxmin()]]
+    return match["CONTINENT"].iloc[0]
+
+
 def plot_all_cases(
     ewb_cases,
     event_type=None,
@@ -651,6 +706,7 @@ def plot_all_cases(
     title_loc="center",
     y_label=None,
     is_marginal=False,
+    show_continent_counts=False,
 ):
     """A function to plot all cases
     Args:
@@ -665,6 +721,9 @@ def plot_all_cases(
         fill_boxes (bool): Whether to fill the boxes with color.
         ax (matplotlib.axes.Axes): The axis to plot the cases on. If None, a new axis
             will be created using plt.axes(projection=ccrs.PlateCarree()).
+        show_continent_counts (bool): Whether to annotate the map with a
+            per-continent breakdown of the plotted cases, placed in the
+            South Atlantic where the map is consistently empty.
     """
     # plot all cases on one giant world map
     if ax is None:
@@ -768,7 +827,9 @@ def plot_all_cases(
             combined_event_type = "marginal_severe_convection"
         else:
             combined_event_type = "marginal_temperature"
-    
+
+    continent_counts: Counter = Counter()
+
     # Plot boxes for each case
     for indiv_case in cases_to_plot:
         # Get color based on event type
@@ -792,6 +853,8 @@ def plot_all_cases(
 
             # count the events by type
             counts_by_type[combined_event_type] += 1
+            if show_continent_counts:
+                continent_counts[_continent_for_case(indiv_case)] += 1
 
             # to handle wrapping around the prime meridian, we
             # can't use geopandas plot (and besides it is slow)
@@ -896,6 +959,33 @@ def plot_all_cases(
             rotation='vertical',
             transform=ax.transAxes,
             fontsize=14,
+        )
+
+    if show_continent_counts:
+        # One continent per line: narrow rather than wide, so its width stays
+        # fixed (~6 chars) regardless of count digits (e.g. "NA:151" vs
+        # "NA:15") -- a wide multi-item-per-line layout grows into whichever
+        # coastline is nearest for large counts. Anchored in the South
+        # Pacific (off the Chile/Peru coast), which has tens of degrees of
+        # clearance from any coastline or the legend in every direction.
+        # Placed in axes-fraction coordinates rather than data (lon/lat)
+        # coordinates: cartopy's PlateCarree transform mis-centers multi-line
+        # ax.text vertically, while transAxes renders correctly and (since
+        # set_global()'s data aspect closely matches the axes box aspect
+        # here) still lands in the same geographic spot.
+        continent_text = "\n".join(
+            f"{CONTINENT_LABELS[continent]}:{continent_counts.get(continent, 0)}"
+            for continent in CONTINENT_ORDER
+        )
+        ax.text(
+            0.15, 0.42, continent_text,
+            transform=ax.transAxes,
+            fontsize=6.5, va="center", ha="center",
+            zorder=15,
+            bbox=dict(
+                facecolor="white", edgecolor="black", alpha=0.9,
+                boxstyle="round,pad=0.25",
+            ),
         )
 
     # save if there is a filename specified (otherwise the user
@@ -1146,31 +1236,19 @@ def plot_all_cases_and_obs(
                 indiv_event_type in ["heat_wave", "freeze", "tropical_cyclone"]
                 and len(my_target_info) > 0
             ):
-                # Get the data from my_target_info
+                # Get the data from my_target_info. GHCN/tropical_cyclone targets use
+                # the sparse (valid_time, location) layout with latitude/longitude as
+                # non-dimension coords on location, so they can be read directly.
                 data = my_target_info[0]
-
-                # sparse array for GHCN data
-                if indiv_event_type in ["heat_wave", "freeze"]:
-                    try:
-                        data = utils.stack_dataarray_from_dims(
-                            data["surface_air_temperature"], ["latitude", "longitude"]
-                        )
-                    except Exception as e:
-                        print(
-                            f"Error stacking sparse data for "
-                            f"{indiv_case.case_id_number} from "
-                            f"dimensions latitude, longitude: {e}. "
-                            f"This is likely because the data is not "
-                            f"available for this case."
-                        )
-                        continue
                 try:
                     lat_values = data["latitude"].values
                     lon_values = data["longitude"].values
                 except Exception as e:
                     print(
-                        f"Error stacking sparse data from dimensions "
-                        f"latitude, longitude: {e}"
+                        f"Error getting latitude/longitude for "
+                        f"{indiv_case.case_id_number}: {e}. "
+                        f"This is likely because the data is not "
+                        f"available for this case."
                     )
                     continue
 
