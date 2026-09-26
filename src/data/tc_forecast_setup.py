@@ -10,6 +10,7 @@ from src.data.arraylake_utils import (
     ArraylakeForecast,
     BB_metadata_variable_mapping,
 )  # noqa: E402
+from src.data.cira_utils import get_cira_icechunk_forecast
 from src.data.model_name_setup import (
     CIRA_MODEL_NAME_TO_SOURCE,
 )
@@ -57,15 +58,12 @@ class TropicalCycloneForecastSetup:
 
     def get_cira_tc_forecast(self, model_name, init_type):
         model_str = CIRA_MODEL_NAME_TO_SOURCE[model_name]
-        source_str = f"gs://extremeweatherbench/{model_str}_{init_type}.parq"
         name_str = f"CIRA {model_name} {init_type}"
 
-        cira_tc_forecast = ewb.inputs.KerchunkForecast(
-            source=source_str,
-            variables=[ewb.derived.TropicalCycloneTrackVariables()],            
-            variable_mapping=ewb.inputs.CIRA_metadata_variable_mapping,
-            storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
-            preprocess=ewb.defaults.preprocess_cira_kerchunk_tc_forecast_dataset,
+        cira_tc_forecast = get_cira_icechunk_forecast(
+            model_name=f"{model_str}_{init_type}",
+            variables=[ewb.derived.TropicalCycloneTrackVariables()],
+            preprocess=ewb.defaults.preprocess_cira_icechunk_tc_forecast_dataset,
             name=name_str,
         )
         return cira_tc_forecast

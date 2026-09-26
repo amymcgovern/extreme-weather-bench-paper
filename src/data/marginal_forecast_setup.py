@@ -10,6 +10,7 @@ from src.data.aifs_util import (
 from src.data.check_icechunk import open_mlwp_archive_icechunk_dataset
 
 from src.data.arraylake_utils import ArraylakeForecast  # noqa: E402
+from src.data.cira_utils import get_cira_icechunk_forecast
 from src.data.model_name_setup import (
     BB_MODEL_NAME_TO_CREDENTIALS_PREFIX,
     BB_MODEL_NAME_TO_PREFIX,
@@ -21,7 +22,6 @@ marginal_temperature_metrics = [
 ]
 
 def my_preprocess_marginal_temperature_cira_forecast_dataset(ds: xr.Dataset) -> xr.Dataset:
-    ds = ewb.defaults.preprocess_cira_kerchunk_forecast_dataset(ds)
     ds = ewb.defaults.preprocess_heatwave_forecast_dataset(ds)
     return ds
 
@@ -31,14 +31,11 @@ class MarginalTemperatureForecastSetup:
 
     def get_cira_marginal_temperature_forecast(self, model_name, init_type):
         model_str = CIRA_MODEL_NAME_TO_SOURCE[model_name]
-        source_str = f"gs://extremeweatherbench/{model_str}_{init_type}.parq"
         name_str = f"CIRA {model_name} {init_type}"
 
-        cira_marginal_temperature_forecast = ewb.inputs.KerchunkForecast(
-            source=source_str,
+        cira_marginal_temperature_forecast = get_cira_icechunk_forecast(
+            model_name=f"{model_str}_{init_type}",
             variables=["surface_air_temperature"],
-            variable_mapping={"t2": "surface_air_temperature"},
-            storage_options={"remote_protocol": "s3", "remote_options": {"anon": True}},
             preprocess=my_preprocess_marginal_temperature_cira_forecast_dataset,
             name=name_str,
         )
