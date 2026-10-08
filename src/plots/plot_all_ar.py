@@ -129,12 +129,17 @@ def _plot_case(
 
     row_length = len(model_dirs) + (1 if plot_era_separately else 0)
     # Height scales with the row count (4 model rows == the paper's figure).
+    fig_height = 2 * len(lead_times_to_plot) * len(model_dirs) / 4
     fig, axs = plt.subplots(
         row_length, len(lead_times_to_plot) + 1,
-        figsize=(18, 2 * len(lead_times_to_plot) * len(model_dirs) / 4),
+        figsize=(18, fig_height),
         subplot_kw={"projection": ccrs.PlateCarree()},
         squeeze=False,
     )
+    # Reserve a fixed ~1.2in for the suptitle (matplotlib's default top=0.88
+    # on the 10in-tall 4-row figure) so shorter figures don't collide the
+    # suptitle with the column titles.
+    fig.subplots_adjust(top=round(1 - 1.2 / fig_height, 6))
 
     skip_msgs = []
 
