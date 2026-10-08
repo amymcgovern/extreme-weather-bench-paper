@@ -4,7 +4,8 @@ import cartopy.feature as cfeature
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from matplotlib.colors import ListedColormap, ScalarMappable
+from matplotlib.cm import ScalarMappable
+from matplotlib.colors import ListedColormap
 from matplotlib.lines import Line2D
 
 from src.plots.plotting_utils import (
