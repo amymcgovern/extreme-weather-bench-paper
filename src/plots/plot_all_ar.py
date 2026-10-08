@@ -128,11 +128,12 @@ def _plot_case(
     anchor_str = pd.to_datetime(anchor).strftime("%Y-%m-%d %HZ")
 
     row_length = len(model_dirs) + (1 if plot_era_separately else 0)
-    # Height scales with the row count (4 model rows == the paper's figure).
-    fig_height = 2 * len(lead_times_to_plot) * len(model_dirs) / 4
+    # 3in per column and 2.5in per model row (5 leads + ERA5 x 4 models ==
+    # the paper's 18x10in figure), so any row/lead count keeps panel size.
+    fig_height = 2.5 * len(model_dirs)
     fig, axs = plt.subplots(
         row_length, len(lead_times_to_plot) + 1,
-        figsize=(18, fig_height),
+        figsize=(3 * (len(lead_times_to_plot) + 1), fig_height),
         subplot_kw={"projection": ccrs.PlateCarree()},
         squeeze=False,
     )
