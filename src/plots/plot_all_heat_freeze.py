@@ -571,10 +571,16 @@ def _plot_case(
     # The truth column needs 3 rows (ERA5, GHCN, climatology); height
     # scales with the row count (4 rows == the paper's 4-model figure).
     n_rows, n_cols = max(len(model_dirs), 3), 6  # 5 lead cols + 1 truth col
-    fig = plt.figure(figsize=(20.5, 11 * n_rows / 4))
+    fig_height = 11 * n_rows / 4
+    fig = plt.figure(figsize=(20.5, fig_height))
+    # Margins and suptitle position are fixed in inches (as on the 11in-tall
+    # 4-row paper figure) so shorter figures keep the same title headroom.
+    top_frac = round(1 - 1.1 / fig_height, 6)
+    bottom_frac = round(0.99 / fig_height, 6)
+    suptitle_y = round(1 - 0.385 / fig_height, 6)
     gs = GridSpec(
         n_rows, n_cols, figure=fig,
-        left=0.045, right=0.90, top=0.90, bottom=0.09,
+        left=0.045, right=0.90, top=top_frac, bottom=bottom_frac,
         wspace=0.05, hspace=0.22,
         width_ratios=[1.0] * 5 + [1.05],
     )
@@ -757,7 +763,7 @@ def _plot_case(
         f"{_case_type_label(event_type, marginal)} case {cid}: "
         f"{my_case.title} on {my_case.start_date} "
         f"({_anchor_label(anchor)} {_fmt_anchor_time(anchor_ts)})",
-        fontsize=TITLE_FONTSIZE, y=0.965,
+        fontsize=TITLE_FONTSIZE, y=suptitle_y,
     )
 
     if marginal:
