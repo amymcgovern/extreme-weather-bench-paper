@@ -655,6 +655,7 @@ def plot_tc_panel(
             transform=ax.transAxes,
             fontsize=STORM_LABEL_FONTSIZE,
             va="center", ha="right", rotation=90,
+            multialignment="center",
         )
 
     if add_colorbar and n_times > 0:

@@ -9,6 +9,7 @@ Usage:
     python src/plots/figure5_tc_tracks.py
 """
 
+import functools
 import pathlib
 import pickle
 
@@ -59,6 +60,31 @@ TICK_FONTSIZE = 14
 CBAR_LABEL_FONTSIZE = 22
 CBAR_TICK_FONTSIZE = 18
 STORM_LABEL_FONTSIZE = 24
+
+
+@functools.lru_cache(maxsize=1)
+def _ewb_cases_by_id():
+    import extremeweatherbench as ewb
+
+    return {
+        c.case_id_number: c
+        for c in ewb.cases.load_ewb_events_yaml_into_case_list()
+    }
+
+
+def storm_label_with_dates(case_id, storm_label):
+    """Append the EWB case window (events.yaml start/end) to a storm label.
+
+    Returns e.g. ``"TC Beryl\n26 Jun – 13 Jul 2024"``.
+    """
+    case = _ewb_cases_by_id()[case_id]
+    start = pd.Timestamp(case.start_date)
+    end = pd.Timestamp(case.end_date)
+    start_fmt = "%-d %b" if start.year == end.year else "%-d %b %Y"
+    return (
+        f"{storm_label}\n"
+        f"{start.strftime(start_fmt)} \u2013 {end.strftime('%-d %b %Y')}"
+    )
 
 
 def _setup_colormap(bounds):
@@ -438,6 +464,7 @@ def plot_tc_panel(
             transform=ax.transAxes,
             fontsize=STORM_LABEL_FONTSIZE,
             va="center", ha="right",
+            multialignment="center",
             rotation=90,
         )
 
@@ -465,6 +492,7 @@ def main():
         STORM_ROWS
     ):
         extent = row_extents[case_id]
+        storm_label = storm_label_with_dates(case_id, storm_label)
         for col_idx, (model_dir, display_name) in enumerate(
             MODEL_COLS
         ):
@@ -499,6 +527,7 @@ def main():
                         transform=ax.transAxes,
                         fontsize=STORM_LABEL_FONTSIZE,
                         va="center", ha="right",
+                        multialignment="center",
                         rotation=90,
                     )
                 continue
