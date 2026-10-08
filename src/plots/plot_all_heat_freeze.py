@@ -494,8 +494,13 @@ def _plot_case(
     diff_vmax: float = 10.0,
     marginal: bool = False,
     overlay_ghcn: bool = False,
+    out_path: Optional[Path] = None,
 ) -> str:
     """Worker: render one per-case figure. Returns a status string.
+
+    ``model_dirs`` is a list of ``(row_label, per_case_pickle_dir)``, one
+    row per entry. ``out_path`` overrides the default
+    ``graphics/{event_type}/{heat|freeze}_case_<id>[...].png`` path.
 
     ``mode``:
         - ``"abs"`` (default): each model/lead panel shows absolute 2 m T
@@ -563,8 +568,10 @@ def _plot_case(
     # Extra width + a right margin so the vertical ERA5/GHCN and
     # climatology colorbars sit outside the truth column instead of
     # overlapping the unused AIFS-row cell.
-    fig = plt.figure(figsize=(20.5, 11))
-    n_rows, n_cols = 4, 6  # 5 lead cols + 1 truth col
+    # The truth column needs 3 rows (ERA5, GHCN, climatology); height
+    # scales with the row count (4 rows == the paper's 4-model figure).
+    n_rows, n_cols = max(len(model_dirs), 3), 6  # 5 lead cols + 1 truth col
+    fig = plt.figure(figsize=(20.5, 11 * n_rows / 4))
     gs = GridSpec(
         n_rows, n_cols, figure=fig,
         left=0.045, right=0.90, top=0.90, bottom=0.09,
@@ -574,7 +581,7 @@ def _plot_case(
     extent = _build_extent(my_case, era5_ds)
 
     axes_lead: list[list] = [
-        [None] * len(LEAD_HOURS) for _ in range(len(MODEL_ROWS))
+        [None] * len(LEAD_HOURS) for _ in range(len(model_dirs))
     ]
 
     skip_msgs: list[str] = []
@@ -676,10 +683,11 @@ def _plot_case(
         fontsize=TRUTH_TITLE_FONTSIZE, pad=6,
     )
 
-    # Hide the leftover truth-column cell so its axes lines don't print
+    # Hide the leftover truth-column cells so their axes lines don't print
     # underneath the shared colorbar below.
-    placeholder = fig.add_subplot(gs[3, 5])
-    placeholder.set_visible(False)
+    for row_idx in range(3, n_rows):
+        placeholder = fig.add_subplot(gs[row_idx, 5])
+        placeholder.set_visible(False)
 
     bottom_row = [ax for ax in axes_lead[-1] if ax is not None]
     if bottom_row:
@@ -761,11 +769,13 @@ def _plot_case(
     else:
         out_dir = Path(basepath) / f"graphics/{event_type}"
         prefix = "heat" if event_type == "heat_wave" else "freeze"
-    out_dir.mkdir(parents=True, exist_ok=True)
     suffix = _anchor_suffix(anchor)
     mode_suffix = "_diff" if mode == "diff" else ""
     ghcn_suffix = "_ghcn" if overlay_ghcn else ""
-    out_path = out_dir / f"{prefix}_case_{cid}{suffix}{mode_suffix}{ghcn_suffix}.png"
+    if out_path is None:
+        out_path = out_dir / f"{prefix}_case_{cid}{suffix}{mode_suffix}{ghcn_suffix}.png"
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
 

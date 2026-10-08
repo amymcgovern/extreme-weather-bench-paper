@@ -78,26 +78,28 @@ def _vertical_pph_colorbar(fig, sm, ax, levels=None, label="Practically Perfect 
 def _plot_case(
     my_case,
     my_lsr,
-    hres_dir: Path,
-    gc_dir: Path,
-    pang_dir: Path,
-    aifs_dir: Path,
+    model_dirs: list[tuple[str, Path]],
     era5_dir: Path,
     lead_times_to_plot,
     basepath: str,
+    out_path: Path = None,
 ) -> str:
-    """Build and save the 4-row severe-convection PNG for one case.
+    """Build and save the per-model-row severe-convection PNG for one case.
 
     Designed to be executed inside a joblib ``loky`` worker so many cases can
     render concurrently. Everything the worker needs (model directories, this
     case's LSRs, output path) is passed by value; no globals are referenced.
+    ``model_dirs`` is a list of ``(row_label, per_case_pickle_dir)``, one row
+    per entry. ``out_path`` overrides the default
+    ``graphics/severe/severe_case_<id>.png`` under ``basepath``.
     Returns a short status string for logging.
     """
     my_id = my_case.case_id_number
 
     n_lead_cols = len(lead_times_to_plot)
     n_cols = n_lead_cols + 1  # + 1 truth column (ERA5 CBSS + PPH + LSR reports)
-    n_rows = 4
+    # At least 2 rows: the truth-column legend sits in the cell below ERA5.
+    n_rows = max(len(model_dirs), 2)
 
     width_per_col = 3
     total_width = width_per_col * n_lead_cols + width_per_col * 1.05
@@ -162,67 +164,26 @@ def _plot_case(
         # column layout.
         truth_ax = fig.add_subplot(gs[0, n_lead_cols], projection=ccrs.PlateCarree())
 
-        hres_raw = _load_case(hres_dir, my_id)
-        gc_raw   = _load_case(gc_dir,   my_id)
-        pang_raw = _load_case(pang_dir, my_id)
-        aifs_raw = _load_case(aifs_dir, my_id)
         era5_raw = _load_case(era5_dir, my_id)
 
         # PPH contours and LSR report markers are shown only in the dedicated
         # truth-column panel below (show_overlay=False here), not repeated on
-        # every one of the 4x5 model/lead panels.
-        if hres_raw is not None:
-            cbss_hres, pph_hres = hres_raw["cbss"], hres_raw["pph"]
+        # every model/lead panel.
+        for row, (model_label, model_dir) in enumerate(model_dirs):
+            model_raw = _load_case(Path(model_dir), my_id)
+            if model_raw is None:
+                print(f"Skipping {model_label} for case {my_id}: no per-case pickle at {model_dir}/case_{my_id}.pkl", flush=True)
+                continue
+            cbss_m, pph_m = model_raw["cbss"], model_raw["pph"]
             for i, lead_time_hours in enumerate(lead_times_to_plot):
-                title = f"{lead_time_hours} hours"
-                left_label = "HRES" if i == 0 else None
+                title = f"{lead_time_hours} hours" if row == 0 else ""
+                left_label = model_label if i == 0 else None
                 plot_cbss_pph_panel(
-                    cbss_hres, pph_hres, my_case, lsrs=my_lsr,
-                    ax=axs[0, i], title=title, lead_time_hours=lead_time_hours,
+                    cbss_m, pph_m, my_case, lsrs=my_lsr,
+                    ax=axs[row, i], title=title, lead_time_hours=lead_time_hours,
                     gridlines_kwargs={"show_left_labels": False, "show_bottom_labels": False},
                     left_label=left_label, show_overlay=False,
                 )
-        else:
-            print(f"Skipping HRES for case {my_id}: no per-case pickle at {hres_dir}/case_{my_id}.pkl", flush=True)
-
-        if gc_raw is not None:
-            cbss_gc, pph_gc = gc_raw["cbss"], gc_raw["pph"]
-            for i, lead_time_hours in enumerate(lead_times_to_plot):
-                left_label = "GraphCast" if i == 0 else None
-                plot_cbss_pph_panel(
-                    cbss_gc, pph_gc, my_case, lsrs=my_lsr, ax=axs[1, i],
-                    title="", lead_time_hours=lead_time_hours,
-                    gridlines_kwargs={"show_left_labels": False, "show_bottom_labels": False},
-                    left_label=left_label, show_overlay=False,
-                )
-        else:
-            print(f"Skipping GraphCast for case {my_id}: no per-case pickle at {gc_dir}/case_{my_id}.pkl", flush=True)
-
-        if pang_raw is not None:
-            cbss_pang, pph_pang = pang_raw["cbss"], pang_raw["pph"]
-            for i, lead_time_hours in enumerate(lead_times_to_plot):
-                left_label = "Pangu" if i == 0 else None
-                plot_cbss_pph_panel(
-                    cbss_pang, pph_pang, my_case, lsrs=my_lsr, ax=axs[2, i],
-                    title="", lead_time_hours=lead_time_hours,
-                    gridlines_kwargs={"show_left_labels": False, "show_bottom_labels": False},
-                    left_label=left_label, show_overlay=False,
-                )
-        else:
-            print(f"Skipping Pangu for case {my_id}: no per-case pickle at {pang_dir}/case_{my_id}.pkl", flush=True)
-
-        if aifs_raw is not None:
-            cbss_aifs, pph_aifs = aifs_raw["cbss"], aifs_raw["pph"]
-            for i, lead_time_hours in enumerate(lead_times_to_plot):
-                left_label = "AIFS" if i == 0 else None
-                plot_cbss_pph_panel(
-                    cbss_aifs, pph_aifs, my_case, lsrs=my_lsr, ax=axs[3, i],
-                    title="", lead_time_hours=lead_time_hours,
-                    gridlines_kwargs={"show_left_labels": False, "show_bottom_labels": False},
-                    left_label=left_label, show_overlay=False,
-                )
-        else:
-            print(f"Skipping AIFS for case {my_id}: no per-case pickle at {aifs_dir}/case_{my_id}.pkl", flush=True)
 
         # Truth column: ERA5 CBSS with PPH contours + LSR report markers on
         # top, in the top-right cell (matching plot_all_ar.py's ERA5 column).
@@ -285,7 +246,9 @@ def _plot_case(
         )
 
         fig.suptitle(f"Case {my_id}: {my_case.title} on {my_case.start_date}", fontsize=32, y=0.98)
-        out_path = basepath + f"graphics/severe/severe_case_{my_id}.png"
+        if out_path is None:
+            out_path = basepath + f"graphics/severe/severe_case_{my_id}.png"
+        Path(out_path).parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(out_path, dpi=300, bbox_inches="tight")
         return f"ok case {my_id} -> {out_path}"
     finally:
@@ -558,7 +521,9 @@ if __name__ == "__main__":
         delayed(_plot_case)(
             my_case,
             lsr_by_case.get(my_case.case_id_number),
-            hres_dir, gc_dir, pang_dir, aifs_dir, era5_dir,
+            [("HRES", hres_dir), ("GraphCast", gc_dir),
+             ("Pangu", pang_dir), ("AIFS", aifs_dir)],
+            era5_dir,
             lead_times_to_plot,
             basepath,
         )

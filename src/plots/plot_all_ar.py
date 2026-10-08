@@ -93,24 +93,24 @@ def _plot_era_only(
 def _plot_case(
     my_case,
     plot_era_separately: bool,
-    hres_dir: Path,
-    gc_dir: Path,
-    pang_dir: Path,
-    aifs_dir: Path,
+    model_dirs: list[tuple[str, Path]],
     era5_dir: Path,
     lead_times_to_plot: list,
     basepath: str,
+    out_path: Path = None,
 ) -> str:
-    """Plot all-models AR figure for one case. Runs in a worker process."""
+    """Plot all-models AR figure for one case. Runs in a worker process.
+
+    ``model_dirs`` is a list of ``(row_label, per_case_pickle_dir)``, one row
+    per entry. ``out_path`` overrides the default
+    ``graphics/atmospheric_river/ar_case_<id>.png`` under ``basepath``.
+    """
     my_id = my_case.case_id_number
 
-    hres_raw = _load_case(hres_dir, my_id)
-    gc_raw = _load_case(gc_dir, my_id)
-    pang_raw = _load_case(pang_dir, my_id)
-    aifs_raw = _load_case(aifs_dir, my_id)
+    model_raws = [_load_case(Path(d), my_id) for _, d in model_dirs]
     era5_raw = _load_case(era5_dir, my_id)
 
-    if all(r is None for r in (hres_raw, gc_raw, pang_raw, aifs_raw, era5_raw)):
+    if all(r is None for r in model_raws + [era5_raw]):
         # All per-case pickles missing. Skip writing a blank figure so a
         # stale but useful PNG isn't clobbered by an empty one.
         return (
@@ -121,17 +121,19 @@ def _plot_case(
     # Prefer ERA5 so all models are verified against the same observed peak;
     # fall back to the first available forecast pickle if ERA5 is missing.
     anchor_src = next(
-        r for r in (era5_raw, hres_raw, gc_raw, pang_raw, aifs_raw) if r is not None
+        r for r in [era5_raw] + model_raws if r is not None
     )
     anchor = ar_plot_utils.resolve_ar_anchor_valid_time(anchor_src)
     anchor = ar_plot_utils.snap_ar_anchor_to_synoptic(anchor)
     anchor_str = pd.to_datetime(anchor).strftime("%Y-%m-%d %HZ")
 
-    row_length = 5 if plot_era_separately else 4
+    row_length = len(model_dirs) + (1 if plot_era_separately else 0)
+    # Height scales with the row count (4 model rows == the paper's figure).
     fig, axs = plt.subplots(
         row_length, len(lead_times_to_plot) + 1,
-        figsize=(18, 2 * len(lead_times_to_plot)),
+        figsize=(18, 2 * len(lead_times_to_plot) * len(model_dirs) / 4),
         subplot_kw={"projection": ccrs.PlateCarree()},
+        squeeze=False,
     )
 
     skip_msgs = []
@@ -185,10 +187,8 @@ def _plot_case(
                 colorbar=False, left_label=left_label,
             )
 
-    _plot_model_row(hres_raw, 0, "HRES", hres_dir)
-    _plot_model_row(gc_raw, 1, "Graphcast", gc_dir)
-    _plot_model_row(pang_raw, 2, "Pangu", pang_dir)
-    _plot_model_row(aifs_raw, 3, "AIFS", aifs_dir)
+    for row, ((model_label, model_dir), raw) in enumerate(zip(model_dirs, model_raws)):
+        _plot_model_row(raw, row, model_label, model_dir)
 
     # Colorbar below the bottom row spanning all lead-time columns.
     cmap, norm = ar_plot_utils.setup_atmospheric_river_colormap_and_levels()
@@ -208,7 +208,9 @@ def _plot_case(
         f"Case {my_id}: {my_case.title}, valid {anchor_str}",
         fontsize=32,
     )
-    out_path = Path(basepath) / f"graphics/atmospheric_river/ar_case_{my_id}.png"
+    if out_path is None:
+        out_path = Path(basepath) / f"graphics/atmospheric_river/ar_case_{my_id}.png"
+    out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
@@ -293,8 +295,9 @@ if __name__ == "__main__":
     results = Parallel(n_jobs=args.n_jobs, backend="loky")(
         delayed(_plot_case)(
             mc, args.plot_era_separately,
-            hres_dir, gc_dir, pang_dir, aifs_dir, era5_dir,
-            lead_times_to_plot, basepath,
+            [("HRES", hres_dir), ("Graphcast", gc_dir),
+             ("Pangu", pang_dir), ("AIFS", aifs_dir)],
+            era5_dir, lead_times_to_plot, basepath,
         )
         for mc in ewb_cases
     )

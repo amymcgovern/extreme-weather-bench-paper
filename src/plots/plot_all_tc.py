@@ -77,8 +77,21 @@ def _load_one(dir_name: str, case_id: int) -> Optional[dict[str, Any]]:
         return pickle.load(f)
 
 
-def _plot_case(my_case, basepath: str) -> str:
-    """Render one case's 1 x 4 model-column PNG. Runs in a worker process."""
+def _plot_case(
+    my_case,
+    basepath: str,
+    model_cols: Optional[list[tuple[str, str, str, str]]] = None,
+    out_path: Optional[Path] = None,
+) -> str:
+    """Render one case's 1 x N model-column PNG. Runs in a worker process.
+
+    ``model_cols`` defaults to ``MODEL_COLS``; each entry is
+    ``(cache_key, display_name, dir_name, flag)``. ``dir_name`` may be an
+    absolute path to a per-case pickle dir outside ``TC_TRACKS_ROOT``.
+    ``out_path`` overrides ``graphics/tropical_cyclone/tc_case_<id>.png``.
+    """
+    if model_cols is None:
+        model_cols = MODEL_COLS
     cid = my_case.case_id_number
     forecasts: dict[str, Optional[xr.Dataset]] = {}
     target: Optional[xr.Dataset] = None
@@ -86,7 +99,7 @@ def _plot_case(my_case, basepath: str) -> str:
 
     print(f"Plotting case {cid}")
 
-    for cache_key, _display, dir_name, flag in MODEL_COLS:
+    for cache_key, _display, dir_name, flag in model_cols:
         payload = _load_one(dir_name, cid)
         if payload is None:
             forecasts[cache_key] = None
@@ -109,7 +122,7 @@ def _plot_case(my_case, basepath: str) -> str:
     extent = _get_shared_extent(cid, case_data)
     proj = extent.crs if isinstance(extent, TrackMapExtent) else EXTENT_CRS
 
-    n_cols = len(MODEL_COLS)
+    n_cols = len(model_cols)
     # Slightly taller figure + smaller top region so the fontsize-22 suptitle
     # has clear headroom above the fontsize-22 per-column titles (previously
     # top=0.86 put the two title bands on top of each other).
@@ -120,7 +133,7 @@ def _plot_case(my_case, basepath: str) -> str:
         wspace=0.05,
     )
 
-    for col_idx, (cache_key, display_name, _, _) in enumerate(MODEL_COLS):
+    for col_idx, (cache_key, display_name, _, _) in enumerate(model_cols):
         ax = fig.add_subplot(gs[0, col_idx], projection=proj)
         plot_tc_panel(
             forecast_ds=forecasts[cache_key],
@@ -148,7 +161,9 @@ def _plot_case(my_case, basepath: str) -> str:
         bbox_to_anchor=(0.5, 0.0),
     )
 
-    out_path = Path(basepath) / f"graphics/tropical_cyclone/tc_case_{cid}.png"
+    if out_path is None:
+        out_path = Path(basepath) / f"graphics/tropical_cyclone/tc_case_{cid}.png"
+    out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
