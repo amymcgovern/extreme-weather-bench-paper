@@ -496,6 +496,8 @@ def _plot_case(
     overlay_ghcn: bool = False,
     out_path: Optional[Path] = None,
     lead_hours: Optional[list[int]] = None,
+    lead_label_units: str = "days",
+    extra_top_in: float = 0.0,
 ) -> str:
     """Worker: render one per-case figure. Returns a status string.
 
@@ -504,6 +506,9 @@ def _plot_case(
     ``graphics/{event_type}/{heat|freeze}_case_<id>[...].png`` path.
     ``lead_hours`` picks the lead columns (default ``LEAD_HOURS``, i.e.
     10/7/5/3/1 days); figure width scales with the column count.
+    ``lead_label_units`` ("days" or "hours") sets the column titles, and
+    ``extra_top_in`` adds header room (inches) above the panels, e.g. for
+    narrow figures where the suptitle would reach the truth-column title.
 
     ``mode``:
         - ``"abs"`` (default): each model/lead panel shows absolute 2 m T
@@ -576,7 +581,8 @@ def _plot_case(
     if lead_hours is None:
         lead_hours = LEAD_HOURS
     lead_labels = [
-        f"{h // 24} day{'s' if h != 24 else ''}" if h % 24 == 0 else f"{h} hours"
+        f"{h // 24} day{'s' if h != 24 else ''}"
+        if h % 24 == 0 and lead_label_units == "days" else f"{h} hours"
         for h in lead_hours
     ]
     n_leads = len(lead_hours)
@@ -585,7 +591,7 @@ def _plot_case(
     fig = plt.figure(figsize=(20.5 * n_cols / 6, fig_height))
     # Margins and suptitle position are fixed in inches (as on the 11in-tall
     # 4-row paper figure) so shorter figures keep the same title headroom.
-    top_frac = round(1 - 1.1 / fig_height, 6)
+    top_frac = round(1 - (1.1 + extra_top_in) / fig_height, 6)
     bottom_frac = round(0.99 / fig_height, 6)
     suptitle_y = round(1 - 0.385 / fig_height, 6)
     gs = GridSpec(
