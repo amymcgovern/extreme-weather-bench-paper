@@ -82,6 +82,7 @@ def _plot_case(
     basepath: str,
     model_cols: Optional[list[tuple[str, str, str, str]]] = None,
     out_path: Optional[Path] = None,
+    max_cols: Optional[int] = None,
 ) -> str:
     """Render one case's 1 x N model-column PNG. Runs in a worker process.
 
@@ -89,6 +90,7 @@ def _plot_case(
     ``(cache_key, display_name, dir_name, flag)``. ``dir_name`` may be an
     absolute path to a per-case pickle dir outside ``TC_TRACKS_ROOT``.
     ``out_path`` overrides ``graphics/tropical_cyclone/tc_case_<id>.png``.
+    ``max_cols`` wraps the model panels onto multiple rows (default: one row).
     """
     if model_cols is None:
         model_cols = MODEL_COLS
@@ -122,19 +124,25 @@ def _plot_case(
     extent = _get_shared_extent(cid, case_data)
     proj = extent.crs if isinstance(extent, TrackMapExtent) else EXTENT_CRS
 
-    n_cols = len(model_cols)
+    n_models = len(model_cols)
+    n_cols = min(n_models, max_cols) if max_cols else n_models
+    n_rows = -(-n_models // n_cols)
     # Slightly taller figure + smaller top region so the fontsize-22 suptitle
     # has clear headroom above the fontsize-22 per-column titles (previously
-    # top=0.86 put the two title bands on top of each other).
-    fig = plt.figure(figsize=(4 * n_cols, 5.4))
+    # top=0.86 put the two title bands on top of each other). Margins are
+    # fixed in inches (as on the 5.4in one-row figure) so wrapped rows keep
+    # the same headroom.
+    fig_height = 5.4 + 4.8 * (n_rows - 1)
+    fig = plt.figure(figsize=(4 * n_cols, fig_height))
     gs = GridSpec(
-        1, n_cols, figure=fig,
-        left=0.04, right=0.98, top=0.80, bottom=0.15,
-        wspace=0.05,
+        n_rows, n_cols, figure=fig,
+        left=0.04, right=0.98,
+        top=round(1 - 1.08 / fig_height, 6), bottom=round(0.81 / fig_height, 6),
+        wspace=0.05, hspace=0.45,
     )
 
     for col_idx, (cache_key, display_name, _, _) in enumerate(model_cols):
-        ax = fig.add_subplot(gs[0, col_idx], projection=proj)
+        ax = fig.add_subplot(gs[col_idx // n_cols, col_idx % n_cols], projection=proj)
         plot_tc_panel(
             forecast_ds=forecasts[cache_key],
             target_ds=target,
@@ -143,14 +151,14 @@ def _plot_case(
             extent=extent,
             show_col_title=True,
             col_title=display_name,
-            storm_label=my_case.title if col_idx == 0 else None,
+            storm_label=my_case.title if col_idx % n_cols == 0 else None,
             add_colorbar=True,
         )
 
     fig.suptitle(
         f"Case {cid}: {my_case.title} on {my_case.start_date}",
         fontsize=22,
-        y=0.97,
+        y=round(1 - 0.162 / fig_height, 6),
     )
     fig.legend(
         handles=_landfall_legend_handles(),

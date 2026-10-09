@@ -10,6 +10,7 @@ matplotlib.use("Agg")
 
 import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from extremeweatherbench import (
     cases,
@@ -42,6 +43,28 @@ def _load_case(model_dir: Path, case_id: int):
     if hasattr(raw, "load"):
         raw = raw.load()
     return raw
+
+
+def _has_exact_lead(raw, lead_time_hours, valid_time) -> bool:
+    """True if *raw* has a real forecast at exactly this lead, valid at *valid_time*.
+
+    Unlike ``select_ivt_and_maks`` (nearest lead, then nearest valid time with
+    finite data), this never substitutes a neighbouring lead or time -- used
+    for multi-model comparisons where models have different init cadences.
+    """
+    lead_td = pd.Timedelta(hours=lead_time_hours)
+    if lead_td not in set(pd.to_timedelta(raw["lead_time"].values)):
+        return False
+    try:
+        sel = raw.sel(lead_time=lead_td).sel(
+            valid_time=valid_time, method="nearest", tolerance=pd.Timedelta(hours=3),
+        )
+    except KeyError:
+        return False
+    if "valid_time_mask" in sel.coords and np.isnan(np.asarray(sel["valid_time_mask"].values, dtype=float)).all():
+        return False
+    ivt = np.asarray(sel["integrated_vapor_transport"].values, dtype=float)
+    return bool(np.isfinite(ivt).any() and np.nanmax(ivt) != 0.0)
 
 
 def _plot_era_only(
@@ -98,12 +121,18 @@ def _plot_case(
     lead_times_to_plot: list,
     basepath: str,
     out_path: Path = None,
+    exact_leads: bool = False,
 ) -> str:
     """Plot all-models AR figure for one case. Runs in a worker process.
 
     ``model_dirs`` is a list of ``(row_label, per_case_pickle_dir)``, one row
     per entry. ``out_path`` overrides the default
     ``graphics/atmospheric_river/ar_case_<id>.png`` under ``basepath``.
+
+    ``exact_leads=True`` (multi-model comparisons): a panel is drawn only when
+    the model has a forecast at exactly that lead valid at the case anchor;
+    otherwise -- and for rows whose pickle is missing -- an empty map labeled
+    "No forecast" / "No data" keeps the row and column in place.
     """
     my_id = my_case.case_id_number
 
@@ -168,14 +197,25 @@ def _plot_case(
                 f"{era5_dir}/case_{my_id}.pkl"
             )
 
+    placeholders = []  # (ax, message, row, col) drawn once a reference extent exists
+    drawn_axes = []
+
     def _plot_model_row(raw, row, model_label, model_dir):
         if raw is None:
             skip_msgs.append(
                 f"Skipping {model_label} for case {my_id}: no per-case pickle at "
                 f"{model_dir}/case_{my_id}.pkl"
             )
+            if exact_leads:
+                placeholders.extend(
+                    (axs[row, i], "No data", row, i, model_label)
+                    for i in range(len(lead_times_to_plot))
+                )
             return
         for i, lead_time_hours in enumerate(lead_times_to_plot):
+            if exact_leads and not _has_exact_lead(raw, lead_time_hours, anchor):
+                placeholders.append((axs[row, i], "No forecast", row, i, model_label))
+                continue
             ivt, ar_mask = ar_plot_utils.select_ivt_and_maks(
                 raw, lead_time_hours, valid_time=anchor,
             )
@@ -192,9 +232,28 @@ def _plot_case(
                 title=title, ax=axs[row, i],
                 colorbar=False, left_label=left_label,
             )
+            drawn_axes.append(axs[row, i])
 
     for row, ((model_label, model_dir), raw) in enumerate(zip(model_dirs, model_raws)):
         _plot_model_row(raw, row, model_label, model_dir)
+
+    if placeholders:
+        ref_ax = axs[0, len(lead_times_to_plot)] if era5_raw is not None else (drawn_axes[0] if drawn_axes else None)
+        ref_extent = ref_ax.get_extent(crs=ccrs.PlateCarree()) if ref_ax is not None else None
+        for ax, message, row, col, model_label in placeholders:
+            if ref_extent is not None:
+                ax.set_extent(ref_extent, crs=ccrs.PlateCarree())
+            ax.coastlines(linewidth=0.5, color="0.6")
+            ax.text(
+                0.5, 0.5, message, transform=ax.transAxes,
+                ha="center", va="center", fontsize="x-large", color="0.4", style="italic",
+            )
+            if row == 0:
+                ax.set_title(f"{lead_times_to_plot[col]} hours", loc="center", size="xx-large")
+            if col == 0:
+                pos = ax.get_position(fig)
+                fig.text(pos.x0 - 0.01, pos.y0 + pos.height * 0.5, model_label,
+                         fontsize="xx-large", ha="right", va="center")
 
     # Colorbar below the bottom row spanning all lead-time columns.
     cmap, norm = ar_plot_utils.setup_atmospheric_river_colormap_and_levels()

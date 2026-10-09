@@ -47,6 +47,37 @@ def _load_case(model_dir: Path, case_id: int):
     return payload
 
 
+def _has_exact_lead(cbss, lead_time_hours) -> bool:
+    """True if *cbss* has non-NaN CBSS at exactly this lead (no nearest-lead fallback)."""
+    lead_td = pd.Timedelta(hours=lead_time_hours)
+    da = cbss["craven_brooks_significant_severe"]
+    if "lead_time" not in da.dims or lead_td not in set(pd.to_timedelta(da["lead_time"].values)):
+        return False
+    return bool(np.isfinite(np.asarray(da.sel(lead_time=lead_td).values, dtype=float)).any())
+
+
+def _placeholder_panel(fig, ax, my_case, message, title=None, left_label=None):
+    """Empty case-extent map with a centred message, keeping grid layout intact."""
+    bbox = dict(
+        latitude_min=my_case.location.latitude_min,
+        latitude_max=my_case.location.latitude_max,
+        longitude_min=my_case.location.longitude_min,
+        longitude_max=my_case.location.longitude_max,
+    )
+    plot_utils.add_geographic_features(ax)
+    lon_min, lon_max = plot_utils.convert_bbox_longitude(bbox)
+    ax.set_extent([lon_min, lon_max, bbox["latitude_min"], bbox["latitude_max"]], crs=ccrs.PlateCarree())
+    plot_utils.setup_gridlines(ax, show_left_labels=False, show_bottom_labels=False)
+    ax.text(0.5, 0.5, message, transform=ax.transAxes, ha="center", va="center",
+            fontsize=14, color="gray", style="italic")
+    if title:
+        ax.set_title(title, fontsize=18)
+    if left_label is not None:
+        pos = ax.get_position(fig)
+        fig.text(pos.x0 - 0.01, pos.y0 + pos.height * 0.5, left_label,
+                 fontsize="xx-large", ha="right", va="center")
+
+
 def _vertical_pph_colorbar(fig, sm, ax, levels=None, label="Practically Perfect Hindcast"):
     """Draw a vertical PPH colorbar just to the right of ``ax``.
 
@@ -83,8 +114,14 @@ def _plot_case(
     lead_times_to_plot,
     basepath: str,
     out_path: Path = None,
+    exact_leads: bool = False,
 ) -> str:
     """Build and save the per-model-row severe-convection PNG for one case.
+
+    ``exact_leads=True`` (multi-model comparisons): a panel is drawn only when
+    the model has non-NaN CBSS at exactly that lead (no nearest-lead
+    substitution); otherwise -- and for rows whose pickle is missing -- an
+    empty map labeled "No forecast" / "No data" keeps the row in place.
 
     Designed to be executed inside a joblib ``loky`` worker so many cases can
     render concurrently. Everything the worker needs (model directories, this
@@ -173,11 +210,19 @@ def _plot_case(
             model_raw = _load_case(Path(model_dir), my_id)
             if model_raw is None:
                 print(f"Skipping {model_label} for case {my_id}: no per-case pickle at {model_dir}/case_{my_id}.pkl", flush=True)
+                if exact_leads:
+                    for i, lead_time_hours in enumerate(lead_times_to_plot):
+                        _placeholder_panel(fig, axs[row, i], my_case, "No data",
+                                           f"{lead_time_hours} hours" if row == 0 else None,
+                                           model_label if i == 0 else None)
                 continue
             cbss_m, pph_m = model_raw["cbss"], model_raw["pph"]
             for i, lead_time_hours in enumerate(lead_times_to_plot):
                 title = f"{lead_time_hours} hours" if row == 0 else ""
                 left_label = model_label if i == 0 else None
+                if exact_leads and not _has_exact_lead(cbss_m, lead_time_hours):
+                    _placeholder_panel(fig, axs[row, i], my_case, "No forecast", title or None, left_label)
+                    continue
                 plot_cbss_pph_panel(
                     cbss_m, pph_m, my_case, lsrs=my_lsr,
                     ax=axs[row, i], title=title, lead_time_hours=lead_time_hours,
