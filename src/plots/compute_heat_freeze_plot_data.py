@@ -377,14 +377,19 @@ def _process_case_forecast(
     overwrite: bool,
     label: str,
     fallback_fc_ds: Optional[xr.Dataset] = None,
+    lead_hours: Optional[list[int]] = None,
 ) -> str:
     """Compute + pickle one forecast snapshot for one case.
+
+    ``lead_hours`` defaults to ``LEAD_HOURS`` (10/7/5/3/1 days).
 
     When ``fallback_fc_ds`` is provided and the primary forecast returns
     no leads at the case anchor (e.g. the case predates the primary
     archive's time range), retry with the fallback. This mirrors the
     HRES WB2 -> BB HRES pattern in ``compute_ar_plot_data.py``.
     """
+    if lead_hours is None:
+        lead_hours = LEAD_HOURS
     cid = case.case_id_number
     out_path = out_dir / f"case_{cid}.pkl"
     if out_path.exists() and not overwrite:
@@ -395,7 +400,7 @@ def _process_case_forecast(
         f"anchor={anchor_valid_time})"
     )
     try:
-        ds = _forecast_snapshot(fc_ds, case, anchor_valid_time, LEAD_HOURS)
+        ds = _forecast_snapshot(fc_ds, case, anchor_valid_time, lead_hours)
     except Exception as exc:  # noqa: BLE001
         return _log(f"[{label}] error case {cid}: {exc!r}")
 
@@ -405,7 +410,7 @@ def _process_case_forecast(
         )
         try:
             ds = _forecast_snapshot(
-                fallback_fc_ds, case, anchor_valid_time, LEAD_HOURS,
+                fallback_fc_ds, case, anchor_valid_time, lead_hours,
             )
         except Exception as exc:  # noqa: BLE001
             return _log(f"[{label}] fallback error case {cid}: {exc!r}")

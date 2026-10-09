@@ -495,12 +495,15 @@ def _plot_case(
     marginal: bool = False,
     overlay_ghcn: bool = False,
     out_path: Optional[Path] = None,
+    lead_hours: Optional[list[int]] = None,
 ) -> str:
     """Worker: render one per-case figure. Returns a status string.
 
     ``model_dirs`` is a list of ``(row_label, per_case_pickle_dir)``, one
     row per entry. ``out_path`` overrides the default
     ``graphics/{event_type}/{heat|freeze}_case_<id>[...].png`` path.
+    ``lead_hours`` picks the lead columns (default ``LEAD_HOURS``, i.e.
+    10/7/5/3/1 days); figure width scales with the column count.
 
     ``mode``:
         - ``"abs"`` (default): each model/lead panel shows absolute 2 m T
@@ -570,9 +573,16 @@ def _plot_case(
     # overlapping the unused AIFS-row cell.
     # The truth column needs 3 rows (ERA5, GHCN, climatology); height
     # scales with the row count (4 rows == the paper's 4-model figure).
-    n_rows, n_cols = max(len(model_dirs), 3), 6  # 5 lead cols + 1 truth col
+    if lead_hours is None:
+        lead_hours = LEAD_HOURS
+    lead_labels = [
+        f"{h // 24} day{'s' if h != 24 else ''}" if h % 24 == 0 else f"{h} hours"
+        for h in lead_hours
+    ]
+    n_leads = len(lead_hours)
+    n_rows, n_cols = max(len(model_dirs), 3), n_leads + 1  # lead cols + 1 truth col
     fig_height = 11 * n_rows / 4
-    fig = plt.figure(figsize=(20.5, fig_height))
+    fig = plt.figure(figsize=(20.5 * n_cols / 6, fig_height))
     # Margins and suptitle position are fixed in inches (as on the 11in-tall
     # 4-row paper figure) so shorter figures keep the same title headroom.
     top_frac = round(1 - 1.1 / fig_height, 6)
@@ -582,12 +592,12 @@ def _plot_case(
         n_rows, n_cols, figure=fig,
         left=0.045, right=0.90, top=top_frac, bottom=bottom_frac,
         wspace=0.05, hspace=0.22,
-        width_ratios=[1.0] * 5 + [1.05],
+        width_ratios=[1.0] * n_leads + [1.05],
     )
     extent = _build_extent(my_case, era5_ds)
 
     axes_lead: list[list] = [
-        [None] * len(LEAD_HOURS) for _ in range(len(model_dirs))
+        [None] * n_leads for _ in range(len(model_dirs))
     ]
 
     skip_msgs: list[str] = []
@@ -595,14 +605,14 @@ def _plot_case(
         model_ds = preloaded_models[row_idx]
         if model_ds is None:
             skip_msgs.append(f"missing model dir {model_dir}")
-        for col_idx, lead_h in enumerate(LEAD_HOURS):
+        for col_idx, lead_h in enumerate(lead_hours):
             ax = fig.add_subplot(
                 gs[row_idx, col_idx], projection=ccrs.PlateCarree(),
             )
             axes_lead[row_idx][col_idx] = ax
             if row_idx == 0:
                 ax.set_title(
-                    LEAD_LABELS[col_idx],
+                    lead_labels[col_idx],
                     fontsize=COL_TITLE_FONTSIZE, pad=6,
                 )
             if col_idx == 0:
@@ -651,7 +661,7 @@ def _plot_case(
                         ax, lon_s, lat_s, t_obs, cmap_abs, norm_abs,
                     )
 
-    era5_ax = fig.add_subplot(gs[0, 5], projection=ccrs.PlateCarree())
+    era5_ax = fig.add_subplot(gs[0, n_leads], projection=ccrs.PlateCarree())
     _plot_field_panel(
         era5_ax, era5_ds["surface_air_temperature"], extent, cmap_abs, norm_abs,
         mask_ocean=True,
@@ -666,7 +676,7 @@ def _plot_case(
         fontsize=TRUTH_TITLE_FONTSIZE, pad=6,
     )
 
-    ghcn_ax = fig.add_subplot(gs[1, 5], projection=ccrs.PlateCarree())
+    ghcn_ax = fig.add_subplot(gs[1, n_leads], projection=ccrs.PlateCarree())
     n_stations = _plot_ghcn_panel(ghcn_ax, ghcn_ds, extent, cmap_abs, norm_abs)
     ghcn_ax.set_title(
         f"GHCN (n={n_stations})",
@@ -674,7 +684,7 @@ def _plot_case(
     )
 
     anom = _era5_anomaly_vs_climo(era5_ds)
-    anom_ax = fig.add_subplot(gs[2, 5], projection=ccrs.PlateCarree())
+    anom_ax = fig.add_subplot(gs[2, n_leads], projection=ccrs.PlateCarree())
     if anom is None:
         _empty_placeholder(anom_ax, extent, "No climatology")
         cmap_anom, norm_anom = None, None
@@ -692,7 +702,7 @@ def _plot_case(
     # Hide the leftover truth-column cells so their axes lines don't print
     # underneath the shared colorbar below.
     for row_idx in range(3, n_rows):
-        placeholder = fig.add_subplot(gs[row_idx, 5])
+        placeholder = fig.add_subplot(gs[row_idx, n_leads])
         placeholder.set_visible(False)
 
     bottom_row = [ax for ax in axes_lead[-1] if ax is not None]
