@@ -496,7 +496,7 @@ def plot_freeze_case(
 
     mask = temp_data < climatology_data
     masked_temp = temp_data.where(mask)
-    cmap, norm = celsius_colormap_and_normalize()
+    cmap, norm = celsius_colormap_and_normalize(kind="freeze")
     im = masked_temp.sel(valid_time=subset_timestep).plot(
         ax=ax1,
         transform=ccrs.PlateCarree(),
