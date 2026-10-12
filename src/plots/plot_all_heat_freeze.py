@@ -495,6 +495,10 @@ def _build_extent(
     lat_max = float(np.max(lat)) + PADDING_DEG
     lon_min = float(np.min(lon)) - PADDING_DEG
     lon_max = float(np.max(lon)) + PADDING_DEG
+    if float(np.max(lon)) <= 180:
+        # Don't let the pad push a box that ends near 180 past the
+        # antimeridian; _map_projection would treat it as a crossing case.
+        lon_max = min(lon_max, 180.0)
     return (lon_min, lon_max, lat_min, lat_max)
 
 
