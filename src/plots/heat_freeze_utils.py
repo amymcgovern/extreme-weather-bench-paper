@@ -171,6 +171,41 @@ def generate_heatwave_dataset(
     return merged_dataset
 
 
+def mostly_outside_fixed_ramp(values_c, kind: str, min_inside: float = 0.5) -> bool:
+    """True when under *min_inside* of the finite *values_c* (Celsius) lie on the
+    fixed ``celsius_colormap_and_normalize(kind)`` ramp.
+
+    The fixed ramps suit typical curated cases; a case mostly outside them (an
+    Antarctic heat wave far below 0 C on the 0..45 C heat ramp, or a freeze
+    colder than -30 C) would render as one flat saturated color.
+    """
+    vals = np.asarray(values_c, dtype=float)
+    vals = vals[np.isfinite(vals)]
+    if not vals.size:
+        return False
+    _, norm = celsius_colormap_and_normalize(kind=kind)
+    return bool(((vals >= norm.vmin) & (vals <= norm.vmax)).mean() < min_inside)
+
+
+def case_colormap_and_normalize(values_c, kind: str):
+    """The fixed ramp for *kind*, unless the case's values mostly fall off it.
+
+    Then a ramp fitted to the values (1st-99th percentile, padded 2 C and
+    snapped to 5 C): blue-red ``coolwarm`` centred on 0 C when the range
+    straddles freezing, ``coolwarm`` for an all-cold case, ``inferno`` for an
+    all-hot one -- the same rule the per-case figures use for such cases.
+    """
+    if not mostly_outside_fixed_ramp(values_c, kind):
+        return celsius_colormap_and_normalize(kind=kind)
+    vals = np.asarray(values_c, dtype=float)
+    vals = vals[np.isfinite(vals)]
+    lo = np.floor((np.percentile(vals, 1) - 2) / 5) * 5
+    hi = np.ceil((np.percentile(vals, 99) + 2) / 5) * 5
+    if lo < 0 < hi:
+        return plt.get_cmap("coolwarm"), mcolors.TwoSlopeNorm(vmin=lo, vcenter=0.0, vmax=hi)
+    return plt.get_cmap("coolwarm" if hi <= 0 else "inferno"), mcolors.Normalize(vmin=lo, vmax=hi)
+
+
 def plot_heatwave_case(
     heatwave_dataset: xr.Dataset,
     single_case: cases.IndividualCase,
@@ -222,6 +257,8 @@ def plot_heatwave_case(
     # Mask places where temp >= 85th percentile climatology
     temp_data = heatwave_dataset["2m_temperature"] - 273.15
     climatology_data = heatwave_dataset["surface_temperature_85th_percentile"] - 273.15
+    # Land only, like the scores (EWB's ocean-removal forecast preprocess).
+    temp_data = utils.remove_ocean_gridpoints(temp_data)
 
     # Create mask for values where temp > climatology
     # (heatwave condition)
@@ -229,7 +266,9 @@ def plot_heatwave_case(
 
     # Apply mask to temperature data
     masked_temp = temp_data.where(mask)
-    cmap, norm = celsius_colormap_and_normalize()
+    cmap, norm = case_colormap_and_normalize(
+        masked_temp.sel(valid_time=subset_timestep).values, kind="heat"
+    )
     im = masked_temp.sel(valid_time=subset_timestep).plot(
         ax=ax1,
         transform=ccrs.PlateCarree(),
@@ -493,10 +532,14 @@ def plot_freeze_case(
     ]
     temp_data = freeze_dataset["2m_temperature"] - 273.15
     climatology_data = freeze_dataset["surface_temperature_15th_percentile"] - 273.15
+    # Land only, like the scores (EWB's ocean-removal forecast preprocess).
+    temp_data = utils.remove_ocean_gridpoints(temp_data)
 
     mask = temp_data < climatology_data
     masked_temp = temp_data.where(mask)
-    cmap, norm = celsius_colormap_and_normalize(kind="freeze")
+    cmap, norm = case_colormap_and_normalize(
+        masked_temp.sel(valid_time=subset_timestep).values, kind="freeze"
+    )
     im = masked_temp.sel(valid_time=subset_timestep).plot(
         ax=ax1,
         transform=ccrs.PlateCarree(),
