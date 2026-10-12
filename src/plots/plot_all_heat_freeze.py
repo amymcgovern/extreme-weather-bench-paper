@@ -53,6 +53,7 @@ from matplotlib.gridspec import GridSpec
 
 from src.plots.heat_freeze_utils import (
     celsius_colormap_and_normalize,
+    mostly_outside_fixed_ramp,
     celsius_diff_colormap_and_normalize,
 )
 
@@ -166,6 +167,9 @@ def _era5_anomaly_vs_climo(era5_ds: xr.Dataset) -> Optional[xr.DataArray]:
         clim = _get_climatology_median()
         snap = clim.sel(dayofyear=doy, hour=clim_hour)
         snap = utils.convert_longitude_to_180(snap)
+        if float(t2["longitude"].max()) > 180:
+            # Antimeridian case: truth is on a continuous 0..360 axis.
+            snap = snap.assign_coords(longitude=snap["longitude"] % 360).sortby("longitude")
         clim_aligned = snap.sel(
             latitude=t2["latitude"],
             longitude=t2["longitude"],
@@ -214,6 +218,22 @@ def _round_to(x: float, step: float, mode: str) -> float:
     if mode == "up":
         return float(np.ceil(x / step) * step)
     raise ValueError(f"mode must be 'up' or 'down', got {mode!r}")
+
+
+def _mostly_outside_fixed_ramp(
+    era5_ds: xr.Dataset, kind: str, min_inside: float = 0.5
+) -> bool:
+    """True when under *min_inside* of the ERA5 truth lies on the fixed ramp.
+
+    The fixed ``celsius_colormap_and_normalize(kind)`` range suits typical
+    curated cases; a case mostly outside it (an Antarctic heat wave well
+    below 0 C on the 0..45 C heat ramp) saturates to one flat color.
+    """
+    if "surface_air_temperature" not in era5_ds:
+        return False
+    return mostly_outside_fixed_ramp(
+        np.asarray(era5_ds["surface_air_temperature"].values) - 273.15, kind, min_inside
+    )
 
 
 def _infer_abs_norm(
@@ -323,11 +343,10 @@ def _plot_field_panel(
 ) -> None:
     """Render one gridded 2 m T panel (forecast or ERA5) in Celsius.
 
-    The BB model archives (AIFS / GraphCast / Pangu / HRES) come pre-masked
-    with NaN over ocean, so ocean pixels render as the axes background.
-    ERA5 has no such mask, so pass ``mask_ocean=True`` to overlay
-    ``cfeature.OCEAN`` on top of the pcolormesh so the ERA5 panel visually
-    matches the model panels.
+    Heat/freeze are scored over land only (EWB's ocean-removal forecast
+    preprocess), so every panel passes ``mask_ocean=True`` to overlay
+    ``cfeature.OCEAN`` on top of the pcolormesh. The BB model archives come
+    pre-masked with NaN over ocean, but ERA5 and the WP-MIP stores don't.
 
     ``kelvin_to_celsius`` (default True) subtracts 273.15 before plotting;
     set False when ``da`` is already in the target units (e.g. a
@@ -479,6 +498,12 @@ def _build_extent(
     return (lon_min, lon_max, lat_min, lat_max)
 
 
+def _map_projection(extent) -> ccrs.PlateCarree:
+    """PlateCarree centred on 180 for antimeridian cases (extent past 180,
+    i.e. truth on a 0..360 axis), else the usual Greenwich-centred one."""
+    return ccrs.PlateCarree(central_longitude=180 if extent[1] > 180 else 0)
+
+
 def _fmt_anchor_time(anchor_ts: np.datetime64) -> str:
     return pd.to_datetime(anchor_ts).strftime("%Y-%m-%d %HZ")
 
@@ -553,12 +578,15 @@ def _plot_case(
     preloaded_models: list[Optional[xr.Dataset]] = [
         _load_case(Path(model_dir), cid) for _, model_dir in model_dirs
     ]
-    if marginal:
+    if marginal or _mostly_outside_fixed_ramp(era5_ds, kind):
         # Marginal ``heat_wave`` cases include boreal-winter events whose
         # temps run well below the fixed 0..45 C ramp -- infer per-case so
         # the truth panels stay legible. Regular curated heat/freeze cases
         # deliberately keep the fixed ramps so cross-case comparison in
-        # the paper stays consistent.
+        # the paper stays consistent, except a curated case whose ERA5
+        # truth mostly falls off that ramp (e.g. case 76, an Antarctic
+        # winter heat wave far below 0 C), which would otherwise render
+        # as a solid saturated block.
         cmap_abs, norm_abs = _infer_abs_norm(
             era5_ds, ghcn_ds, preloaded_models, kind
         )
@@ -601,6 +629,7 @@ def _plot_case(
         width_ratios=[1.0] * n_leads + [1.05],
     )
     extent = _build_extent(my_case, era5_ds)
+    proj = _map_projection(extent)
 
     axes_lead: list[list] = [
         [None] * n_leads for _ in range(len(model_dirs))
@@ -613,7 +642,7 @@ def _plot_case(
             skip_msgs.append(f"missing model dir {model_dir}")
         for col_idx, lead_h in enumerate(lead_hours):
             ax = fig.add_subplot(
-                gs[row_idx, col_idx], projection=ccrs.PlateCarree(),
+                gs[row_idx, col_idx], projection=proj,
             )
             axes_lead[row_idx][col_idx] = ax
             if row_idx == 0:
@@ -648,7 +677,7 @@ def _plot_case(
                 diff = snap_aligned - era5_ref
                 _plot_field_panel(
                     ax, diff, extent, cmap_diff, norm_diff,
-                    kelvin_to_celsius=False,
+                    mask_ocean=True, kelvin_to_celsius=False,
                 )
                 if stations is not None:
                     lon_s, lat_s, t_obs = stations
@@ -660,14 +689,14 @@ def _plot_case(
                         cmap_diff, norm_diff, kelvin_to_celsius=False,
                     )
             else:
-                _plot_field_panel(ax, snap, extent, cmap_abs, norm_abs)
+                _plot_field_panel(ax, snap, extent, cmap_abs, norm_abs, mask_ocean=True)
                 if stations is not None:
                     lon_s, lat_s, t_obs = stations
                     _scatter_ghcn_circles(
                         ax, lon_s, lat_s, t_obs, cmap_abs, norm_abs,
                     )
 
-    era5_ax = fig.add_subplot(gs[0, n_leads], projection=ccrs.PlateCarree())
+    era5_ax = fig.add_subplot(gs[0, n_leads], projection=proj)
     _plot_field_panel(
         era5_ax, era5_ds["surface_air_temperature"], extent, cmap_abs, norm_abs,
         mask_ocean=True,
@@ -682,7 +711,7 @@ def _plot_case(
         fontsize=TRUTH_TITLE_FONTSIZE, pad=6,
     )
 
-    ghcn_ax = fig.add_subplot(gs[1, n_leads], projection=ccrs.PlateCarree())
+    ghcn_ax = fig.add_subplot(gs[1, n_leads], projection=proj)
     n_stations = _plot_ghcn_panel(ghcn_ax, ghcn_ds, extent, cmap_abs, norm_abs)
     ghcn_ax.set_title(
         f"GHCN (n={n_stations})",
@@ -690,7 +719,7 @@ def _plot_case(
     )
 
     anom = _era5_anomaly_vs_climo(era5_ds)
-    anom_ax = fig.add_subplot(gs[2, n_leads], projection=ccrs.PlateCarree())
+    anom_ax = fig.add_subplot(gs[2, n_leads], projection=proj)
     if anom is None:
         _empty_placeholder(anom_ax, extent, "No climatology")
         cmap_anom, norm_anom = None, None

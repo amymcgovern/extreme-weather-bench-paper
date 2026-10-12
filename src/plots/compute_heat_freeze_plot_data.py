@@ -130,17 +130,44 @@ def _case_lon_bounds(case) -> tuple[float, float]:
     return lmin, lmax
 
 
+def _crosses_dateline(case) -> bool:
+    """True if the case bbox spans the antimeridian (e.g. 154.75..190).
+
+    After folding into ``[-180, 180]`` such a box has ``lon_min > lon_max``
+    (154.75..-170), so a plain ``slice`` selects nothing.
+    """
+    lmin, lmax = _case_lon_bounds(case)
+    return lmin > lmax
+
+
+def _sel_case_lon(da, case):
+    """Select the case bbox longitudes from a ``[-180, 180]`` field.
+
+    Boxes that cross the antimeridian keep both sides (``lon >= lon_min``
+    or ``lon <= lon_max``) and come back on a continuous 0..360 axis
+    (e.g. 154.75..190), so the field stays one contiguous block for
+    plotting and nearest-neighbour lookups. Every other box is a plain
+    slice on the existing ``[-180, 180]`` axis, unchanged.
+    """
+    lon_min, lon_max = _case_lon_bounds(case)
+    if lon_min <= lon_max:
+        return da.sel(longitude=slice(lon_min, lon_max))
+    lon = da["longitude"].values
+    keep = np.nonzero((lon >= lon_min) | (lon <= lon_max))[0]
+    da = da.isel(longitude=keep)
+    return da.assign_coords(longitude=da["longitude"] % 360).sortby("longitude")
+
+
 def _slice_era5_case_t2(
     era5: xr.Dataset,
     case,
 ) -> xr.DataArray:
     """Return ``2m_temperature`` on (valid_time, latitude, longitude) for one case."""
-    lon_min, lon_max = _case_lon_bounds(case)
-    return era5["2m_temperature"].sel(
+    da = era5["2m_temperature"].sel(
         valid_time=slice(case.start_date, case.end_date),
         latitude=slice(case.location.latitude_max, case.location.latitude_min),
-        longitude=slice(lon_min, lon_max),
     )
+    return _sel_case_lon(da, case)
 
 
 FREEZE_THRESHOLD_K = 273.15  # 0 C in Kelvin, used by the freeze peak_day rule.
@@ -239,11 +266,7 @@ def _slice_bbox(
         if lat_desc
         else slice(case.location.latitude_min, case.location.latitude_max)
     )
-    lon_min, lon_max = _case_lon_bounds(case)
-    return da.sel(
-        latitude=lat_slice,
-        longitude=slice(lon_min, lon_max),
-    )
+    return _sel_case_lon(da.sel(latitude=lat_slice), case)
 
 
 def _forecast_snapshot(
@@ -354,11 +377,11 @@ def _ghcn_truth_snapshot(
     # bloats the pickle for no plotting benefit. latitude / longitude are
     # already non-dim coords on ``location`` so they ride along.
     slim = sel[["surface_air_temperature"]]
-    # Fold 0..360 lon values into -180..180 to match forecast/ERA5 panels.
+    # Fold 0..360 lon values into -180..180 to match forecast/ERA5 panels
+    # -- or, for antimeridian boxes, onto 0..360 like ``_sel_case_lon``.
     lon = slim["longitude"].values
-    slim = slim.assign_coords(
-        longitude=("location", np.where(lon > 180, lon - 360.0, lon))
-    )
+    lon = lon % 360 if _crosses_dateline(case) else np.where(lon > 180, lon - 360.0, lon)
+    slim = slim.assign_coords(longitude=("location", lon))
     slim = slim.assign_coords(anchor_valid_time=anchor_valid_time)
     return slim.load()
 
