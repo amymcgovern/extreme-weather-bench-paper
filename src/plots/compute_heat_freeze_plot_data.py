@@ -274,50 +274,68 @@ def _forecast_snapshot(
     case,
     anchor_valid_time: np.datetime64,
     lead_hours_list: list[int],
+    max_offset_hours: int = 12,
 ) -> Optional[xr.Dataset]:
     """Assemble a (lead_time, lat, lon) Dataset for one case + model.
 
-    Each lead is selected independently so a lead-time gap in the archive
-    (e.g. the init_time - lead pair isn't in the ledger) skips that column
-    instead of failing the whole case. Returns ``None`` when no lead has
-    usable data.
+    For each nominal lead, every (init, lead) pair with the init within
+    ``max_offset_hours`` of ``anchor - lead_h`` and the lead within
+    ``max_offset_hours`` of ``lead_h`` is a candidate, and the one whose
+    valid time is nearest the anchor wins (ties: lead nearest nominal, then
+    the later init). Holding the lead fixed and taking the nearest init
+    instead can land up to 12 h from the anchor when the archive has only
+    00Z inits (e.g. a 15Z peak drawn from forecasts valid at 00Z the next
+    night). With 6-hourly leads the valid time is at most 3 h off.
+
+    All-NaN (padded) inits are skipped. Each lead is selected
+    independently, so a gap skips that column instead of failing the whole
+    case. ``lead_time`` keeps the nominal lead so the figure columns are
+    unchanged; the actual valid time of each lead is in the
+    ``forecast_valid_time`` coord. Returns ``None`` when no lead has usable
+    data.
     """
+    da = fc_ds["surface_air_temperature"]
     lat_desc = bool(
-        fc_ds.latitude.size > 1
-        and float(fc_ds.latitude.values[0]) > float(fc_ds.latitude.values[-1])
+        da.latitude.size > 1
+        and float(da.latitude.values[0]) > float(da.latitude.values[-1])
     )
+    anchor = np.datetime64(anchor_valid_time, "ns")
+    inits = da.init_time.values.astype("datetime64[ns]")
+    leads = da.lead_time.values.astype("timedelta64[ns]")
+    max_offset = np.timedelta64(max_offset_hours, "h")
+
     lead_slices: list[xr.DataArray] = []
     kept_leads: list[int] = []
+    valid_times: list[np.datetime64] = []
     for lead_h in lead_hours_list:
-        # Anchors can land on odd hours (max_low commonly picks the
-        # overnight-min timestep) so init = anchor - lead doesn't always
-        # match the archive's 00/12Z init cadence. Pick the nearest init
-        # within +/- 12 h so the panel still reflects "roughly a <lead_h>
-        # day forecast valid at the anchor" even when the exact pair is
-        # missing.
-        target_init = anchor_valid_time - np.timedelta64(lead_h, "h")
-        lead_td = np.timedelta64(lead_h * 3600, "s")
-        try:
-            snap = fc_ds["surface_air_temperature"].sel(lead_time=lead_td)
-        except KeyError:
-            continue
-        try:
-            snap = snap.sel(
-                init_time=target_init,
-                method="nearest",
-                tolerance=np.timedelta64(12, "h"),
+        nominal = np.timedelta64(lead_h, "h")
+        cand_inits = inits[np.abs(inits - (anchor - nominal)) <= max_offset]
+        cand_leads = leads[np.abs(leads - nominal) <= max_offset]
+        candidates = sorted(
+            ((i, l) for i in cand_inits for l in cand_leads),
+            key=lambda p: (
+                abs(p[0] + p[1] - anchor),
+                abs(p[1] - nominal),
+                -p[0].astype("int64"),
+            ),
+        )
+        for init, lead in candidates:
+            snap = _slice_bbox(
+                da.sel(init_time=init, lead_time=lead), case, lat_desc
             )
-        except KeyError:
-            continue
-        snap = _slice_bbox(snap, case, lat_desc)
-        if snap.size == 0:
-            continue
-        # Drop non-spatial coords that would break the concat below.
-        for extra in ("init_time", "lead_time", "valid_time"):
-            if extra in snap.coords:
-                snap = snap.drop_vars(extra)
-        lead_slices.append(snap)
-        kept_leads.append(lead_h)
+            if snap.size == 0:
+                break
+            snap = snap.load()
+            if not np.isfinite(snap.values).any():
+                continue
+            # Drop non-spatial coords that would break the concat below.
+            snap = snap.drop_vars(
+                [c for c in ("init_time", "lead_time", "valid_time") if c in snap.coords]
+            )
+            lead_slices.append(snap)
+            kept_leads.append(lead_h)
+            valid_times.append(init + lead)
+            break
 
     if not lead_slices:
         return None
@@ -328,7 +346,12 @@ def _forecast_snapshot(
         ),
     )
     out = stacked.to_dataset(name="surface_air_temperature")
-    out = out.assign_coords(anchor_valid_time=anchor_valid_time)
+    out = out.assign_coords(
+        anchor_valid_time=anchor_valid_time,
+        forecast_valid_time=(
+            "lead_time", np.array(valid_times, dtype="datetime64[ns]")
+        ),
+    )
     return out.load()
 
 
@@ -439,6 +462,8 @@ def _process_case_forecast(
             return _log(f"[{label}] fallback error case {cid}: {exc!r}")
 
     if ds is None:
+        # a pickle from an earlier run would otherwise still be plotted
+        out_path.unlink(missing_ok=True)
         return _log(
             f"[{label}] empty case {cid} (no leads available at anchor)"
         )
@@ -469,6 +494,7 @@ def _process_case_era5(
     except Exception as exc:  # noqa: BLE001
         return _log(f"[era5] error case {cid}: {exc!r}")
     if ds is None:
+        out_path.unlink(missing_ok=True)
         return _log(f"[era5] empty case {cid}")
     out_dir.mkdir(parents=True, exist_ok=True)
     with open(out_path, "wb") as f:
@@ -497,6 +523,7 @@ def _process_case_ghcn(
     except Exception as exc:  # noqa: BLE001
         return _log(f"[ghcn] error case {cid}: {exc!r}")
     if ds is None:
+        out_path.unlink(missing_ok=True)
         return _log(f"[ghcn] empty case {cid} (no stations at anchor)")
     out_dir.mkdir(parents=True, exist_ok=True)
     with open(out_path, "wb") as f:
