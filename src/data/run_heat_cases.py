@@ -108,7 +108,7 @@ if __name__ == "__main__":
         args.run_bb_graphcast = True
         args.run_bb_pangu = True
     # load in the events
-    ewb_cases = ewb.cases.load_ewb_events_yaml_into_case_list()
+    ewb_cases = ewb.cases.load_ewb_cases()
     ewb_cases = [n for n in ewb_cases if n.event_type == "heat_wave"]
 
     parallel_config = {"backend": "loky", "n_jobs": args.n_jobs}

@@ -176,7 +176,7 @@ if __name__ == "__main__":
     atmospheric_river_evaluation_setup = AtmosphericRiverEvaluationSetup()
 
     # load in all of the events in the yaml file
-    ewb_cases = cases.load_ewb_events_yaml_into_case_list()
+    ewb_cases = cases.load_ewb_cases()
     ewb_cases = [n for n in ewb_cases if n.event_type == "atmospheric_river"]
 
     # if we are subsetting the cases, do it here

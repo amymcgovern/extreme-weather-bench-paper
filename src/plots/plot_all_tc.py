@@ -213,7 +213,7 @@ if __name__ == "__main__":
 
     basepath = str(Path.home() / "extreme-weather-bench-paper") + "/"
 
-    ewb_cases = cases.load_ewb_events_yaml_into_case_list()
+    ewb_cases = cases.load_ewb_cases()
     ewb_cases = [c for c in ewb_cases if c.event_type == "tropical_cyclone"]
     if args.cases:
         wanted = set(args.cases)

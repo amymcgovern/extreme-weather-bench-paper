@@ -361,7 +361,7 @@ def _add_basemap(ax) -> None:
 
 def _load_cases(case_ids: list[int]):
     """Return IndividualCase objects in the order of ``case_ids``."""
-    all_cases = cases.load_ewb_events_yaml_into_case_list()
+    all_cases = cases.load_ewb_cases()
     by_id = {c.case_id_number: c for c in all_cases}
     missing = [cid for cid in case_ids if cid not in by_id]
     if missing:

@@ -458,7 +458,7 @@ if __name__ == "__main__":
     basepath = str(basepath) + "/"
 
     # load in all of the events in the yaml file
-    ewb_cases = ewb.cases.load_ewb_events_yaml_into_case_list()
+    ewb_cases = ewb.cases.load_ewb_cases()
     ewb_cases = [n for n in ewb_cases if n.event_type == "severe_convection"]
 
     # build out all of the expected data to evalate the case (we need this so we can plot
