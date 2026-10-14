@@ -460,6 +460,70 @@ def generate_marginal_temperature_dataset(
     return dataset
 
 
+def plot_marginal_temperature_case(
+    marginal_dataset: xr.Dataset,
+    single_case: cases.IndividualCase,
+    ax: Optional[plt.Axes] = None,
+    add_colorbar: bool = True,
+):
+    """Map land 2 m T inside the 15th-85th percentile band at the peak timestep.
+
+    The marginal counterpart of :func:`plot_heatwave_case`: same timestep
+    (warmest area mean, the peak-day anchor the per-case figures use), same
+    land-only masking and colormap rule, but shading where the temperature
+    lies inside the climatology band instead of above the 85th percentile.
+
+    Args:
+        marginal_dataset: from :func:`generate_marginal_temperature_dataset`
+        single_case: cases.IndividualCase object with metadata
+        ax: optional PlateCarree axes to draw on
+        add_colorbar: if False, skip the per-axes colorbar
+    """
+    area_mean = marginal_dataset["2m_temperature"].mean(["latitude", "longitude"])
+    peak_time = area_mean["valid_time"][area_mean.argmax("valid_time")]
+    snap = marginal_dataset.sel(valid_time=peak_time) - 273.15
+    temp = utils.remove_ocean_gridpoints(snap["2m_temperature"])
+    inside = (temp >= snap["surface_temperature_15th_percentile"]) & (
+        temp <= snap["surface_temperature_85th_percentile"]
+    )
+    masked = temp.where(inside)
+
+    if ax is None:
+        fig = plt.figure(figsize=(12, 6))
+        ax = plt.axes(projection=ccrs.PlateCarree())
+    else:
+        fig = ax.get_figure()
+    cmap, norm = case_colormap_and_normalize(masked.values, kind="heat")
+    im = masked.plot(ax=ax, transform=ccrs.PlateCarree(), cmap=cmap, norm=norm, add_colorbar=False)
+    temp.plot.contour(ax=ax, levels=[0], colors="r", linewidths=0.75, transform=ccrs.PlateCarree())
+    ax.coastlines()
+    ax.add_feature(cfeature.BORDERS, linestyle=":")
+    ax.add_feature(cfeature.LAND, edgecolor="black")
+    ax.add_feature(cfeature.LAKES, edgecolor="black")
+    ax.add_feature(cfeature.RIVERS, edgecolor=[0.59375, 0.71484375, 0.8828125], alpha=0.5)
+    ax.add_feature(cfeature.STATES, edgecolor="grey")
+    gl = ax.gridlines(draw_labels=True, alpha=0.25)
+    gl.top_labels = False
+    gl.right_labels = False
+    gl.xformatter = LongitudeFormatter()
+    gl.yformatter = LatitudeFormatter()
+    gl.xlabel_style = {"size": 12, "color": "k"}
+    gl.ylabel_style = {"size": 12, "color": "k"}
+    ax.set_title("")
+    ax.set_title(
+        "Temperature Within 15th-85th Percentile Climatology\n"
+        f"{single_case.title}, Case ID {single_case.case_id_number}\n"
+        f"{peak_time.dt.strftime('%Y-%m-%d %Hz').values}",
+        loc="left",
+    )
+    if add_colorbar:
+        cax = make_axes_locatable(ax).append_axes("right", size="5%", pad=0.1, axes_class=plt.Axes)
+        cbar = fig.colorbar(im, cax=cax)
+        cbar.set_label("Temperature (C)", size=14)
+        cbar.ax.tick_params(labelsize=12)
+    return im
+
+
 def plot_marginal_temperature_time_series(
     marginal_dataset: xr.Dataset,
     single_case: cases.IndividualCase,
