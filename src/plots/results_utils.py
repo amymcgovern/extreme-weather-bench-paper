@@ -353,6 +353,84 @@ def _bootstrap_mean_and_ci(
     return boot_dist, ci_lower, ci_upper
 
 
+def _match_cases(
+    my_values: xr.DataArray,
+    comparison_values: xr.DataArray,
+) -> tuple[xr.DataArray, xr.DataArray]:
+    """Restrict two (lead_time, case_id_number) arrays to their shared cases.
+
+    The two arrays are aligned on both dims (outer join), then at each lead
+    time any case that is not finite in both is set to NaN in both, so a
+    NaN-skipping mean over case_id_number uses the same cases for each.
+    parameters:
+        my_values: DataArray with dims (lead_time, case_id_number).
+        comparison_values: DataArray with dims (lead_time, case_id_number).
+    returns:
+        (my_matched, comparison_matched): float DataArrays on the same
+            (lead_time, case_id_number) grid, NaN wherever either is missing.
+    """
+    my_values, comparison_values = xr.align(
+        my_values.transpose("lead_time", "case_id_number").astype(float),
+        comparison_values.transpose("lead_time", "case_id_number").astype(float),
+        join="outer",
+    )
+    ok = np.isfinite(my_values) & np.isfinite(comparison_values)
+    return my_values.where(ok), comparison_values.where(ok)
+
+
+def _paired_bootstrap_relative_error(
+    my_values: xr.DataArray,
+    comparison_values: xr.DataArray,
+    bootstrap_samples: int,
+    higher_is_better: bool = False,
+    rng: np.random.Generator | None = None,
+) -> xr.DataArray:
+    """Paired bootstrap of the relative error of ``my_values`` vs ``comparison_values``.
+
+    Both inputs have dims (lead_time, case_id_number). They are aligned on
+    both dims, and for each lead time only the cases where both sources are
+    finite are kept. Each draw resamples one set of those case ids with
+    replacement and uses it for both sources, so case-to-case difficulty
+    cancels out of the relative error.
+    parameters:
+        my_values: DataArray with dims (lead_time, case_id_number).
+        comparison_values: DataArray with dims (lead_time, case_id_number).
+        bootstrap_samples: number of bootstrap draws.
+        higher_is_better: same meaning as in compute_relative_error.
+        rng: optional numpy Generator for reproducibility.
+    returns:
+        rel_error_dist: DataArray with dims (bootstrap, lead_time) holding
+            the per-draw relative error (%); NaN at lead times with no
+            matched cases.
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+
+    my_values, comparison_values = _match_cases(my_values, comparison_values)
+    my_arr = my_values.values
+    comparison_arr = comparison_values.values
+
+    rel_error_dist = np.full((bootstrap_samples, my_arr.shape[0]), np.nan)
+    for k in range(my_arr.shape[0]):
+        ok = np.isfinite(my_arr[k]) & np.isfinite(comparison_arr[k])
+        n_ok = int(ok.sum())
+        if n_ok == 0:
+            continue
+        idx = rng.integers(0, n_ok, size=(bootstrap_samples, n_ok))
+        my_boot = my_arr[k][ok][idx].mean(axis=1)
+        comparison_boot = comparison_arr[k][ok][idx].mean(axis=1)
+        if higher_is_better:
+            rel_error_dist[:, k] = (comparison_boot - my_boot) / comparison_boot * 100
+        else:
+            rel_error_dist[:, k] = (my_boot - comparison_boot) / comparison_boot * 100
+
+    return xr.DataArray(
+        rel_error_dist,
+        dims=("bootstrap", "lead_time"),
+        coords={"lead_time": my_values.lead_time.values},
+    )
+
+
 def compute_mean_by_lead_time(
     ewb_cases,
     results_df,
@@ -439,6 +517,7 @@ def compute_relative_error(
     ci_level=0.95,
     return_ci=False,
     rng=None,
+    paired=False,
 ):
     """Computes the relative error of the results by lead time Error
     is defined as relative to the comparison results.
@@ -476,6 +555,15 @@ def compute_relative_error(
             relative error. Defaults to False so existing callers keep
             getting a plain (my_mean, my_relative_error) 2-tuple.
         rng: optional numpy Generator for reproducible bootstrap draws.
+        paired: if True, restrict both sources at each lead time to the
+            cases they both have (see _match_cases) and use those matched
+            cases for everything: the returned means and relative errors,
+            and (when bootstrap_samples > 0) a paired bootstrap in which
+            each draw resamples one set of case ids and uses it for both
+            sources (see _paired_bootstrap_relative_error). Lead times with
+            no matched cases come back as NaN. If False (default), each
+            source's means use all of its own cases and the bootstrap
+            resamples the two sources independently (the original behavior).
     returns:
         my_mean: numpy array containing the mean of the results by lead time
         my_relative_error: numpy array containing the relative error of
@@ -485,7 +573,31 @@ def compute_relative_error(
             error) and significant (True where that interval excludes 0).
     """
 
-    if bootstrap_samples > 0:
+    if paired:
+        subset_kwargs = dict(
+            target_source=target_source,
+            metric=metric,
+            lead_time_days=lead_time_days,
+            case_id_list=case_ids,
+            target_variable=target_variable,
+            snap_lead_times=snap_lead_times,
+            snap_tolerance_hours=snap_tolerance_hours,
+        )
+        my_values = subset_results_to_xarray(
+            results_df=results_df, forecast_source=forecast_source, **subset_kwargs
+        )["value"]
+        comparison_values = subset_results_to_xarray(
+            results_df=comparison_results_df,
+            forecast_source=comparison_forecast_source,
+            **subset_kwargs,
+        )["value"]
+        # matched cases only; drop lead times with none so they show up as
+        # structurally missing (NaN) below rather than as a 0 from nan_to_num
+        my_matched, comparison_matched = _match_cases(my_values, comparison_values)
+        has_match = my_matched.notnull().any("case_id_number")
+        my_mean = my_matched.mean("case_id_number").where(has_match, drop=True)
+        comparison_mean = comparison_matched.mean("case_id_number").where(has_match, drop=True)
+    elif bootstrap_samples > 0:
         my_mean, _, _, my_boot_dist = compute_mean_by_lead_time(
             ewb_cases,
             results_df,
@@ -542,7 +654,7 @@ def compute_relative_error(
             snap_tolerance_hours=snap_tolerance_hours,
         )
 
-    if bootstrap_samples > 0 and return_ci:
+    if bootstrap_samples > 0 and return_ci and not paired:
         # lead-time coords matching my_boot_dist/comparison_boot_dist, captured
         # before my_mean/comparison_mean get reindexed to the full requested
         # grid below (that reindex can add lead times the bootstrap draws
@@ -570,7 +682,15 @@ def compute_relative_error(
     my_mean_arr[mean_missing] = np.nan
     my_relative_error_arr[rel_missing] = np.nan
 
-    if bootstrap_samples > 0 and return_ci:
+    if bootstrap_samples > 0 and return_ci and paired:
+        rel_error_dist = _paired_bootstrap_relative_error(
+            my_values,
+            comparison_values,
+            bootstrap_samples,
+            higher_is_better=higher_is_better,
+            rng=rng,
+        ).reindex(lead_time=all_lead_times)
+    elif bootstrap_samples > 0 and return_ci:
         # per-draw relative error distribution, aligned to the requested lead-time grid,
         # to derive a CI for the relative error itself (not just the two input means)
         my_boot_da = xr.DataArray(
@@ -591,6 +711,7 @@ def compute_relative_error(
         else:
             rel_error_dist = (my_boot_da - comparison_boot_da) / comparison_boot_da * 100
 
+    if bootstrap_samples > 0 and return_ci:
         alpha = 1 - ci_level
         ci_lower = rel_error_dist.quantile(alpha / 2, dim="bootstrap").values
         ci_upper = rel_error_dist.quantile(1 - alpha / 2, dim="bootstrap").values
