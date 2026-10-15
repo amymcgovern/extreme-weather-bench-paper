@@ -166,7 +166,8 @@ if __name__ == "__main__":
     # convert the case ids to integers
     if len(args.case_ids) > 0:
         # split the list by commas and convert to integers
-        args.case_ids = [int(n) for n in args.case_ids[0].split(",")]
+        # accept "1,2,3" and "1 2 3" (and mixes of the two)
+        args.case_ids = [int(n) for s in args.case_ids for n in s.split(",") if n]
     else:
         args.case_ids = None
 
