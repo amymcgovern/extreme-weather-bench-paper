@@ -1924,6 +1924,23 @@ def add_horizontal_colorbar_below(
     return cb
 
 
+
+def _outline_cells(ax, mask, inset: float = 0.07) -> None:
+    """Box each True cell of *mask* on a seaborn heatmap axes (cell (r, c) spans
+    x in [c, c+1], y in [r, r+1]). Black outer line with a white inner line so the
+    box reads on light and dark cells; inset so neighbouring boxes stay apart."""
+    for r, c in zip(*np.nonzero(np.asarray(mask, dtype=bool))):
+        # same rectangle twice: a thin white stroke centred in a wider black one, so
+        # it reads as one framed line at any cell size
+        for lw, color in ((3.2, "black"), (1.0, "white")):
+            ax.add_patch(
+                patches.Rectangle(
+                    (c + inset, r + inset), 1 - 2 * inset, 1 - 2 * inset,
+                    fill=False, edgecolor=color, linewidth=lw, zorder=5, clip_on=False,
+                )
+            )
+
+
 def plot_heatmap(
     relative_error_array,
     error_array,
@@ -1942,6 +1959,7 @@ def plot_heatmap(
     annot_fontsize=None,
     significance_array=None,
     cell_size=5,
+    significance_style: str = "bold",
 ):
     """
     Plots a heatmap of the relative error of the models versus the IFS HRES
@@ -1971,6 +1989,12 @@ def plot_heatmap(
             Significant cells are rendered in bold (annotation text is
             otherwise unchanged).
             None (default) disables significance markers.
+        significance_style: how ``significance_array`` cells are marked:
+            ``"bold"`` (default) sets their annotations in bold italic;
+            ``"outline"`` instead draws a box around each significant cell
+            (a white inner line inside a black outer line, so it reads on
+            both light and dark cells) and leaves the numbers in normal
+            weight.
         cell_size: inches allotted per metric subplot (only used when
             ``ax`` is None, i.e. this call creates its own standalone
             figure). Increase this if bold/starred annotations from
@@ -2117,7 +2141,9 @@ def plot_heatmap(
             annot_kws={"size": annot_fontsize} if annot_fontsize else {},
         )
 
-        if sig_data is not None:
+        if sig_data is not None and significance_style == "outline":
+            _outline_cells(ax, sig_data)
+        elif sig_data is not None:
             # sns.heatmap creates annotation Text objects in row-major order matching the data
             for text_obj, is_sig in zip(ax.texts, sig_data.flatten()):
                 if is_sig:

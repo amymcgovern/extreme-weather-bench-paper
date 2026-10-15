@@ -430,6 +430,165 @@ def plot_heatwave_time_series(
     plt.show()
 
 
+def generate_marginal_temperature_dataset(
+    era5: xr.Dataset,
+    climatology_lower: xr.Dataset,
+    climatology_upper: xr.Dataset,
+    single_case: cases.IndividualCase,
+):
+    """Case ERA5 2 m T with the lower and upper climatology quantiles.
+
+    Marginal temperature events stay inside a climatology band (15th-85th
+    percentile) instead of above the 85th (heat) or below the 15th (freeze).
+    Same subsetting as :func:`generate_heatwave_dataset`, with both bounds.
+
+    Args:
+        era5: ERA5 dataset containing 2m_temperature
+        climatology_lower: climatology at the 15th percentile
+        climatology_upper: climatology at the 85th percentile
+        single_case: cases.IndividualCase object with metadata
+
+    Returns:
+        Dataset with ``2m_temperature``, ``surface_temperature_15th_percentile``
+        and ``surface_temperature_85th_percentile``.
+    """
+    dataset = generate_heatwave_dataset(era5, climatology_upper, single_case)
+    lower = generate_heatwave_dataset(era5, climatology_lower, single_case)
+    dataset["surface_temperature_15th_percentile"] = lower[
+        "surface_temperature_85th_percentile"
+    ]
+    return dataset
+
+
+def plot_marginal_temperature_case(
+    marginal_dataset: xr.Dataset,
+    single_case: cases.IndividualCase,
+    ax: Optional[plt.Axes] = None,
+    add_colorbar: bool = True,
+):
+    """Map land 2 m T inside the 15th-85th percentile band at the peak timestep.
+
+    The marginal counterpart of :func:`plot_heatwave_case`: same timestep
+    (warmest area mean, the peak-day anchor the per-case figures use), same
+    land-only masking and colormap rule, but shading where the temperature
+    lies inside the climatology band instead of above the 85th percentile.
+
+    Args:
+        marginal_dataset: from :func:`generate_marginal_temperature_dataset`
+        single_case: cases.IndividualCase object with metadata
+        ax: optional PlateCarree axes to draw on
+        add_colorbar: if False, skip the per-axes colorbar
+    """
+    area_mean = marginal_dataset["2m_temperature"].mean(["latitude", "longitude"])
+    peak_time = area_mean["valid_time"][area_mean.argmax("valid_time")]
+    snap = marginal_dataset.sel(valid_time=peak_time) - 273.15
+    temp = utils.remove_ocean_gridpoints(snap["2m_temperature"])
+    inside = (temp >= snap["surface_temperature_15th_percentile"]) & (
+        temp <= snap["surface_temperature_85th_percentile"]
+    )
+    masked = temp.where(inside)
+
+    if ax is None:
+        fig = plt.figure(figsize=(12, 6))
+        ax = plt.axes(projection=ccrs.PlateCarree())
+    else:
+        fig = ax.get_figure()
+    cmap, norm = case_colormap_and_normalize(masked.values, kind="heat")
+    im = masked.plot(ax=ax, transform=ccrs.PlateCarree(), cmap=cmap, norm=norm, add_colorbar=False)
+    temp.plot.contour(ax=ax, levels=[0], colors="r", linewidths=0.75, transform=ccrs.PlateCarree())
+    ax.coastlines()
+    ax.add_feature(cfeature.BORDERS, linestyle=":")
+    ax.add_feature(cfeature.LAND, edgecolor="black")
+    ax.add_feature(cfeature.LAKES, edgecolor="black")
+    ax.add_feature(cfeature.RIVERS, edgecolor=[0.59375, 0.71484375, 0.8828125], alpha=0.5)
+    ax.add_feature(cfeature.STATES, edgecolor="grey")
+    gl = ax.gridlines(draw_labels=True, alpha=0.25)
+    gl.top_labels = False
+    gl.right_labels = False
+    gl.xformatter = LongitudeFormatter()
+    gl.yformatter = LatitudeFormatter()
+    gl.xlabel_style = {"size": 12, "color": "k"}
+    gl.ylabel_style = {"size": 12, "color": "k"}
+    ax.set_title("")
+    ax.set_title(
+        "Temperature Within 15th-85th Percentile Climatology\n"
+        f"{single_case.title}, Case ID {single_case.case_id_number}\n"
+        f"{peak_time.dt.strftime('%Y-%m-%d %Hz').values}",
+        loc="left",
+    )
+    if add_colorbar:
+        cax = make_axes_locatable(ax).append_axes("right", size="5%", pad=0.1, axes_class=plt.Axes)
+        cbar = fig.colorbar(im, cax=cax)
+        cbar.set_label("Temperature (C)", size=14)
+        cbar.ax.tick_params(labelsize=12)
+    return im
+
+
+def plot_marginal_temperature_time_series(
+    marginal_dataset: xr.Dataset,
+    single_case: cases.IndividualCase,
+    filename: Optional[str] = None,
+):
+    """Plot the area-mean 2 m T against the 15th-85th percentile band.
+
+    The band between the two climatology quantiles is filled grey, and the
+    times when the area mean lies inside it (the marginal condition) are
+    shaded green.
+    """
+    ts = marginal_dataset.mean(["latitude", "longitude"]) - 273.15
+    t = ts["2m_temperature"]
+    lower = ts["surface_temperature_15th_percentile"]
+    upper = ts["surface_temperature_85th_percentile"]
+    times = ts.valid_time.values
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.fill_between(times, lower, upper, color="0.85", alpha=0.6, lw=0)
+    lower.plot(ax=ax, c="tab:blue", ls="-.", lw=0.75)
+    upper.plot(ax=ax, c="k", ls="-.", lw=0.75)
+    t.plot(ax=ax, c="tab:red", ls="-", lw=1.5)
+
+    inside = ((t >= lower) & (t <= upper)).values
+    start = None
+    for i, val in enumerate(inside):
+        if val and start is None:
+            start = times[i]
+        elif not val and start is not None:
+            ax.axvspan(start, times[i], color="tab:green", alpha=0.1)
+            start = None
+    if start is not None:
+        ax.axvspan(start, times[-1], color="tab:green", alpha=0.1)
+
+    ax.set_title("")
+    ax.set_title(
+        "Spatially Averaged Marginal Temperature Event vs 15th-85th Percentile Climatology",
+        fontsize=14,
+        loc="left",
+    )
+    ax.set_ylabel("Temperature (C)", fontsize=12)
+    ax.set_xlabel("valid_time", fontsize=12)
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))
+    ax.xaxis.set_tick_params(rotation=45, labelsize=10, pad=0.0001)
+    ax.tick_params(axis="y", labelsize=12)
+
+    legend_elements = [
+        plt.Line2D([0], [0], color="k", linestyle="-.", linewidth=0.75,
+                   label="2m Temperature, 85th Percentile"),
+        plt.Line2D([0], [0], color="tab:blue", linestyle="-.", linewidth=0.75,
+                   label="2m Temperature, 15th Percentile"),
+        plt.Line2D([0], [0], color="tab:red", linestyle="-", linewidth=1.5,
+                   label="2m Temperature"),
+        Patch(facecolor="0.85", alpha=0.6, label="15th-85th Percentile Band"),
+        Patch(facecolor="tab:green", alpha=0.1, label="Within Band"),
+    ]
+    ax.legend(handles=legend_elements, fontsize=11)
+
+    plt.tight_layout()
+    if filename is not None:
+        plt.savefig(filename, transparent=True)
+
+    plt.show()
+
+
 def generate_heatwave_plots(
     heatwave_dataset: xr.Dataset,
     single_case: cases.IndividualCase,

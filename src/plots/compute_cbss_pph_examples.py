@@ -196,7 +196,7 @@ if __name__ == "__main__":
         ewb_cases = ewb.cases.load_individual_cases_from_yaml(events_yaml_file)
         ewb_cases = [n for n in ewb_cases if n.event_type == "severe_convection"]
     else:
-        ewb_cases = ewb.cases.load_ewb_events_yaml_into_case_list()
+        ewb_cases = ewb.cases.load_ewb_cases()
         ewb_cases = [n for n in ewb_cases if n.event_type == "severe_convection"]
 
     if args.case_ids is not None:

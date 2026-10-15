@@ -198,7 +198,7 @@ if __name__ == "__main__":
 
     print(f"Case IDs: {args.case_ids}", flush=True)
 
-    ewb_cases = cases.load_ewb_events_yaml_into_case_list()
+    ewb_cases = cases.load_ewb_cases()
     ewb_cases = [n for n in ewb_cases if n.event_type == "tropical_cyclone"]
     if args.case_ids is not None:
         ewb_cases = [n for n in ewb_cases if n.case_id_number in args.case_ids]

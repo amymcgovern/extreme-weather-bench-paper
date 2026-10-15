@@ -361,7 +361,7 @@ def _add_basemap(ax) -> None:
 
 def _load_cases(case_ids: list[int]):
     """Return IndividualCase objects in the order of ``case_ids``."""
-    all_cases = cases.load_ewb_events_yaml_into_case_list()
+    all_cases = cases.load_ewb_cases()
     by_id = {c.case_id_number: c for c in all_cases}
     missing = [cid for cid in case_ids if cid not in by_id]
     if missing:
@@ -572,6 +572,7 @@ def plot_tc_panel(
     show_col_title: bool = False,
     col_title: str = "",
     storm_label: Optional[str] = None,
+    ibtracs_below: bool = False,
     add_colorbar: bool = True,
 ):
     """Render one (storm, model) panel with landfall markers."""
@@ -605,11 +606,15 @@ def plot_tc_panel(
     else:
         colors = np.empty((0, 4))
 
+    # ibtracs_below: draw the observed track under the forecasts (thinner) so a
+    # forecast that follows it closely stays visible; default keeps it on top.
+    track_z, forecast_z = (2.0, 3.0) if ibtracs_below else (None, None)
     for i, (_it, lats_v, lons_v) in enumerate(valid_groups):
         ax.plot(
             lons_v, lats_v, "-",
             color=colors[i], alpha=0.85,
             linewidth=3, transform=ccrs.PlateCarree(),
+            **({"zorder": forecast_z} if forecast_z is not None else {}),
         )
 
     target_lats = target_ds.coords["latitude"].values
@@ -617,8 +622,9 @@ def plot_tc_panel(
     ax.plot(
         target_lons, target_lats,
         "-ok", transform=ccrs.PlateCarree(),
-        linewidth=3, markersize=4,
+        linewidth=2 if ibtracs_below else 3, markersize=3 if ibtracs_below else 4,
         markeredgecolor="white", markeredgewidth=0.3,
+        **({"zorder": track_z} if track_z is not None else {}),
     )
 
     matched_landfalls, target_landfall_points = _compute_landfalls(
@@ -657,6 +663,16 @@ def plot_tc_panel(
             va="center", ha="right", rotation=90,
             multialignment="center",
         )
+
+    if add_colorbar and n_times == 0:
+        # No tracks, so no init-date colorbar -- but still take the same space
+        # from the panel (then hide it), so this map stays the size of the others.
+        placeholder = fig.colorbar(
+            ScalarMappable(cmap=_setup_colormap(), norm=plt.Normalize(0, 1)), ax=ax,
+            orientation="horizontal", pad=0.04, shrink=0.85, aspect=22,
+        )
+        placeholder.set_label("Init Date", fontsize=CBAR_LABEL_FONTSIZE, labelpad=2)
+        placeholder.ax.set_visible(False)
 
     if add_colorbar and n_times > 0:
         init_datetimes = [pd.to_datetime(str(it)) for it, _, _ in valid_groups]

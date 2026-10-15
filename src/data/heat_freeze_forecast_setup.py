@@ -2,7 +2,7 @@ import operator
 
 import extremeweatherbench as ewb
 import xarray as xr
-from check_icechunk import open_mlwp_archive_icechunk_dataset
+from src.data.check_icechunk import open_mlwp_archive_icechunk_dataset
 from extremeweatherbench.defaults import get_climatology
 
 from src.data.aifs_util import (

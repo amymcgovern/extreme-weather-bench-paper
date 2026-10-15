@@ -696,7 +696,7 @@ if __name__ == "__main__":
             flush=True,
         )
     else:
-        ewb_cases = cases.load_ewb_events_yaml_into_case_list()
+        ewb_cases = cases.load_ewb_cases()
         ewb_cases = [
             c for c in ewb_cases if c.event_type in {"heat_wave", "freeze"}
         ]

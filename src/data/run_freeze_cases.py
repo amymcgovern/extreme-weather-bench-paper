@@ -86,7 +86,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # load in all of the events in the yaml file
-    ewb_cases = ewb.cases.load_ewb_events_yaml_into_case_list()
+    ewb_cases = ewb.cases.load_ewb_cases()
     ewb_cases = [n for n in ewb_cases if n.event_type == "freeze"]
 
     heat_freeze_forecast_setup = HeatFreezeForecastSetup()

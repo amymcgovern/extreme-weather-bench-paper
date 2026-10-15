@@ -83,8 +83,14 @@ def _plot_case(
     model_cols: Optional[list[tuple[str, str, str, str]]] = None,
     out_path: Optional[Path] = None,
     max_cols: Optional[int] = None,
+    storm_row_labels: bool = True,
+    ibtracs_below: bool = False,
 ) -> str:
     """Render one case's 1 x N model-column PNG. Runs in a worker process.
+
+    ``storm_row_labels=False`` drops the storm name drawn beside the first
+    panel of each row (the suptitle already names the storm), which declutters
+    multi-row figures.
 
     ``model_cols`` defaults to ``MODEL_COLS``; each entry is
     ``(cache_key, display_name, dir_name, flag)``. ``dir_name`` may be an
@@ -151,7 +157,8 @@ def _plot_case(
             extent=extent,
             show_col_title=True,
             col_title=display_name,
-            storm_label=my_case.title if col_idx % n_cols == 0 else None,
+            storm_label=my_case.title if storm_row_labels and col_idx % n_cols == 0 else None,
+            ibtracs_below=ibtracs_below,
             add_colorbar=True,
         )
 
@@ -213,7 +220,7 @@ if __name__ == "__main__":
 
     basepath = str(Path.home() / "extreme-weather-bench-paper") + "/"
 
-    ewb_cases = cases.load_ewb_events_yaml_into_case_list()
+    ewb_cases = cases.load_ewb_cases()
     ewb_cases = [c for c in ewb_cases if c.event_type == "tropical_cyclone"]
     if args.cases:
         wanted = set(args.cases)

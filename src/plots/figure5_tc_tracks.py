@@ -68,7 +68,7 @@ def _ewb_cases_by_id():
 
     return {
         c.case_id_number: c
-        for c in ewb.cases.load_ewb_events_yaml_into_case_list()
+        for c in ewb.cases.load_ewb_cases()
     }
 
 
