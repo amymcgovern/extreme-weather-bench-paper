@@ -1959,7 +1959,7 @@ def plot_heatmap(
     annot_fontsize=None,
     significance_array=None,
     cell_size=5,
-    significance_style: str = "bold",
+    significance_style: str = "outline",
 ):
     """
     Plots a heatmap of the relative error of the models versus the IFS HRES
@@ -1986,15 +1986,13 @@ def plot_heatmap(
             with boolean arrays (same shape as each metric's error array)
             marking which cells are statistically significant (e.g. from
             ``results_utils.compute_relative_error(..., return_ci=True)``).
-            Significant cells are rendered in bold (annotation text is
-            otherwise unchanged).
+            Significant cells are marked per ``significance_style``.
             None (default) disables significance markers.
         significance_style: how ``significance_array`` cells are marked:
-            ``"bold"`` (default) sets their annotations in bold italic;
-            ``"outline"`` instead draws a box around each significant cell
+            ``"outline"`` (default) draws a box around each significant cell
             (a white inner line inside a black outer line, so it reads on
             both light and dark cells) and leaves the numbers in normal
-            weight.
+            weight; ``"bold"`` instead sets their annotations in bold italic.
         cell_size: inches allotted per metric subplot (only used when
             ``ax`` is None, i.e. this call creates its own standalone
             figure). Increase this if bold/starred annotations from
