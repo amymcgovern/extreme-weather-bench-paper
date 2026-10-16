@@ -574,8 +574,16 @@ def plot_tc_panel(
     storm_label: Optional[str] = None,
     ibtracs_below: bool = False,
     add_colorbar: bool = True,
+    init_times: Optional[list] = None,
 ):
-    """Render one (storm, model) panel with landfall markers."""
+    """Render one (storm, model) panel with landfall markers.
+
+    ``init_times`` fixes the init-date colors: every calendar day in the list
+    gets one color (spread over the ramp in date order; 00Z and 12Z inits of a
+    day share it) and the colorbar shows every day, so a color means the same
+    init day in every panel given the same list. Default: the panel's own inits
+    are spread over the ramp.
+    """
     _add_basemap(ax)
     if extent is not None:
         if isinstance(extent, TrackMapExtent):
@@ -600,11 +608,22 @@ def plot_tc_panel(
         )
 
     n_times = len(valid_groups)
-    if n_times > 0:
+    # Colorbar dates/colors: the shared list's days when given, else this panel's inits.
+    unit = "D" if init_times is not None else "ns"
+    bar_times = (
+        sorted({np.datetime64(t, unit) for t in init_times}
+               | {np.datetime64(it, unit) for it, _, _ in valid_groups})
+        if init_times is not None
+        else [np.datetime64(it, unit) for it, _, _ in valid_groups]
+    )
+    n_bar = len(bar_times)
+    if n_bar > 0:
         cmap = _setup_colormap()
-        colors = cmap(np.linspace(0.2, 1 - 1 / (n_times + 1), n_times))
+        bar_colors = cmap(np.linspace(0.2, 1 - 1 / (n_bar + 1), n_bar))
     else:
-        colors = np.empty((0, 4))
+        bar_colors = np.empty((0, 4))
+    bar_index = {t: i for i, t in enumerate(bar_times)}
+    colors = [bar_colors[bar_index[np.datetime64(it, unit)]] for it, _, _ in valid_groups]
 
     # ibtracs_below: draw the observed track under the forecasts (thinner) so a
     # forecast that follows it closely stays visible; default keeps it on top.
@@ -664,7 +683,7 @@ def plot_tc_panel(
             multialignment="center",
         )
 
-    if add_colorbar and n_times == 0:
+    if add_colorbar and n_bar == 0:
         # No tracks, so no init-date colorbar -- but still take the same space
         # from the panel (then hide it), so this map stays the size of the others.
         placeholder = fig.colorbar(
@@ -674,9 +693,10 @@ def plot_tc_panel(
         placeholder.set_label("Init Date", fontsize=CBAR_LABEL_FONTSIZE, labelpad=2)
         placeholder.ax.set_visible(False)
 
-    if add_colorbar and n_times > 0:
-        init_datetimes = [pd.to_datetime(str(it)) for it, _, _ in valid_groups]
-        cmap_ = ListedColormap(colors)
+    if add_colorbar and n_bar > 0:
+        n_times = n_bar
+        init_datetimes = [pd.to_datetime(str(it)) for it in bar_times]
+        cmap_ = ListedColormap(bar_colors)
         norm_ = plt.Normalize(vmin=-0.5, vmax=n_times - 0.5)
         sm_ = ScalarMappable(cmap=cmap_, norm=norm_)
         sm_.set_array([])
