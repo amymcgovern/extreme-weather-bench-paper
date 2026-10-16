@@ -33,6 +33,8 @@ from extremeweatherbench import cases, utils
 from matplotlib.patches import Patch
 from shapely.geometry import Polygon
 
+from src.plots import colormaps
+
 logger = logging.getLogger(__name__)
 
 # Boundary levels for scorecard heatmaps and matching colorbars (see plot_heatmap)
@@ -267,21 +269,7 @@ def setup_colormap_and_levels(bounds: np.ndarray):
     Returns:
         Tuple of (colormap, normalization) based on bounds.
     """
-    # Create custom colormap from original code
-    cmap_colors = [
-        "#ffffff",
-        "#bde6fa",
-        "#7bbae7",
-        "#4892bd",
-        "#49ae62",
-        "#a7d051",
-        "#f9d251",
-        "#f7792f",
-        "#e43d28",
-        "#c11b24",
-        "#921318",
-    ]
-    cmap = mcolors.LinearSegmentedColormap.from_list("custom_cubehelix", cmap_colors)
+    cmap = colormaps.get_ramp()
     norm = mcolors.BoundaryNorm(bounds, cmap.N)
 
     return cmap, norm

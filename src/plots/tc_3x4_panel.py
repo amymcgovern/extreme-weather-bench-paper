@@ -57,6 +57,8 @@ _SRC_DATA = REPO_ROOT / "src" / "data"
 if str(_SRC_DATA) not in sys.path:
     sys.path.insert(0, str(_SRC_DATA))
 
+from src.plots.colormaps import get_ramp  # noqa: E402
+
 DEFAULT_ROWS: list[tuple[int, str]] = [
     (173, "TC Lee"),
     (200, "TC Kay"),
@@ -251,15 +253,8 @@ def landfall_legend_handles() -> list[Line2D]:
 
 
 def _setup_colormap() -> mcolors.LinearSegmentedColormap:
-    """Same cubehelix-style ramp used by figure5_tc_tracks.py."""
-    cmap_colors = [
-        "#ffffff", "#bde6fa", "#7bbae7", "#4892bd",
-        "#49ae62", "#a7d051", "#f9d251", "#f7792f",
-        "#e43d28", "#c11b24", "#921318",
-    ]
-    return mcolors.LinearSegmentedColormap.from_list(
-        "custom_cubehelix", cmap_colors,
-    )
+    """Same ramp used by figure5_tc_tracks.py (style set in colormaps.py)."""
+    return get_ramp()
 
 
 def _to_lon360(arr: np.ndarray) -> np.ndarray:

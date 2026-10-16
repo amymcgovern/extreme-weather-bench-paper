@@ -24,6 +24,7 @@ from matplotlib.cm import ScalarMappable
 from matplotlib.colors import ListedColormap
 from matplotlib.gridspec import GridSpec
 
+from src.plots.colormaps import get_ramp
 from src.plots.plotting_utils import generate_extent
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -88,14 +89,8 @@ def storm_label_with_dates(case_id, storm_label):
 
 
 def _setup_colormap(bounds):
-    cmap_colors = [
-        "#ffffff", "#bde6fa", "#7bbae7", "#4892bd",
-        "#49ae62", "#a7d051", "#f9d251", "#f7792f",
-        "#e43d28", "#c11b24", "#921318",
-    ]
-    return mcolors.LinearSegmentedColormap.from_list(
-        "custom_cubehelix", cmap_colors,
-    ), mcolors.BoundaryNorm(bounds, len(cmap_colors) * 256)
+    cmap = get_ramp()
+    return cmap, mcolors.BoundaryNorm(bounds, cmap.N)
 
 
 def _wrap_lon(arr):
@@ -305,8 +300,13 @@ def plot_tc_panel(
     add_colorbar: bool = True,
     forecast_ds=None,
     target_ds=None,
+    ibtracs_below: bool = False,
 ):
     """Plot a single TC track panel.
+
+    ``ibtracs_below`` draws the IBTrACS track thinner and under the forecasts
+    (as in ``tc_3x4_panel.plot_tc_panel``) so forecasts that hug it stay
+    visible; the default keeps the thick track on top.
 
     When ``forecast_ds`` and ``target_ds`` are supplied (the raw per-case
     pickle datasets), landfall markers are overlaid to match the standalone
@@ -346,19 +346,23 @@ def plot_tc_panel(
 
     _add_basemap(ax)
 
+    track_z, forecast_z = (2.0, 3.0) if ibtracs_below else (None, None)
     for i, (lats_v, lons_v) in enumerate(valid_groups):
         ax.plot(
             lons_v, lats_v, "-",
             color=colors[i], alpha=0.8,
             linewidth=4, transform=ccrs.PlateCarree(),
+            **({"zorder": forecast_z} if forecast_z is not None else {}),
         )
 
     ax.plot(
         analysis_track_data.longitude,
         analysis_track_data.latitude,
         "-ok", transform=ccrs.PlateCarree(),
-        linewidth=4, markersize=6,
+        linewidth=2 if ibtracs_below else 4,
+        markersize=3 if ibtracs_below else 6,
         markeredgecolor="white", markeredgewidth=0.3,
+        **({"zorder": track_z} if track_z is not None else {}),
     )
 
     # -- landfall markers --------------------------------------------------

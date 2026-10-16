@@ -12,6 +12,7 @@ import xarray as xr
 from extremeweatherbench import utils
 
 import src.plots.plotting_utils as plotting
+from src.plots.colormaps import ivt_colormap_and_norm
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -207,25 +208,7 @@ def setup_atmospheric_river_colormap_and_levels() -> Tuple[
         Levels based on thresholds: < 10,000 (Low/transparent),
         10,000-22,500 (Marginal), > 22,500 (Significant).
     """
-    # Create custom colormap from original code
-    cmap_colors = [
-        "#ffffff",
-        "#bde6fa",
-        "#7bbae7",
-        "#4892bd",
-        "#49ae62",
-        "#a7d051",
-        "#f9d251",
-        "#f7792f",
-        "#e43d28",
-        "#c11b24",
-        "#921318",
-    ]
-    cmap = mcolors.LinearSegmentedColormap.from_list("custom_cubehelix", cmap_colors)
-    bounds = np.arange(0, 1200, 100)
-    norm = mcolors.BoundaryNorm(bounds, cmap.N)
-
-    return cmap, norm
+    return ivt_colormap_and_norm()
 
 
 def plot_ar_mask_single_timestep(
