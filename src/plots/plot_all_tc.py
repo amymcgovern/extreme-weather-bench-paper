@@ -85,6 +85,7 @@ def _plot_case(
     max_cols: Optional[int] = None,
     storm_row_labels: bool = True,
     ibtracs_below: bool = False,
+    init_times: Optional[list] = None,
 ) -> str:
     """Render one case's 1 x N model-column PNG. Runs in a worker process.
 
@@ -97,6 +98,8 @@ def _plot_case(
     absolute path to a per-case pickle dir outside ``TC_TRACKS_ROOT``.
     ``out_path`` overrides ``graphics/tropical_cyclone/tc_case_<id>.png``.
     ``max_cols`` wraps the model panels onto multiple rows (default: one row).
+    ``init_times`` fixes the init-date colors across panels (and across figures
+    given the same list); see ``plot_tc_panel``.
     """
     if model_cols is None:
         model_cols = MODEL_COLS
@@ -160,6 +163,7 @@ def _plot_case(
             storm_label=my_case.title if storm_row_labels and col_idx % n_cols == 0 else None,
             ibtracs_below=ibtracs_below,
             add_colorbar=True,
+            init_times=init_times,
         )
 
     fig.suptitle(
