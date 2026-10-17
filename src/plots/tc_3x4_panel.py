@@ -96,7 +96,7 @@ MODEL_COLS: list[tuple[str, str, str, str]] = [
 
 TC_TRACKS_ROOT = REPO_ROOT / "saved_data"
 DEFAULT_OUTPUT = (
-    REPO_ROOT / "graphics" / "paper" / "tc_3x4_eta_otis_lan.png"
+    REPO_ROOT / "graphics" / "paper" / "tc_3x4_lee_kay_lan.png"
 )
 
 
