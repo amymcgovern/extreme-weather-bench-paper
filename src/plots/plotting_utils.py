@@ -281,20 +281,26 @@ PANEL_LETTERS = "abcdefghijklmnopqrstuvwxyz"
 def add_panel_labels(
     axes,
     labels: Optional[Sequence[str]] = None,
-    x: float = 0.02,
-    y: float = 0.98,
+    outside: bool = False,
     fontsize: float = 14,
-    box: bool = True,
+    box: Optional[bool] = None,
     **text_kwargs,
 ) -> list:
     """Letter the panels of a multipanel figure (a, b, c, ...).
 
     ``axes`` is any array/list of axes; it is flattened row by row and axes
     that are turned off (``ax.axis("off")``) or ``None`` are skipped, so the
-    letters run in reading order over the visible panels. Letters sit inside
-    each panel's top-left corner (axes coordinates ``x``, ``y``) on a small
-    white box so they stay readable over maps. Extra keyword arguments go
-    to ``ax.text``.
+    letters run in reading order over the visible panels. ``labels`` may be
+    a string (``"aceg"``) or a list, e.g. to interleave two calls.
+
+    ``outside=False`` puts each letter inside the panel's top-left corner on
+    a small white box (good for maps). ``outside=True`` puts it just above
+    and left of the corner with no box -- use it for scorecard heatmaps,
+    where an inside letter would cover the first cell. The text belongs to
+    the figure but is positioned in the panel's axes coordinates, so it
+    follows the panel's final position and still shows when the panel is a
+    hidden container (as ``plot_heatmap`` leaves it). Extra keyword
+    arguments go to ``fig.text``.
 
     Returns the list of Text artists.
     """
@@ -305,16 +311,20 @@ def add_panel_labels(
     labels = list(labels) if labels is not None else list(PANEL_LETTERS)
     if len(labels) < len(visible):
         raise ValueError(f"{len(visible)} panels but only {len(labels)} labels")
-    style = dict(
-        fontsize=fontsize, fontweight="bold", va="top", ha="left", zorder=100,
-    )
+    if box is None:
+        box = not outside
+    if outside:
+        x, y, ha, va = -0.01, 1.01, "right", "bottom"
+    else:
+        x, y, ha, va = 0.02, 0.98, "left", "top"
+    style = dict(fontsize=fontsize, fontweight="bold", ha=ha, va=va, zorder=100)
     if box:
         style["bbox"] = dict(
             boxstyle="round,pad=0.15", facecolor="white", edgecolor="none", alpha=0.85,
         )
     style.update(text_kwargs)
     return [
-        ax.text(x, y, label, transform=ax.transAxes, **style)
+        ax.figure.text(x, y, label, transform=ax.transAxes, **style)
         for ax, label in zip(visible, labels)
     ]
 
