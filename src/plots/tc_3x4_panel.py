@@ -570,8 +570,12 @@ def plot_tc_panel(
     ibtracs_below: bool = False,
     add_colorbar: bool = True,
     init_times: Optional[list] = None,
+    ibtracs_thin: bool = False,
 ):
     """Render one (storm, model) panel with landfall markers.
+
+    ``ibtracs_below`` draws IBTrACS thinner and under the forecasts;
+    ``ibtracs_thin`` draws it thinner but still on top of them.
 
     ``init_times`` fixes the init-date colors: every calendar day in the list
     gets one color (spread over the ramp in date order; 00Z and 12Z inits of a
@@ -636,7 +640,8 @@ def plot_tc_panel(
     ax.plot(
         target_lons, target_lats,
         "-ok", transform=ccrs.PlateCarree(),
-        linewidth=2 if ibtracs_below else 3, markersize=3 if ibtracs_below else 4,
+        linewidth=2 if (ibtracs_below or ibtracs_thin) else 3,
+        markersize=3 if (ibtracs_below or ibtracs_thin) else 4,
         markeredgecolor="white", markeredgewidth=0.3,
         **({"zorder": track_z} if track_z is not None else {}),
     )
@@ -784,8 +789,13 @@ def _add_shared_init_colorbar(fig, axes_grid):
 def build_figure(
     rows: list[tuple[int, str]],
     output_path: Path,
+    ibtracs_thin: bool = False,
 ) -> Path:
-    """Load per-case tracks from disk and render the 3 x 4 figure."""
+    """Load per-case tracks from disk and render the 3 x 4 figure.
+
+    ``ibtracs_thin`` draws IBTrACS thinner, still on top of the forecasts
+    (see ``plot_tc_panel``).
+    """
     case_ids = [cid for cid, _ in rows]
     cache = load_tracks(case_ids)
 
@@ -833,6 +843,7 @@ def build_figure(
                 col_title=display_name,
                 storm_label=storm_label if col_idx == 0 else None,
                 add_colorbar=False,
+                ibtracs_thin=ibtracs_thin,
             )
 
     _add_shared_init_colorbar(fig, axes_grid)
@@ -871,6 +882,10 @@ def main() -> None:
         "--output", default=str(DEFAULT_OUTPUT),
         help=f"Output PNG path. Default: {DEFAULT_OUTPUT}",
     )
+    parser.add_argument(
+        "--ibtracs-thin", action="store_true",
+        help="Draw IBTrACS thinner (still on top of the forecast tracks).",
+    )
     args = parser.parse_args()
 
     case_list = _load_cases(args.cases)
@@ -879,7 +894,7 @@ def main() -> None:
         (c.case_id_number, label_overrides.get(c.case_id_number, c.title))
         for c in case_list
     ]
-    build_figure(rows, Path(args.output))
+    build_figure(rows, Path(args.output), ibtracs_thin=args.ibtracs_thin)
 
 
 if __name__ == "__main__":

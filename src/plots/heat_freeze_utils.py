@@ -1,5 +1,5 @@
 # setup all the imports
-from typing import Optional
+from typing import Callable, Optional
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
@@ -216,6 +216,7 @@ def plot_heatwave_case(
     add_map_features: bool = True,
     add_gridlines: bool = True,
     show_case_label: bool = True,
+    colormap_fn: Optional[Callable] = None,
 ):
     """Plot the heatwave case
     Args:
@@ -236,6 +237,9 @@ def plot_heatwave_case(
         show_case_label: if False, drop the "<title>, Case ID N" line
             from the panel title (useful when the same label is already
             shown in another panel for the same case).
+        colormap_fn: optional
+            ``(values_c, kind) -> (cmap, norm)`` overriding
+            ``case_colormap_and_normalize`` (the default) for this panel.
     """
     
     time_based_heatwave_dataset = heatwave_dataset.mean(["latitude", "longitude"])
@@ -266,7 +270,7 @@ def plot_heatwave_case(
 
     # Apply mask to temperature data
     masked_temp = temp_data.where(mask)
-    cmap, norm = case_colormap_and_normalize(
+    cmap, norm = (colormap_fn or case_colormap_and_normalize)(
         masked_temp.sel(valid_time=subset_timestep).values, kind="heat"
     )
     im = masked_temp.sel(valid_time=subset_timestep).plot(
@@ -660,6 +664,7 @@ def plot_freeze_case(
     add_map_features: bool = True,
     add_gridlines: bool = True,
     show_case_label: bool = True,
+    colormap_fn: Optional[Callable] = None,
 ):
     """Plot the freeze case
     Args:
@@ -677,6 +682,9 @@ def plot_freeze_case(
         add_gridlines: if False, skip the built-in lat/lon gridlines.
         show_case_label: if False, drop the "<title>, Case ID N" line
             from the panel title.
+        colormap_fn: optional
+            ``(values_c, kind) -> (cmap, norm)`` overriding
+            ``case_colormap_and_normalize`` (the default) for this panel.
     """
     if ax is None:
         fig1 = plt.figure(figsize=(12, 6))
@@ -696,7 +704,7 @@ def plot_freeze_case(
 
     mask = temp_data < climatology_data
     masked_temp = temp_data.where(mask)
-    cmap, norm = case_colormap_and_normalize(
+    cmap, norm = (colormap_fn or case_colormap_and_normalize)(
         masked_temp.sel(valid_time=subset_timestep).values, kind="freeze"
     )
     im = masked_temp.sel(valid_time=subset_timestep).plot(

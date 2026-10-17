@@ -21,15 +21,16 @@ from pathlib import Path
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import regionmask
 import xarray as xr
 from extremeweatherbench import cases, defaults, utils
 from matplotlib.gridspec import GridSpec
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from src.plots.heat_freeze_utils import (
-    celsius_colormap_and_normalize,
     generate_freeze_dataset,
     generate_heatwave_dataset,
     plot_freeze_case,
@@ -69,6 +70,24 @@ PADDING_BY_CASE: dict[int, float] = {}
 # colorbar (figure-fraction units) and the colorbar's width.
 COLORBAR_GAP_FRAC = 0.008
 COLORBAR_WIDTH_FRAC = 0.012
+
+# Bottom-row temperature colormaps. "fixed" (default): inferno 15..50 C for
+# heat (keeps detail in very hot cases) and coolwarm centred on 0 C for
+# freeze (white = freezing); every panel of a type shares one scale.
+# "case": the per-case rule in heat_freeze_utils.case_colormap_and_normalize,
+# as used by the other heat/freeze figures.
+HEAT_RANGE_C = (15.0, 50.0)
+FREEZE_RANGE_C = (-45.0, 15.0)
+TEMP_COLORMAP_CHOICES = ("fixed", "case")
+
+
+def fixed_colormap_and_normalize(values_c, kind: str):
+    """Fixed per-type scale for the 6-panel bottom row (see above)."""
+    if kind == "heat":
+        return plt.get_cmap("inferno"), mcolors.Normalize(*HEAT_RANGE_C)
+    lo, hi = FREEZE_RANGE_C
+    return plt.get_cmap("coolwarm"), mcolors.TwoSlopeNorm(vmin=lo, vcenter=0.0, vmax=hi)
+
 
 HEAT_TYPES = {"heat_wave"}
 FREEZE_TYPES = {"freeze", "cold_snap"}
@@ -166,7 +185,7 @@ def _generate_event_dataset(era5, clim_q85, clim_q15, case_obj):
     return generate_freeze_dataset(era5, clim_q15, case_obj)
 
 
-def _plot_event_panel(case_obj, ds, ax):
+def _plot_event_panel(case_obj, ds, ax, temp_colormap: str = "fixed"):
     """Dispatch heat / freeze peak-day plotting on a shared axes.
 
     Returns the mappable so callers can build a shared colorbar.
@@ -179,6 +198,9 @@ def _plot_event_panel(case_obj, ds, ax):
         add_map_features=False,
         add_gridlines=False,
         show_case_label=False,
+        colormap_fn=(
+            fixed_colormap_and_normalize if temp_colormap == "fixed" else None
+        ),
     )
     if _is_heat(case_obj):
         return plot_heatwave_case(ds, case_obj, **common)
@@ -216,8 +238,18 @@ def _output_filename(case_ids: list[int], event_types: set[str]) -> str:
     return f"{kind}_{2 * n}panel_cases_{ids_str}.png"
 
 
-def build_figure(case_ids: list[int], output_path: Path) -> Path:
-    """Compute fields and render the 2 x N figure to ``output_path``."""
+def build_figure(
+    case_ids: list[int], output_path: Path, temp_colormap: str = "fixed",
+) -> Path:
+    """Compute fields and render the 2 x N figure to ``output_path``.
+
+    ``temp_colormap`` picks the bottom-row scale: ``"fixed"`` or ``"case"``
+    (see ``TEMP_COLORMAP_CHOICES``).
+    """
+    if temp_colormap not in TEMP_COLORMAP_CHOICES:
+        raise ValueError(
+            f"temp_colormap must be one of {TEMP_COLORMAP_CHOICES}, got {temp_colormap!r}"
+        )
     case_list = _load_cases(case_ids)
     event_types = {c.event_type for c in case_list}
     uniform_event_type = len(event_types) == 1
@@ -331,37 +363,53 @@ def build_figure(case_ids: list[int], output_path: Path) -> Path:
         )
 
     print("Drawing bottom row (peak-day temperature maps)...")
-    bottom_im = None
     bottom_axes = []
+    bottom_mappables = []
     for col, (case_obj, ds, ext) in enumerate(
         zip(case_list, event_datasets, extents)
     ):
         ax = fig.add_subplot(gs[1, col], projection=EXTENT_CRS)
         bottom_axes.append(ax)
         ax.add_feature(cfeature.OCEAN, facecolor="lightblue", zorder=0)
-        bottom_im = _plot_event_panel(case_obj, ds, ax)
+        bottom_im = _plot_event_panel(case_obj, ds, ax, temp_colormap)
         _add_map_features(ax)
         ax.set_extent(ext, crs=EXTENT_CRS)
+        bottom_mappables.append(bottom_im)
 
-    # Bottom-row colorbar: every panel uses the same fixed Celsius
-    # normalization, so any panel's mappable suffices.
-    _, norm_bottom = celsius_colormap_and_normalize()
-    cax_bot = fig.add_subplot(gs[1, n])
-    cbar_bot = fig.colorbar(bottom_im, cax=cax_bot)
-    cbar_bot.mappable.set_norm(norm_bottom)
-    cbar_bot.ax.set_ylabel(
-        "Temperature (C)",
-        rotation=270,
-        labelpad=15,
-        va="center",
-        fontsize=12,
-    )
+    # Bottom-row colorbar: one shared bar when every panel has the same
+    # scale (one event type, fixed colormap); otherwise one per panel, as
+    # the top row does in mixed runs.
+    cax_bot = None
+    if uniform_event_type and temp_colormap == "fixed":
+        cax_bot = fig.add_subplot(gs[1, n])
+        cbar_bot = fig.colorbar(bottom_mappables[-1], cax=cax_bot)
+        cbar_bot.ax.set_ylabel(
+            "Temperature (C)",
+            rotation=270,
+            labelpad=15,
+            va="center",
+            fontsize=12,
+        )
+    else:
+        for ax, im in zip(bottom_axes, bottom_mappables):
+            cax = make_axes_locatable(ax).append_axes(
+                "right", size="3.75%", pad=0.1, axes_class=plt.Axes,
+            )
+            cbar = fig.colorbar(im, cax=cax)
+            cbar.ax.set_ylabel(
+                "Temperature (C)",
+                rotation=270,
+                labelpad=12,
+                va="center",
+                fontsize=12,
+            )
 
     # Pull each shared colorbar in close to the rightmost case panel
     # (the GridSpec ``wspace`` would otherwise leave a wide gap).
     if cax_top is not None:
         _snug_colorbar(fig, top_axes[-1], cax_top)
-    _snug_colorbar(fig, bottom_axes[-1], cax_bot)
+    if cax_bot is not None:
+        _snug_colorbar(fig, bottom_axes[-1], cax_bot)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=200, bbox_inches="tight")
@@ -398,6 +446,17 @@ def main() -> None:
             f"{DEFAULT_OUTPUT_DIR}/<heat|freeze|mixed>_<2n>panel_cases_<ids>.png"
         ),
     )
+    parser.add_argument(
+        "--temp-colormap",
+        choices=TEMP_COLORMAP_CHOICES,
+        default="fixed",
+        help=(
+            "Bottom-row temperature scale. fixed (default): inferno"
+            f" {HEAT_RANGE_C[0]:g}..{HEAT_RANGE_C[1]:g} C for heat, coolwarm"
+            " centred on 0 C for freeze. case: the per-case rule used by the"
+            " other heat/freeze figures."
+        ),
+    )
     args = parser.parse_args()
     if args.output:
         out = Path(args.output)
@@ -406,7 +465,7 @@ def main() -> None:
         case_list = _load_cases(args.cases)
         event_types = {c.event_type for c in case_list}
         out = DEFAULT_OUTPUT_DIR / _output_filename(args.cases, event_types)
-    build_figure(args.cases, out)
+    build_figure(args.cases, out, temp_colormap=args.temp_colormap)
 
 
 if __name__ == "__main__":
