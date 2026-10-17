@@ -275,6 +275,50 @@ def setup_colormap_and_levels(bounds: np.ndarray):
     return cmap, norm
 
 
+PANEL_LETTERS = "abcdefghijklmnopqrstuvwxyz"
+
+
+def add_panel_labels(
+    axes,
+    labels: Optional[Sequence[str]] = None,
+    x: float = 0.02,
+    y: float = 0.98,
+    fontsize: float = 14,
+    box: bool = True,
+    **text_kwargs,
+) -> list:
+    """Letter the panels of a multipanel figure (a, b, c, ...).
+
+    ``axes`` is any array/list of axes; it is flattened row by row and axes
+    that are turned off (``ax.axis("off")``) or ``None`` are skipped, so the
+    letters run in reading order over the visible panels. Letters sit inside
+    each panel's top-left corner (axes coordinates ``x``, ``y``) on a small
+    white box so they stay readable over maps. Extra keyword arguments go
+    to ``ax.text``.
+
+    Returns the list of Text artists.
+    """
+    visible = [
+        ax for ax in np.ravel(np.asarray(axes, dtype=object))
+        if ax is not None and ax.axison
+    ]
+    labels = list(labels) if labels is not None else list(PANEL_LETTERS)
+    if len(labels) < len(visible):
+        raise ValueError(f"{len(visible)} panels but only {len(labels)} labels")
+    style = dict(
+        fontsize=fontsize, fontweight="bold", va="top", ha="left", zorder=100,
+    )
+    if box:
+        style["bbox"] = dict(
+            boxstyle="round,pad=0.15", facecolor="white", edgecolor="none", alpha=0.85,
+        )
+    style.update(text_kwargs)
+    return [
+        ax.text(x, y, label, transform=ax.transAxes, **style)
+        for ax, label in zip(visible, labels)
+    ]
+
+
 def add_horizontal_colorbar(
     fig: plt.Figure,
     gs: plt.GridSpec,
