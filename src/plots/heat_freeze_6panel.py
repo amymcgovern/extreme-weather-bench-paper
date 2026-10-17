@@ -36,7 +36,7 @@ from src.plots.heat_freeze_utils import (
     plot_freeze_case,
     plot_heatwave_case,
 )
-from src.plots.plotting_utils import generate_extent
+from src.plots.plotting_utils import add_panel_labels, generate_extent
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -240,11 +240,13 @@ def _output_filename(case_ids: list[int], event_types: set[str]) -> str:
 
 def build_figure(
     case_ids: list[int], output_path: Path, temp_colormap: str = "fixed",
+    panel_labels: bool = True,
 ) -> Path:
     """Compute fields and render the 2 x N figure to ``output_path``.
 
     ``temp_colormap`` picks the bottom-row scale: ``"fixed"`` or ``"case"``
-    (see ``TEMP_COLORMAP_CHOICES``).
+    (see ``TEMP_COLORMAP_CHOICES``). ``panel_labels`` letters the panels
+    a, b, c, ... (top row, then bottom row).
     """
     if temp_colormap not in TEMP_COLORMAP_CHOICES:
         raise ValueError(
@@ -411,6 +413,9 @@ def build_figure(
     if cax_bot is not None:
         _snug_colorbar(fig, bottom_axes[-1], cax_bot)
 
+    if panel_labels:
+        add_panel_labels([top_axes, bottom_axes], fontsize=16)
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
@@ -457,6 +462,10 @@ def main() -> None:
             " other heat/freeze figures."
         ),
     )
+    parser.add_argument(
+        "--no-panel-labels", action="store_true",
+        help="Don't letter the panels (a, b, c, ...).",
+    )
     args = parser.parse_args()
     if args.output:
         out = Path(args.output)
@@ -465,7 +474,10 @@ def main() -> None:
         case_list = _load_cases(args.cases)
         event_types = {c.event_type for c in case_list}
         out = DEFAULT_OUTPUT_DIR / _output_filename(args.cases, event_types)
-    build_figure(args.cases, out, temp_colormap=args.temp_colormap)
+    build_figure(
+        args.cases, out, temp_colormap=args.temp_colormap,
+        panel_labels=not args.no_panel_labels,
+    )
 
 
 if __name__ == "__main__":

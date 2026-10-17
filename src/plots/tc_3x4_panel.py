@@ -58,6 +58,7 @@ if str(_SRC_DATA) not in sys.path:
     sys.path.insert(0, str(_SRC_DATA))
 
 from src.plots.colormaps import get_ramp  # noqa: E402
+from src.plots.plotting_utils import add_panel_labels  # noqa: E402
 
 DEFAULT_ROWS: list[tuple[int, str]] = [
     (173, "TC Lee"),
@@ -790,11 +791,13 @@ def build_figure(
     rows: list[tuple[int, str]],
     output_path: Path,
     ibtracs_thin: bool = False,
+    panel_labels: bool = True,
 ) -> Path:
     """Load per-case tracks from disk and render the 3 x 4 figure.
 
     ``ibtracs_thin`` draws IBTrACS thinner, still on top of the forecasts
-    (see ``plot_tc_panel``).
+    (see ``plot_tc_panel``). ``panel_labels`` letters the panels a, b, c, ...
+    row by row.
     """
     case_ids = [cid for cid, _ in rows]
     cache = load_tracks(case_ids)
@@ -847,6 +850,8 @@ def build_figure(
             )
 
     _add_shared_init_colorbar(fig, axes_grid)
+    if panel_labels:
+        add_panel_labels(axes_grid, fontsize=20)
 
     fig.legend(
         handles=landfall_legend_handles(), loc="lower center",
@@ -886,6 +891,10 @@ def main() -> None:
         "--ibtracs-thin", action="store_true",
         help="Draw IBTrACS thinner (still on top of the forecast tracks).",
     )
+    parser.add_argument(
+        "--no-panel-labels", action="store_true",
+        help="Don't letter the panels (a, b, c, ...).",
+    )
     args = parser.parse_args()
 
     case_list = _load_cases(args.cases)
@@ -894,7 +903,10 @@ def main() -> None:
         (c.case_id_number, label_overrides.get(c.case_id_number, c.title))
         for c in case_list
     ]
-    build_figure(rows, Path(args.output), ibtracs_thin=args.ibtracs_thin)
+    build_figure(
+        rows, Path(args.output), ibtracs_thin=args.ibtracs_thin,
+        panel_labels=not args.no_panel_labels,
+    )
 
 
 if __name__ == "__main__":
