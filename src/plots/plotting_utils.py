@@ -299,8 +299,11 @@ def add_panel_labels(
     where an inside letter would cover the first cell. The text belongs to
     the figure but is positioned in the panel's axes coordinates, so it
     follows the panel's final position and still shows when the panel is a
-    hidden container (as ``plot_heatmap`` leaves it). Extra keyword
-    arguments go to ``fig.text``.
+    hidden container (as ``plot_heatmap`` leaves it). For a hidden
+    container the letter is anchored to the top-left visible axes drawn
+    inside it (e.g. the first heatmap), so it sits right at the panel's
+    corner; call this after the panel is drawn. Extra keyword arguments go
+    to ``fig.text``.
 
     Returns the list of Text artists.
     """
@@ -324,9 +327,28 @@ def add_panel_labels(
         )
     style.update(text_kwargs)
     return [
-        ax.figure.text(x, y, label, transform=ax.transAxes, **style)
+        ax.figure.text(x, y, label, transform=_label_anchor(ax).transAxes, **style)
         for ax, label in zip(visible, labels)
     ]
+
+
+def _label_anchor(ax):
+    """``ax`` itself, or for a hidden container the top-left visible axes in it."""
+    if ax.get_visible():
+        return ax
+    box = ax.get_position()
+    inside = []
+    for other in ax.figure.axes:
+        if other is ax or not other.get_visible():
+            continue
+        pos = other.get_position()
+        if box.x0 <= pos.x0 < box.x1 and box.y0 <= (pos.y0 + pos.y1) / 2 <= box.y1:
+            inside.append(other)
+    if not inside:
+        return ax
+    top = max(o.get_position().y1 for o in inside)
+    row = [o for o in inside if o.get_position().y1 >= top - 1e-6]
+    return min(row, key=lambda o: o.get_position().x0)
 
 
 def add_horizontal_colorbar(

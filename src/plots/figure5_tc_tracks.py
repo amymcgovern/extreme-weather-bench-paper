@@ -301,12 +301,14 @@ def plot_tc_panel(
     forecast_ds=None,
     target_ds=None,
     ibtracs_below: bool = False,
+    ibtracs_thin: bool = False,
 ):
     """Plot a single TC track panel.
 
     ``ibtracs_below`` draws the IBTrACS track thinner and under the forecasts
     (as in ``tc_3x4_panel.plot_tc_panel``) so forecasts that hug it stay
-    visible; the default keeps the thick track on top.
+    visible; ``ibtracs_thin`` draws it thinner but still on top. The default
+    keeps the thick track on top.
 
     When ``forecast_ds`` and ``target_ds`` are supplied (the raw per-case
     pickle datasets), landfall markers are overlaid to match the standalone
@@ -359,8 +361,8 @@ def plot_tc_panel(
         analysis_track_data.longitude,
         analysis_track_data.latitude,
         "-ok", transform=ccrs.PlateCarree(),
-        linewidth=2 if ibtracs_below else 4,
-        markersize=3 if ibtracs_below else 6,
+        linewidth=2 if (ibtracs_below or ibtracs_thin) else 4,
+        markersize=3 if (ibtracs_below or ibtracs_thin) else 6,
         markeredgecolor="white", markeredgewidth=0.3,
         **({"zorder": track_z} if track_z is not None else {}),
     )
