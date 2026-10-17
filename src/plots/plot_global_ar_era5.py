@@ -34,7 +34,7 @@ WB2_TO_EWB = {
     "specific_humidity": "specific_humidity",
 }
 
-OUTPUT_DIR = Path.home() / "plots"
+OUTPUT_DIR = Path(__file__).resolve().parents[2] / "graphics" / "paper"
 
 
 def load_era5_for_timestamp(timestamp: pd.Timestamp) -> xr.Dataset:

@@ -37,8 +37,11 @@ from src.plots.heat_freeze_utils import (
 )
 from src.plots.plotting_utils import generate_extent
 
-# data_prep is not packaged; expose temperature_events.py via sys.path.
-_EWB_DATA_PREP = Path.home() / "code" / "ExtremeWeatherBench" / "data_prep"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+# data_prep is not packaged; expose temperature_events.py from the EWB
+# checkout in external/ via sys.path.
+_EWB_DATA_PREP = REPO_ROOT / "external" / "ExtremeWeatherBench" / "data_prep"
 if str(_EWB_DATA_PREP) not in sys.path:
     sys.path.insert(0, str(_EWB_DATA_PREP))
 from temperature_events import (  # noqa: E402
@@ -49,14 +52,7 @@ from temperature_events import (  # noqa: E402
 )
 
 DEFAULT_CASE_IDS = [14, 23, 70]
-DEFAULT_OUTPUT_DIR = (
-    Path.home()
-    / "code"
-    / "extreme-weather-bench-paper"
-    / "graphics"
-    / "paper"
-    / "subplots"
-)
+DEFAULT_OUTPUT_DIR = REPO_ROOT / "graphics" / "paper"
 CLIMATOLOGY_URI = (
     "gs://extremeweatherbench/datasets/"
     "surface_air_temperature_1990_2019_climatology.zarr/"
