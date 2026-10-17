@@ -97,11 +97,13 @@ def convert_lon_0360_to_180(da: xr.DataArray) -> xr.DataArray:
     return da
 
 
-def main(timestamp_str: str = "2021-10-24T18:00") -> None:
+def main(timestamp_str: str = "2021-10-24T18:00", output: str | None = None) -> None:
     """Load ERA5, compute AR fields, and save a global plot.
 
     Args:
         timestamp_str: ISO-format timestamp string for the target time.
+        output: Output path (format from its extension, e.g. .pdf). Default:
+            graphics/paper/global_ar_era5_<YYYYMMDD>_<HH>z.png.
     """
     timestamp = pd.Timestamp(timestamp_str)
     print(f"Loading ERA5 data for {timestamp} ...")
@@ -129,9 +131,11 @@ def main(timestamp_str: str = "2021-10-24T18:00") -> None:
         colorbar=True,
     )
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    fname = timestamp.strftime("global_ar_era5_%Y%m%d_%Hz.png")
-    out_path = OUTPUT_DIR / fname
+    out_path = (
+        Path(output) if output
+        else OUTPUT_DIR / timestamp.strftime("global_ar_era5_%Y%m%d_%Hz.png")
+    )
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     ax.figure.savefig(out_path, dpi=300, bbox_inches="tight")
     plt.close(ax.figure)
     print(f"Saved → {out_path}")
@@ -146,5 +150,9 @@ if __name__ == "__main__":
         default="2021-10-24T18:00",
         help="ISO timestamp, e.g. '2021-10-24T18:00' (default: 2021-10-24T18:00)",
     )
+    parser.add_argument(
+        "--output", default=None,
+        help="Output path; the extension sets the format (e.g. .pdf).",
+    )
     args = parser.parse_args()
-    main(args.time)
+    main(args.time, args.output)
