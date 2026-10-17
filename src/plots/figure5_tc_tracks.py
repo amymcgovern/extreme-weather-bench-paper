@@ -3,7 +3,7 @@
 2 rows (storms) x 4 columns (models) of Cartopy forecast-track maps.
 Row 1: TC Beryl (case 155)
 Row 2: TC Yagi  (case 162)
-Columns follow the shared paper convention: HRES IFS, GraphCast, Pangu, AIFS.
+Columns follow the shared paper convention: IFS HRES, GraphCast, Pangu, AIFS.
 
 Usage:
     python src/plots/figure5_tc_tracks.py
@@ -38,11 +38,11 @@ TC_DATA_DIR = REPO_ROOT / "saved_data"
 # Change this to the directory where the output will be saved
 OUTPUT_DIR = REPO_ROOT / "graphics" / "paper"
 
-# Columns follow the shared paper ordering: HRES IFS first, then GraphCast,
+# Columns follow the shared paper ordering: IFS HRES first, then GraphCast,
 # Pangu, AIFS.  Directory names are the per-case-pickle output dirs written
 # by ``compute_tc_tracks.py``.
 MODEL_COLS = [
-    ("hres_tc_tracks", "HRES IFS"),
+    ("hres_tc_tracks", "IFS HRES"),
     ("gc_bb_tc_tracks", "GraphCast"),
     ("pang_bb_tc_tracks", "Pangu"),
     ("aifs_bb_tc_tracks", "AIFS"),
