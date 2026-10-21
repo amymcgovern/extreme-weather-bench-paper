@@ -573,6 +573,7 @@ def plot_tc_panel(
     col_title: str = "",
     storm_label: Optional[str] = None,
     ibtracs_below: bool = False,
+    ibtracs_thin: bool = False,
     add_colorbar: bool = True,
     init_times: Optional[list] = None,
 ):
@@ -583,6 +584,10 @@ def plot_tc_panel(
     day share it) and the colorbar shows every day, so a color means the same
     init day in every panel given the same list. Default: the panel's own inits
     are spread over the ramp.
+
+    ``ibtracs_thin`` draws the observed track on top of the forecasts as a thin
+    line with small dots, so it stays visible without hiding forecasts that
+    follow it closely (takes precedence over ``ibtracs_below``).
     """
     _add_basemap(ax)
     if extent is not None:
@@ -627,7 +632,9 @@ def plot_tc_panel(
 
     # ibtracs_below: draw the observed track under the forecasts (thinner) so a
     # forecast that follows it closely stays visible; default keeps it on top.
-    track_z, forecast_z = (2.0, 3.0) if ibtracs_below else (None, None)
+    if ibtracs_thin:
+        ibtracs_below = False
+    track_z, forecast_z = (2.0, 3.0) if ibtracs_below else ((4.0, 3.0) if ibtracs_thin else (None, None))
     for i, (_it, lats_v, lons_v) in enumerate(valid_groups):
         ax.plot(
             lons_v, lats_v, "-",
@@ -641,8 +648,9 @@ def plot_tc_panel(
     ax.plot(
         target_lons, target_lats,
         "-ok", transform=ccrs.PlateCarree(),
-        linewidth=2 if ibtracs_below else 3, markersize=3 if ibtracs_below else 4,
-        markeredgecolor="white", markeredgewidth=0.3,
+        linewidth=1.8 if ibtracs_thin else (2 if ibtracs_below else 3),
+        markersize=2.8 if ibtracs_thin else (3 if ibtracs_below else 4),
+        markeredgecolor="white", markeredgewidth=0.2 if ibtracs_thin else 0.3,
         **({"zorder": track_z} if track_z is not None else {}),
     )
 
