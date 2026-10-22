@@ -180,12 +180,12 @@ def _plot_case(
     total_height = case_aspect * total_width * (cell_width_frac / cell_height_frac)
     total_height = float(np.clip(total_height, 6.0, 18.0))
 
-    # Reserve a fixed ~1.2in at the top for the suptitle + truth-panel title
+    # Reserve a fixed ~1.7in at the top for the suptitle + truth-panel title
     # regardless of total_height -- a fixed *fraction* like the nominal 0.90
     # above gives fewer absolute inches once total_height shrinks for
     # wide-bbox cases, which collides the truth panel's title with the
     # figure suptitle.
-    top = max(0.6, 1 - 1.2 / total_height)
+    top = max(0.6, 1 - 1.7 / total_height)
     gs_kwargs = dict(_probe_kwargs, top=top)
 
     fig = plt.figure(figsize=(total_width, total_height))
@@ -290,7 +290,9 @@ def _plot_case(
             tick_labelsize=18,
         )
 
-        fig.suptitle(f"Case {my_id}: {my_case.title} on {my_case.start_date}", fontsize=32, y=0.98)
+        # fixed inches from the top edge, clear of the two-line truth-panel title
+        fig.suptitle(f"Case {my_id}: {my_case.title} on {my_case.start_date}", fontsize=32,
+                     y=1 - 0.15 / total_height, va="top")
         if out_path is None:
             out_path = basepath + f"graphics/severe/severe_case_{my_id}.png"
         Path(out_path).parent.mkdir(parents=True, exist_ok=True)
