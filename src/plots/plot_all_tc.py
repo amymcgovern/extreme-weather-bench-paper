@@ -86,6 +86,7 @@ def _plot_case(
     storm_row_labels: bool = True,
     ibtracs_below: bool = False,
     init_times: Optional[list] = None,
+    ibtracs_thin: bool = False,
 ) -> str:
     """Render one case's 1 x N model-column PNG. Runs in a worker process.
 
@@ -162,6 +163,7 @@ def _plot_case(
             col_title=display_name,
             storm_label=my_case.title if storm_row_labels and col_idx % n_cols == 0 else None,
             ibtracs_below=ibtracs_below,
+            ibtracs_thin=ibtracs_thin,
             add_colorbar=True,
             init_times=init_times,
         )
